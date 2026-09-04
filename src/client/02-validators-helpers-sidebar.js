@@ -1328,11 +1328,11 @@
         ...(reasoning > 0 ? ['Reasoning ' + formatTokens(reasoning)] : []),
       ].join(' · ')
       return el(Tooltip, { label: detail, side: 'top', delayMs: 500 },
-        el('div', { className: 'cm-chip' },
+        el('div', { className: 'cm-chip', style: { maxWidth: '420px' } },
           planPart > 0
             ? t('costChipPlan', { amount: formatMoneyUsd(cost, config) })
             : t('cost', { amount: formatMoneyUsd(cost, config) }),
-          el('span', { style: { fontWeight: 400, opacity: 0.85, marginLeft: '6px' } }, tokenLine)))
+          el('span', { style: { fontWeight: 400, opacity: 0.85, marginLeft: '6px', whiteSpace: 'nowrap' } }, tokenLine)))
     }
 
     function DockLine(props) {
