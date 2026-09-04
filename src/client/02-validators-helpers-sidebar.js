@@ -757,6 +757,10 @@
       if (v < 1000000) return scaled(v / 1000) + 'K'
       return scaled(v / 1000000) + 'M'
     }
+    function formatTokensK(n) {
+      const v = Math.max(0, Number(n) || 0)
+      return (v / 1000).toFixed(3).replace(/\.?0+$/, '') + 'K'
+    }
     /**
      * 模型名归一化(与 lib/pricing.js 的 canonModelId 同逻辑;bundle 无法导入,修改时两处同步):
      * 小写,去括号附注(如 (go)),只保留字母数字——大小写/空格/横杠/点号等差异全部忽略。
@@ -1310,22 +1314,27 @@
       const detail = [
         t('sessionCostTitle'),
         t('sessionDetailTokens', {
-          input: formatTokens(usage?.input ?? 0),
-          cache: formatTokens((usage?.cacheRead ?? 0) + (usage?.cacheWrite ?? 0)),
-          output: formatTokens(usage?.output ?? 0),
+          input: formatTokensK(usage?.input ?? 0),
+          cache: formatTokensK((usage?.cacheRead ?? 0) + (usage?.cacheWrite ?? 0)),
+          output: formatTokensK(usage?.output ?? 0),
         }),
         t('sessionDetailCache', {
-          read: formatTokens(usage?.cacheRead ?? 0),
-          write: formatTokens(usage?.cacheWrite ?? 0),
+          read: formatTokensK(usage?.cacheRead ?? 0),
+          write: formatTokensK(usage?.cacheWrite ?? 0),
         }),
         t('cost', { amount: formatMoneyUsd(cost, config) }),
         ...(planPart > 0 ? [t('sessionDetailPlan', { amount: formatMoneyUsd(planPart, config) })] : []),
       ].join('; ')
+      const reasoningPct = output > 0 ? (reasoning / output) * 100 : null
+      const reasoningPart = (output > 0 || reasoning > 0)
+        ? 'Reasoning ' + formatTokensK(reasoning)
+          + (reasoningPct !== null ? ' (' + (Math.round(reasoningPct * 10) / 10) + '%)' : '')
+        : null
       const tokenLine = [
-        'In ' + formatTokens(input),
-        'Cache ' + formatTokens(cache),
-        'Out ' + formatTokens(output),
-        ...(reasoning > 0 ? ['Reasoning ' + formatTokens(reasoning)] : []),
+        'In ' + formatTokensK(input),
+        'Cache ' + formatTokensK(cache),
+        'Out ' + formatTokensK(output),
+        ...(reasoningPart ? [reasoningPart] : []),
       ].join(' · ')
       return el(Tooltip, { label: detail, side: 'top', delayMs: 500 },
         el('div', { className: 'cm-chip', style: { maxWidth: '420px' } },
