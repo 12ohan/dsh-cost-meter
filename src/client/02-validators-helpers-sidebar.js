@@ -1304,6 +1304,9 @@
         if (planPart > 0) cost = split.api
       }
       const input = billedInput(usage)
+      const cache = (usage?.cacheRead ?? 0) + (usage?.cacheWrite ?? 0)
+      const output = usage?.output ?? 0
+      const reasoning = usage?.reasoning ?? 0
       const detail = [
         t('sessionCostTitle'),
         t('sessionDetailTokens', {
@@ -1318,10 +1321,18 @@
         t('cost', { amount: formatMoneyUsd(cost, config) }),
         ...(planPart > 0 ? [t('sessionDetailPlan', { amount: formatMoneyUsd(planPart, config) })] : []),
       ].join('; ')
+      const tokenLine = [
+        'In ' + formatTokens(input),
+        'Cache ' + formatTokens(cache),
+        'Out ' + formatTokens(output),
+        ...(reasoning > 0 ? ['Reasoning ' + formatTokens(reasoning)] : []),
+      ].join(' · ')
       return el(Tooltip, { label: detail, side: 'top', delayMs: 500 },
-        el('div', { className: 'cm-chip' }, planPart > 0
-          ? t('costChipPlan', { amount: formatMoneyUsd(cost, config) })
-          : t('cost', { amount: formatMoneyUsd(cost, config) })))
+        el('div', { className: 'cm-chip' },
+          planPart > 0
+            ? t('costChipPlan', { amount: formatMoneyUsd(cost, config) })
+            : t('cost', { amount: formatMoneyUsd(cost, config) }),
+          el('span', { style: { fontWeight: 400, opacity: 0.85, marginLeft: '6px' } }, tokenLine)))
     }
 
     function DockLine(props) {
@@ -2025,8 +2036,33 @@
             el('div', { className: 'cm-peak-segment cm-peak-low' })),
           el('span', { className: 'cm-peak-classic-chip' }, t(keys.chip) + ' · ' + chipText)))
     }
+    /** Compact peak indicator: a small colored dot in place of the strip graphic. */
+    function PeakDot(props) {
+      const { config, t } = props
+      const [now, setNow] = useState(Date.now())
+      useEffect(() => {
+        const timer = window.setInterval(() => setNow(Date.now()), 30000)
+        return () => window.clearInterval(timer)
+      }, [])
+      const view = peakView(config, now)
+      if (view === null) return null
+      const keys = phaseLabelKeys(view)
+      const isPeak = !view.weekend && view.inPeak
+      return el(Tooltip, { label: t(keys.notice), side: 'right', delayMs: 300 },
+        el('span', {
+          style: {
+            display: 'inline-block',
+            width: '10px',
+            height: '10px',
+            borderRadius: '50%',
+            background: isPeak ? '#f59a00' : '#4a90d9',
+            flexShrink: 0,
+          },
+          'aria-label': t(keys.notice),
+        }))
+    }
     function peakNoticeEl(state, config, t) {
-      return el(config?.peakStyle === 'classic' ? PeakStripClassic : PeakStrip, { config, t })
+      return el(PeakDot, { config, t })
     }
 
     /** 收起(rail)态简洁样式:竖向同构时段条 + 横排短词(「峰时/平价」),倒计时与完整文案在悬停提示中。 */
@@ -2077,7 +2113,7 @@
           el('span', { className: 'cm-peak-rail-classic-label' }, t(keys.short))))
     }
     function peakNoticeRailEl(state, config, t) {
-      return el(config?.peakStyle === 'classic' ? PeakRailStripClassic : PeakRailStrip, { config, t })
+      return el(PeakDot, { config, t })
     }
 
     /** 预算图框内容(不含外框),供单独显示与「Go+预算」合并卡片复用;详细信息按 budget.detail 开关。 */
