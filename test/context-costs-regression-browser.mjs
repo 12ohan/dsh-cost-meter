@@ -199,7 +199,7 @@ const server = createServer((request, response) => {
 })
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
 const url = `http://127.0.0.1:${server.address().port}/`
-let browser
+let browser, page
 const errors = [], external = [], checks = []
 // Also permits visual validation with an already-running supported cloud
 // browser when the execution OS cannot launch a fresh Chromium process.
@@ -211,7 +211,7 @@ if (process.env.CM_TEST_SERVE_ONLY === '1') {
 }
 try {
   browser = await chromium.launch({ executablePath, headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] })
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 })
+  page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 })
   page.setDefaultTimeout(10000)
   page.on('pageerror', error => errors.push(String(error)))
   await page.route('**/*', route => {
@@ -220,7 +220,7 @@ try {
   })
   const ready = async () => {
     await page.waitForFunction(() => window.fixtureReady && window.fixture.snapshot().manager.available)
-    await page.locator('[data-main-fixture] [data-slot="conversation.view"] [data-lc-current]').first().waitFor()
+    await page.locator('[data-main-fixture] > [data-slot="conversation.view"] [data-lc-current]').first().waitFor()
     if (!(await page.locator('.cm-context-setting').evaluate(node => node.open))) await page.locator('.cm-context-setting>summary').click()
   }
   const assertHeader = async label => {
@@ -311,37 +311,68 @@ try {
   assert.equal(await page.locator('[data-main-fixture]').first().locator('[data-cm-context-costs]').count(), 1, 'another main session remains integrated')
   await page.evaluate(() => window.fixture.setView('context'))
   await assertIntegration(true, 'returning to context view')
-  await second.locator('[data-slot="conversation.view"] [data-lc-current]').evaluate(node => { node.dataset.oldCard = '1' })
+  const secondCard = second.locator(':scope > [data-slot="conversation.view"] [data-lc-current]')
+  assert.equal(await secondCard.count(), 1, 'owned replacement candidate excludes the nested foreign card')
+  await secondCard.evaluate(node => { node.dataset.oldCard = '1' })
   await page.evaluate(() => window.fixture.replaceCard())
   await assertIntegration(true, 'replacement current-context card')
   assert.equal(await second.locator('[data-old-card]').count(), 0, 'the old current card was really replaced')
   await page.evaluate(() => window.fixture.setSession('three'))
   await assertIntegration(true, 'session identity changed')
-  assert.equal(await second.locator('[data-cm-plan-session="two"]').count(), 0, 'the previous session costs never remain under the new session')
+  assert.equal(await second.locator('[data-cm-plan-session="two"]').count(), 0, 'the previous session costs never remain anywhere under the new session')
   assert.ok(await page.evaluate(() => window.reads.includes('three')), 'the new session requests its own costs')
   await page.evaluate(() => window.fixture.showModal(true))
   await page.locator('[data-modal-fixture] [data-lc-current] [data-cm-context-costs]').waitFor()
   assert.equal(await page.locator('[data-modal-fixture] [data-lc-current] [data-cm-context-costs]').count(), 1, 'published modal current-context card is integrated exactly once')
-  assert.equal(await page.locator('[data-modal-fixture] [data-cm-plan-session]').getAttribute('data-cm-plan-session'), 'modal-session', 'modal costs remain session scoped')
-  await assertVisibleSessionCosts(page.locator('[data-modal-fixture] [data-cm-plan-session]'), 'modal-session', 'actual published modal visible')
+  assert.equal(await page.locator('[data-modal-fixture] [data-lc-current] [data-cm-plan-session]').getAttribute('data-cm-plan-session'), 'modal-session', 'modal costs remain session scoped')
+  await assertVisibleSessionCosts(page.locator('[data-modal-fixture] [data-lc-current] [data-cm-plan-session]'), 'modal-session', 'actual published modal visible')
   await assertHeader('actual published modal visible')
   await page.evaluate(() => window.fixture.showModal(false))
   await page.waitForFunction(() => !document.querySelector('[data-modal-fixture] [data-lc-current]'))
-  await page.locator('[data-main-fixture]').first().locator('[data-conversation-tabs]').screenshot({ path: join(output, 'fixed-header.png') })
-  await page.locator('[data-main-fixture]').first().locator('[data-slot="conversation.view"] [data-lc-current]').screenshot({ path: join(output, 'integrated-current-card.png') })
+  await page.locator('[data-main-fixture]').first().locator(':scope > [data-conversation-tabs]').screenshot({ path: join(output, 'fixed-header.png') })
+  await page.locator('[data-main-fixture]').first().locator(':scope > [data-slot="conversation.view"] [data-lc-current]').screenshot({ path: join(output, 'integrated-current-card.png') })
   await page.screenshot({ path: join(output, 'two-main-sessions.png'), fullPage: true })
   await toggle.uncheck()
   await assertIntegration(false, 'final checkbox opt-out')
   assert.deepEqual(errors, [], 'no uncaught browser errors')
   assert.deepEqual(external, [], 'no external network traffic')
   assert.deepEqual(await page.evaluate(() => window.unexpectedFixtureReads), [], 'no unrecognized data reads')
-  const report = { peerVersion, hostVersion, statisticsPath, browser: await browser.version(), checks,
+  const report = { status: 'passed', peerVersion, hostVersion, statisticsPath, browser: await browser.version(), checks,
     slotPublicationCount: await page.evaluate(() => window.slotPublicationCount), errors, external,
+    reads: await page.evaluate(() => window.reads),
     fixturePublicReads: await page.evaluate(() => window.fixturePublicReads),
     scope: 'Exact published header projection + published peer view/hooks/metadata/CSS + real SlotCore and shipped statistics client; standard atoms/services/projections and public-data responses are synthetic. Not the complete host app.' }
   writeFileSync(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
   console.log('[ok] real Chromium: one Context header tab through 3 checkbox cycles, repeated refresh, immediate opt-out, persisted browser reload, enabled manager restart, two main sessions, card/view/session replacement, sidebar/modal and synchronous store reentrancy')
   console.log('Validated dsh-context ' + peerVersion + ' / DSH ' + hostVersion + '; screenshots and report: ' + output)
+} catch (error) {
+  // Persist evidence before teardown even when a late strict locator, assertion
+  // or browser error aborts the run. Capture failures must not replace its cause.
+  const report = { status: 'failed', peerVersion, hostVersion, statisticsPath,
+    error: { name: error?.name ?? 'Error', message: String(error?.message ?? error), stack: error?.stack },
+    checks, lastCompletedCheck: checks.at(-1) ?? null, errors, external, captureErrors: [] }
+  if (page && !page.isClosed()) {
+    report.url = page.url()
+    try {
+      report.fixture = await page.evaluate(() => ({
+        snapshot: window.fixture?.snapshot(), reads: window.reads,
+        slotPublicationCount: window.slotPublicationCount,
+        fixturePublicReads: window.fixturePublicReads,
+        unexpectedFixtureReads: window.unexpectedFixtureReads,
+        mainSurfaces: [...document.querySelectorAll('[data-main-fixture]')].map(scope => ({
+          sessionId: scope.dataset.conversationSession,
+          ownedCurrentCards: scope.querySelectorAll(':scope > [data-slot="conversation.view"] [data-lc-current]').length,
+          nestedCurrentCards: scope.querySelectorAll('[data-nested-card]').length,
+          ownedCostSessions: [...scope.querySelectorAll(':scope > [data-slot="conversation.view"] [data-cm-plan-session]')].map(node => node.dataset.cmPlanSession)
+        }))
+      }))
+    } catch (captureError) { report.captureErrors.push('fixture: ' + String(captureError)) }
+    try { await page.screenshot({ path: join(output, 'failure.png'), fullPage: true, timeout: 10000 }) }
+    catch (captureError) { report.captureErrors.push('screenshot: ' + String(captureError)) }
+  }
+  writeFileSync(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
+  console.error('Failure evidence: ' + output)
+  throw error
 } finally {
   await browser?.close()
   await new Promise(resolve => server.close(resolve))
