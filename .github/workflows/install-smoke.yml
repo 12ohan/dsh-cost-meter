@@ -40,6 +40,8 @@ jobs:
           test -x "$CM_TEST_BROWSER" || (sudo apt-get update && sudo apt-get install -y google-chrome-stable)
           node test/context-costs.mjs
           node test/context-costs-client.mjs
+          node test/context-costs-lifecycle.mjs
+          node test/context-costs-regression-browser.mjs
           node test/context-costs-browser.mjs
           node test/session-costs-browser.mjs
 
