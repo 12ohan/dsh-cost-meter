@@ -234,6 +234,16 @@ try {
     assert.equal(snapshot.viewLedgerLength, 3, label + ': no borrowed conversation.view ledger entry')
     for (const target of snapshot.targets) assert.equal(target.originalPreserved, true, label + ': preserves ' + target.name)
   }
+  const assertVisibleSessionCosts = async (costs, sessionId, label) => {
+    // A portal anchor mounts before IntersectionObserver reports visibility.
+    // Expose the real card and wait for its actual API read and rendered result;
+    // do not disable the observer or force requests from an offscreen/hidden view.
+    await costs.scrollIntoViewIfNeeded()
+    await page.waitForFunction(sessionId => window.reads.includes(sessionId), sessionId)
+    await costs.locator('.cm-plan-summary').waitFor()
+    assert.equal(await costs.getAttribute('data-cm-plan-session'), sessionId, label + ': visible result belongs to ' + sessionId)
+    assert.match(await costs.locator('.cm-plan-summary').innerText(), /12,000 tokens/, label + ': actual context-cost result rendered for ' + sessionId)
+  }
   const assertIntegration = async (enabled, label) => {
     await page.waitForFunction(enabled => window.fixture.snapshot().manager.enabled === enabled, enabled)
     await assertHeader(label)
@@ -248,7 +258,11 @@ try {
         const card = scope.querySelector(':scope > [data-slot="conversation.view"] [data-lc-current]')
         return card && card.querySelectorAll('[data-cm-context-costs]').length === 1 && card.querySelector('[data-cm-plan-session]')?.dataset.cmPlanSession === scope.dataset.conversationSession
       }))
+      for (const scope of await page.locator('[data-main-fixture]').all()) {
+        await assertVisibleSessionCosts(scope.locator(':scope > [data-slot="conversation.view"] [data-lc-current] [data-cm-plan-session]'), await scope.getAttribute('data-conversation-session'), label)
+      }
       await page.locator('[data-sidebar-fixture] [data-lc-current] [data-cm-context-costs]').waitFor()
+      await assertVisibleSessionCosts(page.locator('[data-sidebar-fixture] [data-lc-current] [data-cm-plan-session]'), 'sidebar-session', label)
     } else {
       await page.waitForFunction(() => document.querySelectorAll('[data-cm-context-costs]').length === 0)
     }
@@ -309,6 +323,7 @@ try {
   await page.locator('[data-modal-fixture] [data-lc-current] [data-cm-context-costs]').waitFor()
   assert.equal(await page.locator('[data-modal-fixture] [data-lc-current] [data-cm-context-costs]').count(), 1, 'published modal current-context card is integrated exactly once')
   assert.equal(await page.locator('[data-modal-fixture] [data-cm-plan-session]').getAttribute('data-cm-plan-session'), 'modal-session', 'modal costs remain session scoped')
+  await assertVisibleSessionCosts(page.locator('[data-modal-fixture] [data-cm-plan-session]'), 'modal-session', 'actual published modal visible')
   await assertHeader('actual published modal visible')
   await page.evaluate(() => window.fixture.showModal(false))
   await page.waitForFunction(() => !document.querySelector('[data-modal-fixture] [data-lc-current]'))

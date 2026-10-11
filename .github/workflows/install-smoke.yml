@@ -44,6 +44,16 @@ jobs:
           node test/context-costs-regression-browser.mjs
           node test/context-costs-browser.mjs
           node test/session-costs-browser.mjs
+      - name: Save context regression browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: context-costs-browser-evidence
+          path: |
+            .tmp-context-regression-browser/*.png
+            .tmp-context-regression-browser/report.json
+          if-no-files-found: ignore
+          retention-days: 7
 
   sidebar-search-recovery:
     runs-on: ubuntu-latest
