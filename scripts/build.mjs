@@ -130,7 +130,7 @@ const result = await transform(src, {
   // 输出,比默认 \uXXXX 转义(每字 6 字节)省一半以上,给 256 KiB 单文件上限留出余量。
   charset: 'utf8',
 })
-const header = '// This file is generated from the src/client/*.js fragments via `node scripts/build.mjs` (esbuild). Do not edit directly.\n'
+const header = '// Generated from src/client/*.js by node scripts/build.mjs; do not edit.\n'
 const outPath = resolve(projectRoot, 'lib/client.js')
 writeFileSync(outPath, header + result.code)
 // 字节口径与 test/verify.mjs 的门禁一致(UTF-8 字节而非 UTF-16 字符数,中文文案算多字节)。

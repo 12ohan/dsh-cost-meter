@@ -135,7 +135,8 @@ window.__ModuleLoader__.load({
       '.cm-grid{display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:12px}',
       '.cm-field{display:flex;flex-direction:column;gap:6px}',
       '.cm-field label{font-size:12px;color:var(--dsw-alias-label-secondary)}',
-      '.cm-input{font:inherit;font-size:13px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:6px 10px;outline:none}',
+      // #258: 原生下拉选项不会继承 select 的背景；皮肤为深色、宿主仍为浅色时会出现白字白底。
+      '.cm-input,.cm-input option{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base)}.cm-input{font:inherit;font-size:13px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:6px 10px;outline:none}',
       '.cm-input:focus{border-color:var(--dsw-alias-state-business-primary)}',
       '.cm-input.narrow{max-width:120px}',
       '.cm-range-row{display:flex;align-items:center;gap:10px}',
