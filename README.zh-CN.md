@@ -10,7 +10,7 @@
 
 [![version](https://img.shields.io/badge/version-1.8.22-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
 
-**v1.8.22** 修复 dsh-context 联动反复开关时出现重复“上下文”页签及关闭后残留的问题。会话页保留原生页签，关闭联动立即移除费用区域；覆盖 0.62.0、0.66.0、0.68.1。如旧客户端已累积重复页签，更新后重新加载客户端或重启宿主一次。详见[使用说明](docs/context-costs-design.md)。
+**v1.8.22** 修复 dsh-context 重复页签、关闭残留，以及百炼 CLI 月额度卡片空白的问题。会话页保留原生页签，关闭联动立即移除费用区域；覆盖 0.62.0、0.66.0、0.68.1。如旧客户端已累积重复页签，更新后重新加载客户端或重启宿主一次。详见[使用说明](docs/context-costs-design.md)。
 
 桌面端用户请按 [Desktop 安装说明](docs/install-troubleshooting.md#desktop-安装与更新)，使用应用自带的 CLI 和 `desktop` Profile。
 

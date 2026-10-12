@@ -278,6 +278,8 @@ try {
     await assertIntegration(true, 'checkbox enable ' + cycle)
     await page.evaluate(() => window.fixture.refresh())
     await assertIntegration(true, 'repeated refresh ' + cycle)
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
+    await assertIntegration(true, 'window visibility restored ' + cycle)
     if (cycle === 1) {
       await page.evaluate(() => { window.deferSaves = true })
       await toggle.uncheck()

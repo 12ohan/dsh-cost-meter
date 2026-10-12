@@ -10,7 +10,7 @@ Per-conversation cost · daily totals · OpenCode Go subscription quota display 
 
 [![version](https://img.shields.io/badge/version-1.8.22-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
 
-**v1.8.22** fixes duplicate Context tabs and integration cleanup after repeated toggles. The native conversation tab stays unchanged, and turning integration off immediately removes its cost regions. Published dsh-context 0.62.0, 0.66.0 and 0.68.1 are covered. If an older client already left duplicate tabs, reload the client or restart the host once after updating. See the [guide](docs/context-costs-design.md#english).
+**v1.8.22** fixes duplicate Context tabs and integration cleanup after repeated toggles, and restores monthly Token Plan quotas from Bailian CLI. The native conversation tab stays unchanged, and turning integration off immediately removes its cost regions. Published dsh-context 0.62.0, 0.66.0 and 0.68.1 are covered. If an older client already left duplicate tabs, reload the client or restart the host once after updating. See the [guide](docs/context-costs-design.md#english).
 
 Desktop users: follow the [Desktop installation instructions](docs/install-troubleshooting.md#desktop-安装与更新) for the application's own CLI and `desktop` Profile.
 
