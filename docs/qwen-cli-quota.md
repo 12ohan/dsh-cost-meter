@@ -10,6 +10,7 @@
 npm install -g @qianwenai/qianwen-cli
 qianwen auth login
 qianwen usage summary --format json
+qianwen subscription status --format json
 ```
 
 安装后重启 DSH，使宿主读取新的 `PATH`。远程 DSH、容器或服务账号需要在对应环境安装和登录；只在本地浏览器所在机器登录不生效。插件使用 CLI 自己保存的登录态，不要求复制模型 API Key、Cookie 或管理令牌。
@@ -18,10 +19,11 @@ qianwen usage summary --format json
 
 ## 显示口径
 
-- 只读取 `usage summary --format json` 中的 `token_plan`：总 Credits、剩余 Credits、已用比例，以及可选加量包剩余量。已用量由总量减剩余量计算，小数 Credits 保留，标记 `(CLI)`。
+- 优先读取 `usage summary --format json` 中的 `token_plan`：总 Credits、剩余 Credits、已用比例，以及可选加量包剩余量。已用量由总量减剩余量计算，小数 Credits 保留，标记 `(CLI)`。
+- 若汇总命令成功但未提供有效额度（包括 `subscribed: false`），补查 `subscription status --format json`，只读取 `individual.status: active` 下明确返回的 `monthlyCredits`／`weeklyCredits`。`usedPct` 已是百分比，保留小数；`resetTime` 是该额度窗口的重置时间。总 Credits 单独显示，CLI 未提供的绝对已用／剩余额度不自行推算。原查询有效时不增加命令；认证失败、超时及无效 JSON 不触发补查。
 - CLI 的 `resetDate` 在核验版本中来自订阅实例 `EndTime`，因此显示为「CLI 订阅到期」，不作为月度重置倒计时或采样边界。
-- 官方快照包含该账号在其他工具中的用量；插件不会把这些总量写进 DSH 账本。CLI 没有可靠的当前额度周期边界，因此此模式不生成千问「每 1% / 满窗 Token」估算。
-- 未登录、超时、异常 JSON 或无有效订阅额度时显示提示并清空本次额度。CLI 会把部分上游失败转换为 `subscribed: false`，插件不能据此断言账号没有订阅。可检查终端输出后刷新，或手动切回本地估算；不会自动用本地数值冒充官方数值。
+- 官方快照包含该账号在其他工具中的用量；插件不会把这些总量写进 DSH 账本。CLI 未提供用于采样的完整额度周期边界，因此此模式不生成千问「每 1% / 满窗 Token」估算。
+- 未登录、超时、异常 JSON 或无有效订阅额度时显示提示并清空本次额度。CLI 会把部分上游失败转换为 `subscribed: false`，补查也无有效额度时，插件仍不能据此断言账号没有订阅。可检查终端输出后刷新，或手动切回本地估算；不会自动用本地数值冒充官方数值。
 - 本地估算的月度额度、起始日和抵扣率保留，切回后继续使用。`usage summary` 未提供可用主订阅额度、只有加量包时，当前显示无有效订阅额度提示。
 
 ## 执行与验证
@@ -65,9 +67,9 @@ Expand **Settings → Cost → Quota → Qwen Token Plan**, enable it and select
 
 Install `@qianwenai/qianwen-cli` on the DSH host, run `qianwen auth login` as the same OS user, then verify `qianwen usage summary --format json`. Restart DSH after installation so it receives the updated PATH. Browser-side login alone does not configure a remote host or container.
 
-The card reads the current `token_plan` credits, computes used credits from total minus remaining, preserves fractional credits, and labels the result `(CLI)`. Optional add-on credits appear separately. The verified CLI maps `resetDate` from subscription `EndTime`; it is shown as subscription expiry, never a monthly reset. No account-wide totals are imported into the ledger, and this mode does not produce Qwen per-1% / full-window token estimates without a reliable billing period.
+The card first reads the current `token_plan` credits, computes used credits from total minus remaining, preserves fractional credits, and labels the result `(CLI)`. Optional add-on credits appear separately. The verified CLI maps `resetDate` from subscription `EndTime`; it is shown as subscription expiry, never a monthly reset. No account-wide totals are imported into the ledger, and this mode does not produce Qwen per-1% / full-window token estimates without a reliable billing period.
 
-Refreshes share one child process and use the configured 1–1440 minute cache (15 by default), including failed attempts. Manual refresh retries immediately. Disabling the source or switching to local estimates cancels pending work. Errors clear the quota and provide a setup/retry hint. Some upstream failures become `subscribed: false` inside the CLI, so that result is treated as unavailable data. Add-on-only results without a usable main subscription also show this hint. Select local estimates explicitly when needed; saved local settings remain available.
+Refreshes share one child process and use the configured 1–1440 minute cache (15 by default), including failed attempts. Manual refresh retries immediately. Disabling the source or switching to local estimates cancels pending work. Errors clear the quota and provide a setup/retry hint. When summary succeeds without valid quota, the plugin reads `subscription status --format json` and accepts only active individual monthly/weekly windows. `usedPct` is already a percentage; fractional values and the explicit window reset time are preserved. Total Credits are displayed separately; missing used/remaining Credits are not inferred. Valid summaries avoid the second command, and command failures, invalid JSON and timeouts do not trigger it. An unavailable fallback still does not prove that the account is unsubscribed. Add-on-only results without a usable main subscription also show this hint. Select local estimates explicitly when needed; saved local settings remain available.
 
 Execution uses fixed arguments without a shell, an absolute PATH entry, closed stdin, a hidden window, a 15-second timeout and 1 MiB limits for stdout/stderr. Windows npm installations run their Node entry directly. Credentials remain in the CLI's store; raw child output is never returned to the browser or saved in the ledger.
 
@@ -90,3 +92,5 @@ Tests use synthetic output, real child processes and bilingual component callbac
 Bailian source verification (2026-09-23): [Token Plan output](https://github.com/modelstudioai/cli/blob/72bc8fcce7f5ede6a5df81c1ce72d86de3f3ccd5/packages/commands/src/commands/usage/token-plan.ts), [Coding Plan output](https://github.com/modelstudioai/cli/blob/72bc8fcce7f5ede6a5df81c1ce72d86de3f3ccd5/packages/commands/src/commands/usage/coding-plan.ts), [ratio formatting](https://github.com/modelstudioai/cli/blob/72bc8fcce7f5ede6a5df81c1ce72d86de3f3ccd5/packages/commands/src/commands/usage/quota-box.ts). Tested with source-shaped fixtures and real local child processes; no live paid subscription was queried.
 
 Login source verification (2026-10-05): [auth status](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/status.ts), [console login](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/commands/src/commands/auth/login-console.ts), [exit codes](https://github.com/modelstudioai/cli/blob/8bbbbc722d70fb200641ef22b6f6d033aeae9f74/packages/core/src/errors/codes.ts).
+
+#260 源码核验：[个人订阅额度映射](https://github.com/QianWen-AI/qianwen-cli/blob/054b874c985021ab4424dcf2d7e01c28aa99ad23/src/services/tokenplan-service.ts)、[订阅 JSON 输出](https://github.com/QianWen-AI/qianwen-cli/blob/054b874c985021ab4424dcf2d7e01c28aa99ad23/src/view-models/subscription/shared.ts)。新增回归覆盖 issue 中的 `0.00169%`、月／周窗口、到期与格式错误、补查失败／超时／脱敏及缓存并发；未查询真实付费订阅账号。
