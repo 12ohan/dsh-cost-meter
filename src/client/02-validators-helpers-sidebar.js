@@ -192,6 +192,7 @@
                 refreshMinutes: typeof e.refreshMinutes === 'number' && Number.isFinite(e.refreshMinutes) ? e.refreshMinutes : 15,
                 apiKey: typeof e.apiKey === 'string' ? e.apiKey : '',
                 ...(id === 'minimax' ? { baseUrl: typeof e.baseUrl === 'string' ? e.baseUrl : '' } : {}),
+                ...(id === 'factory' ? { orgId: typeof e.orgId === 'string' ? e.orgId : '', factoryPool: ['core', 'both'].includes(e.factoryPool) ? e.factoryPool : 'standard' } : {}),
                 ...(id === 'qwen' ? { quotaSource: ['cli', 'bailian'].includes(e.quotaSource) ? e.quotaSource : 'local' } : {}),
                 // SCNet / 千问本地计量字段(issue #26/#78):其余厂商无此键,缺省剔除。
                 ...(typeof e.planCredits === 'number' && Number.isFinite(e.planCredits) && e.planCredits > 0 ? { planCredits: e.planCredits } : {}),
@@ -1031,8 +1032,9 @@
       qwen: ['qwen', 'qwen-tokenplan', 'qianwen-tokenplan', 'qwen-token-plan', 'qianwen-token-plan'],
       scnet: ['scnet', 'scnet-tokenplan', 'scnet-token-plan'],
       mimo: ['mimo', 'xiaomimimo', 'mimo-token-plan', 'xiaomi-token-plan', 'xiaomi-token-plan-cn', 'xiaomi-token-plan-sgp', 'xiaomi-token-plan-ams'],
+      factory: ['factory', 'droid', 'factory-a', 'factory-g', 'factory-o'],
     }
-    const PLAN_PROVIDER_IDS_LOCAL = ['anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'scnet', 'volcengine', 'qwen', 'mimo', 'go']
+    const PLAN_PROVIDER_IDS_LOCAL = ['anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'scnet', 'volcengine', 'qwen', 'mimo', 'factory', 'go']
     function planProviderIdOfLocal(provider) {
       const name = String(provider ?? '').trim().toLowerCase().replace(/^llm-/, '')
       if (name.length === 0) return null
@@ -2573,6 +2575,7 @@
 
     /** 通用 Coding Plan 侧边栏卡片(issue #31):每窗口一行进度条;文本窗口(余额等)整行文本。 */
     function codingPlanWindowLabel(name, t) {
+      if (name.startsWith('core_')) return 'Core · ' + codingPlanWindowLabel(name.slice(5), t)
       if (name === 'fiveHour' || name === '5h') return '5h'
       if (name === 'weekly' || name === 'week' || name === '7d') return name === '7d' ? '7d' : t('goShortWeekly')
       if (name === 'monthly' || name === 'month') return t('goShortMonthly')
@@ -2758,6 +2761,7 @@
       volcengine: 'Ark',
       qwen: 'Qwen',
       mimo: 'MiMo',
+      factory: 'Factory',
     }
 
     function QuotaStrip(props) {
@@ -2828,7 +2832,11 @@
           const live = state.codingPlans?.[rowDef.id]
           if (config.codingPlans?.[rowDef.id]?.enabled !== true || !live || live.status !== 'ok') continue
           const windows = live.windows !== null && typeof live.windows === 'object' ? live.windows : {}
-          const entries = Object.entries(windows)
+          const allEntries = Object.entries(windows)
+          const groups = rowDef.id === 'factory'
+            ? [allEntries.filter(([name]) => !name.startsWith('core_')), allEntries.filter(([name]) => name.startsWith('core_'))]
+            : [allEntries]
+          for (const [group, entries] of groups.entries()) {
           if (entries.length === 0) continue
           const vendor = STRIP_VENDOR_SHORT[rowDef.id] ?? rowDef.id
           const segs = []
@@ -2848,7 +2856,7 @@
               segs.push({ name, pct: null, text: typeof win?.text === 'string' ? win.text : '—' })
               continue
             }
-            if (shown >= 2) continue // 每家最多两个百分比段,更多窗口进悬停提示
+            if (shown >= (rowDef.id === 'factory' ? 3 : 2)) continue
             shown += 1
             segs.push({ name, pct: Math.round(simpleBarByDirection(pct, barDirectionOf(config, 'plan')).width) })
             worst = Math.max(worst, pct >= 100 ? 2 : pct >= 80 ? 1 : 0)
@@ -2856,12 +2864,13 @@
           if (live.fetchedAt > 0) detailParts.push(t('goQuotaFetchedAt', { time: new Date(live.fetchedAt).toLocaleTimeString() }))
           if (segs.length === 0) continue
           chips.push({
-            key: rowDef.id,
-            label: vendor,
+            key: rowDef.id + (group ? ':core' : ''),
+            label: vendor + (rowDef.id === 'factory' ? group ? ' Core' : ' Standard' : ''),
             level: ['ok', 'warn', 'over'][worst],
             tip: detailParts.join('; '),
             segs,
           })
+          }
         }
       }
       // Codex chip(issue #59):dsh-codex-connect 在位且已登录时出现;已用口径与各家一致。
@@ -2891,7 +2900,7 @@
           .then(() => (key === 'budget' ? api.reload()
             : key === 'go' ? api.refreshGoQuota()
               : key === 'codex' ? fetchCodexQuota(true, config.codexQuotaEnabled === true)
-                : api.refreshCodingPlan(key)))
+                : key === 'factory:core' ? api.refreshCodingPlan('factory') : api.refreshCodingPlan(key)))
           .catch(error => { setErrs(m => ({ ...m, [key]: error?.message ?? String(error) })) })
           .finally(() => setBusyKey(null))
       }

@@ -3,6 +3,12 @@
 > 本文是面向使用者的版本更新总览；逐条开发记录见 [CHANGELOG.md](../CHANGELOG.md),完整提交历史见
 > [Commits](https://github.com/Han-1413141/dsh-cost-meter/commits/master)。
 
+## v1.8.25(2026-10-14)—— Factory（Droid）订阅额度
+
+- 支持 Factory Standard 与 Droid Core 两套额度的 5 小时、每周、每月窗口，默认 Standard，可在卡片中切换或同时显示。
+- 额度卡片、侧边栏和输入框额度横条联动，支持手动刷新、自动缓存与可选组织 ID；凭据沿用 DSH 凭据库。
+- 更新后在「设置 → 费用 → 额度」启用 Factory（Droid），按需选择显示位置。
+
 ## v1.8.24(2026-10-13)—— 千问个人订阅与模型计费选择
 
 - 千问官方 CLI 在用量汇总缺少额度时补查订阅状态，显示有效个人订阅的月／周用量百分比、重置时间和总额度。
