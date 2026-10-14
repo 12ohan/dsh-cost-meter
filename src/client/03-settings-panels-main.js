@@ -16,10 +16,12 @@
       useEffect(() => {
         let active = true
         setError('')
+        if (typeof load !== 'function') return
         load().then(page => { loadedPages.set(load, page); if (active) setPage(() => page) }, e => { if (active) setError(String(e.message ?? e)) })
         return () => { active = false }
       }, [props.api, props.load, retry])
       if (Page) return el(Page, { ...props, formatMoneyUsd, formatTokens, resolveLocale })
+      if (props.quiet) return null
       return el('div', { className: error ? '' : 'cm-loading', role: error ? 'alert' : 'status', 'aria-label': resolveLocale(props.state?.config) === 'en' ? 'Loading' : '正在读取' }, error || el(Fragment, null, el('i'), el('i'), el('i')), error ? el('button', { className: 'cm-btn', onClick: () => setRetry(n => n + 1) }, '↻') : null)
     }
 
@@ -2153,6 +2155,7 @@
               onClick: () => setTab(id),
             }, label))),
           saveBadge),
+        el(BillingStatistics, { state, api, load: api.loadCommunity, locale, quiet: true }),
         // 操作结果提示(价格同步/历史导入/清除):全局展示,不随触发按钮所在标签页。
         cmMsg(message),
         tab === 'statistics' ? el(BillingStatistics, { state, api }) : null,
@@ -2720,7 +2723,8 @@
           // (z-ai / Kimi / Qwen 等)不随该按钮更新——随插件版本发布维护,可在「拓展价格表」
           // 挂载/编辑或用「模型名匹配」为任意模型指定价格条目。
           el('p', { className: 'cm-note' }, t('syncScopeNote'))))
-        : null)
+        : null,
+        el(BillingStatistics, { state, api, load: api.loadCommunity, locale, quiet: true, footer: true }))
     }
 
     // ── 插件主体 ────────────────────────────────────────────────────────────
@@ -2823,6 +2827,7 @@
       const api = {
         loadStatistics: () => loadPage('statistics'),
         loadOpenRouter: () => loadPage('openrouter'),
+        loadCommunity: () => loadPage('community'),
         reload,
         updateConfig: async patch => {
           const { activeLocale: _local, ...savedPatch } = patch
