@@ -16,6 +16,7 @@
       useEffect(() => {
         let active = true
         setError('')
+        if (typeof load !== 'function') return
         load().then(page => { loadedPages.set(load, page); if (active) setPage(() => page) }, e => { if (active) setError(String(e.message ?? e)) })
         return () => { active = false }
       }, [props.api, props.load, retry])
