@@ -128,6 +128,13 @@ try {
   await meter.updateConfig({ codingPlans: { factory: { factoryPool: 'core' } } })
   const core = await meter.getState()
   assert.deepEqual(Object.keys(core.codingPlans.factory.windows), ['core_fiveHour', 'core_weekly', 'core_monthly'])
+  let failures = 0
+  globalThis.fetch = async () => { failures++; return new Response('PRIVATE_FAILURE', { status: 500 }) }
+  assert.equal((await meter.refreshCodingPlan('factory')).ok, false)
+  await Promise.all([meter.getState(), meter.getState(), meter.getState()])
+  assert.equal(failures, 1, 'failed Factory reads are cached instead of retried on each poll')
+  globalThis.fetch = async () => new Response(JSON.stringify(fixture))
+  assert.equal((await meter.refreshCodingPlan('factory')).ok, true, 'manual refresh bypasses the cached failure')
   // Race: disable a source while its network read is running.
   let entered, release, pendingSignal
   const started = new Promise(resolve => { entered = resolve })
