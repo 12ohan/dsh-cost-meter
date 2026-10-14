@@ -144,7 +144,7 @@ console.log('✓ lib/client.js within DSH STORE per-file bound (262144)')
 
 // DSH 0.2.0-rc.2 package-local chunks use the host's require.async contract.
 // Each on-demand screen has readable source and a bounded runtime asset.
-for (const chunk of ['statistics', 'openrouter']) {
+for (const chunk of ['statistics', 'openrouter', 'community']) {
   const source = readFileSync(resolve(projectRoot, `src/${chunk}/index.js`), 'utf8')
   const result = await transform(source, { minify: true, target: 'es2022', charset: 'utf8', legalComments: 'none' })
   for (const [name, text] of [[`src/${chunk}/index.js`, source], [`lib/client.${chunk}.js`, result.code]]) {

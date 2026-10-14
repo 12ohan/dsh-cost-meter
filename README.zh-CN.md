@@ -2,6 +2,8 @@
 
 [English](README.md) | **简体中文**
 
+交流与反馈：[加入微信交流群 →](#交流与反馈) · 微信交流群已开放，欢迎您加入。
+
 <div align="center">
 
 **DeepSeek Harness 会话费用统计插件(界面中英双语)**
@@ -512,6 +514,15 @@ dsh --profile web --port 3099                           # 真机启动(观察启
 - Token Plan 统计的「每 1% 额度/满窗」为估算值:各家额度接口只返回百分比且读数存在个位级量化(显示 1% 的真实值可能在 0.5%~1.5%),插件以连续可信段的首尾差分推算以压低量化误差(跨度不足 5 个百分点时标注「读数精度受限」,样本超 7 天回退当前用量折算,窗口边界按小时对齐);服务端百分比统计的是该账号全部用量——同一 Key 在其它机器/CLI 的消耗不在本地账本,估算偏低属预期,仅供跨套餐横向比较;
 - Plan/API 双轨分类基于渠道与配置推断,混合订阅/按量使用同一厂商 Key 的场景(如 Kimi 订阅 + PAYG 混用)可在设置中按 provider:model 手动覆盖。
 - 安装/更新插件后需重启 `dsh web` 生效。
+
+## 交流与反馈
+
+使用交流、问题反馈和功能建议，欢迎加入微信交流群。
+
+<p align="center">
+  <a href="docs/community-wechat.jpg"><img src="docs/community-wechat.jpg" alt="dsh-cost-meter 微信交流群二维码" width="320" /></a><br />
+  <a href="docs/community-wechat.jpg">查看二维码大图</a>
+</p>
 
 ## 更新历史
 

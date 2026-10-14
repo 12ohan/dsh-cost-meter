@@ -2,6 +2,8 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
+Community and feedback: [Join the WeChat group →](#community). The WeChat group is open. You're welcome to join.
+
 <div align="center">
 
 **Session cost tracking plugin for the DeepSeek Harness web GUI (bilingual UI)**
@@ -508,6 +510,15 @@ Check and clear the host search before changing stored data.
 - The per-1% quota / full-window figures in Token Plan stats are estimates: vendors only report percentages with ones-digit quantization (a displayed 1% may really be 0.5%–1.5%), so the plugin derives them from end-to-end deltas over continuous sample segments to suppress quantization noise (segments spanning <5 percentage points are tagged "low reading precision"; samples older than 7 days fall back to live ratio; window edges align to whole hours). Server percentages cover ALL usage of the account — consumption of the same key on other machines/CLIs is not in the local ledger, so low estimates are expected; treat them as cross-plan comparisons only;
 - Plan/API classification is inferred from channel and config; mixed subscription/PAYG usage of one vendor (e.g. Kimi) can be overridden per provider:model in settings.
 - A restart of `dsh web` is required after installing/updating the plugin.
+
+## Community
+
+Join the WeChat group to discuss the plugin, share feedback, and suggest features.
+
+<p align="center">
+  <a href="docs/community-wechat.jpg"><img src="docs/community-wechat.jpg" alt="dsh-cost-meter WeChat community QR code" width="320" /></a><br />
+  <a href="docs/community-wechat.jpg">View full-size QR code</a>
+</p>
 
 ## Update history
 
