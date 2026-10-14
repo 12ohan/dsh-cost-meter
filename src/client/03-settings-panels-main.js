@@ -875,19 +875,24 @@
       }, label)
       // 计费方式标记(issue #64):Plan 行附「Plan 订阅」小标签(费用为等值口径)。
       const classChip = r => r.cls === 'plan'
-        ? el('span', { className: 'cm-plan-tag', title: t('billingClassLabel') }, t('billingClassPlan'))
+        ? el('span', { className: 'cm-plan-tag', title: t('billingClassLabel') + ' · ' + (planProviderLabelOf(planProviderIdOfLocal(r.provider, config, r.model), t) || t('billingClassPlan')) }, t('billingClassPlan'))
         : null
       const classSelect = r => el('select', { className: 'cm-input', title: t('billingClassLabel'),
-        value: config.planBilling?.models?.[r.key] ?? 'auto', disabled: draft === null,
+        value: config.planBilling?.models?.[r.key] === 'plan' && config.planBilling?.modelPlans?.[r.key] ? 'plan:' + config.planBilling.modelPlans[r.key] : config.planBilling?.models?.[r.key] ?? 'auto', disabled: draft === null,
         onChange: event => {
           const models = { ...(draft.planBilling?.models ?? {}) }
-          if (event.target.value === 'auto') delete models[r.key]
-          else models[r.key] = event.target.value
-          setDraft({ ...draft, planBilling: { ...draft.planBilling, models } })
+          const modelPlans = { ...(draft.planBilling?.modelPlans ?? {}) }
+          const value = event.target.value
+          delete modelPlans[r.key]
+          if (value.startsWith('plan:')) { models[r.key] = 'plan'; modelPlans[r.key] = value.slice(5) }
+          else if (value === 'auto') delete models[r.key]
+          else models[r.key] = value
+          setDraft({ ...draft, planBilling: { ...draft.planBilling, models, modelPlans } })
         } },
         el('option', { value: 'auto' }, t('billingClassAuto')),
         el('option', { value: 'plan' }, t('billingClassPlan')),
-        el('option', { value: 'api' }, t('billingClassApi')))
+        el('option', { value: 'api' }, t('billingClassApi')),
+        PLAN_PROVIDER_IDS_LOCAL.map(id => el('option', { key: id, value: 'plan:' + id }, t('billingClassPlan') + ' · ' + planProviderLabelOf(id, t))))
       const barRow = (name, frac, barClass, valueText, tagNode) => el('div', { className: 'cm-mstats-row' },
         tagNode ? el('div', { className: 'cm-mstats-label' },
           el('span', { className: 'cm-mstats-name', title: name }, name), tagNode)
@@ -2833,6 +2838,7 @@
           const { activeLocale: _local, ...savedPatch } = patch
           const state = await call('updateConfig', [savedPatch])
           store.set({ status: 'ready', error: null, state })
+          if (patch.planBilling) setTimeout(() => { void reload() }, 1500)
           return state
         },
         fetchPrices: async () => receive(costMeter.fetchPrices()),
