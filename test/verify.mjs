@@ -1078,6 +1078,7 @@ await assert.rejects(queryCodingPlan('nobody', 'sk-x', 'zh', stubT), error => er
 
 // 5.6) 端点白名单全部为官方域名(凭据安全)。
 const officialHosts = {
+  factory: ['api.factory.ai'],
   anthropic: ['api.anthropic.com'],
   zai: ['api.z.ai', 'open.bigmodel.cn'],
   minimax: ['www.minimax.cn', 'www.minimaxi.com', 'www.minimax.io'],
@@ -6739,6 +6740,7 @@ await import('./core-boundaries.mjs')
 await import('./go-credentials.mjs')
 await import('./balance-credentials.mjs')
 await import('./account-balance.mjs')
+await import('./factory-quota.mjs')
 await import('./qwen-cli.mjs')
 await import('./bailian-cli.mjs')
 await import('./minimax-endpoint.mjs')

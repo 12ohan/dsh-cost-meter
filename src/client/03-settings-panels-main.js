@@ -1577,6 +1577,7 @@
       { id: 'volcengine', labelKey: 'codingPlanVolcengine' },
       { id: 'qwen', labelKey: 'codingPlanQwen' },
       { id: 'mimo', labelKey: 'codingPlanMimo' },
+      { id: 'factory', labelKey: 'codingPlanFactory' },
     ]
 
     /** 单个 Coding Plan 订阅卡片(11 家共用:开关在标题行,展示/间隔/计划额度/凭据收在展开区)。 */
@@ -1643,7 +1644,7 @@
                   wide: true,
                   direction: barDirectionOf(config, 'plan'),
                 })
-                : Object.entries(windows).map(([name, win]) => quotaWindowRow(t, name.replace(/_/g, ' '), win, barDirectionOf(config, 'plan'), false, name)))
+                : Object.entries(windows).map(([name, win]) => quotaWindowRow(t, codingPlanWindowLabel(name, t), win, barDirectionOf(config, 'plan'), false, name)))
               : el('div', { className: 'cm-bal-line' }, t('codingPlanNotQueried')),
             el('div', { className: 'cm-go-time' }, t('goQuotaFetchedAt', {
               time: live.fetchedAt > 0 ? new Date(live.fetchedAt).toLocaleTimeString() : '—',
@@ -1654,6 +1655,16 @@
               ? el('p', { className: 'cm-note' }, live.message)
               : el('div', { className: 'cm-bal-line' }, t('codingPlanNotQueried'))
       const configNode = el(Fragment, null,
+        planId === 'factory' ? el(Fragment, null,
+          el('div', { className: 'cm-field' },
+            el('label', null, t('factoryPool')),
+            el('select', { className: 'cm-input', 'aria-label': t('factoryPool'), value: cfgEntry.factoryPool ?? 'standard', onChange: e => setPlan('factoryPool', e.target.value) },
+              el('option', { value: 'standard' }, 'Standard'),
+              el('option', { value: 'core' }, 'Droid Core'),
+              el('option', { value: 'both' }, t('factoryPoolBoth')))),
+          el('div', { className: 'cm-field' },
+            el('label', null, t('factoryOrg')),
+            el('input', { className: 'cm-input', 'aria-label': t('factoryOrg'), value: cfgEntry.orgId ?? '', onChange: e => setPlan('orgId', e.target.value) }))) : null,
         planId === 'minimax' ? el('div', { className: 'cm-field' },
           el('label', null, t('minimaxOrigin')),
           el('input', { className: 'cm-input', type: 'url', value: cfgEntry.baseUrl ?? '', placeholder: 'https://www.minimax.cn',
@@ -1761,13 +1772,13 @@
               el('p', { className: 'cm-note' }, t('volcengineNote')))
             : el(Fragment, null,
               el('div', { className: 'cm-field' },
-                el('label', null, planId === 'mimo' ? 'Cookie (platform.xiaomimimo.com)' : t('codingPlanKeyLabel'))),
+                el('label', null, planId === 'mimo' ? 'Cookie (platform.xiaomimimo.com)' : planId === 'factory' ? 'Factory Token' : t('codingPlanKeyLabel'))),
               el(CredentialField, {
                 target: 'codingPlans.' + planId,
                 configured: live.keyConfigured === true,
                 source: live.keySource,
                 t, api,
-                placeholder: planId === 'mimo' ? 'api-platform_serviceToken=…; userId=…' : 'sk-…',
+                placeholder: planId === 'mimo' ? 'api-platform_serviceToken=…; userId=…' : planId === 'factory' ? 'FACTORY_API_KEY' : 'sk-…',
               })))
       return el(QuotaCard, {
         name: t(labelKey), enabled, saved: config.codingPlans?.[planId], busy, open, errorMsg: msg,
