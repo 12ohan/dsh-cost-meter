@@ -299,6 +299,7 @@
         planBilling: {
           providers: parseBillingClasses(v.planBilling?.providers),
           models: parseBillingClasses(v.planBilling?.models, true),
+          modelPlans: Object.fromEntries(Object.entries(v.planBilling?.modelPlans ?? {}).filter(([key, value]) => key.includes(':') && PLAN_PROVIDER_IDS_LOCAL.includes(value))),
         },
       }
     }
@@ -1035,13 +1036,32 @@
       factory: ['factory', 'droid', 'factory-a', 'factory-g', 'factory-o'],
     }
     const PLAN_PROVIDER_IDS_LOCAL = ['anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'scnet', 'volcengine', 'qwen', 'mimo', 'factory', 'go']
-    function planProviderIdOfLocal(provider) {
+    const PLAN_NAME_HINTS_LOCAL = {
+      anthropic: 'anthropic|claude', zai: 'z[._-]?ai|zhipu|glm|智谱', minimax: 'minimax|海螺',
+      kimi: 'kimi|moonshot|moonshotai|月之暗面', openrouter: 'openrouter', siliconflow: 'siliconflow|硅基',
+      commandcode: 'commandcode', scnet: 'scnet|sugon|超算',
+      volcengine: 'volcengine|volcano|volc|ark|火山|方舟', qwen: 'qwen|qianwen|千问|通义',
+      mimo: 'mimo|xiaomi|小米', factory: 'factory|droid', go: 'opencode(?:[-_\\s]?go)?|zen|go',
+    }
+    const PLAN_NAME_MATCHERS_LOCAL = Object.entries(PLAN_NAME_HINTS_LOCAL).map(([id, hints]) => [id, new RegExp('(?:^|[^a-z0-9])(?:' + hints + ')(?=$|[^a-z0-9])')])
+    function inferPlanProviderIdLocal(provider, modelId) {
+      for (const raw of [provider, modelId]) {
+        const text = String(raw ?? '').normalize('NFKC').replace(/([a-zA-Z0-9\u3400-\u9fff])(?=(?:Coding|Token|Plan|Subscription))/g, '$1-').replace(/([a-z0-9])((?:coding|token)?plan|subscription)$/i, '$1-$2').toLowerCase()
+        if (!/(?:^|[^a-z0-9])(?:(?:coding|token)[-_\s]*)?plan(?:$|[^a-z0-9])|(?:^|[^a-z0-9])subscription(?:$|[^a-z0-9])|套餐|订阅/.test(text)) continue
+        const matches = PLAN_NAME_MATCHERS_LOCAL.filter(([, pattern]) => pattern.test(text))
+        if (matches.length) return matches.length === 1 ? matches[0][0] : null
+      }
+      return null
+    }
+    function planProviderIdOfLocal(provider, config, modelId) {
       const name = String(provider ?? '').trim().toLowerCase().replace(/^llm-/, '')
+      const assigned = config?.planBilling?.modelPlans?.[provider + ':' + modelId] ?? config?.planBilling?.modelPlans?.[name + ':' + modelId]
+      if (PLAN_PROVIDER_IDS_LOCAL.includes(assigned)) return assigned
       if (name.length === 0) return null
       for (const [id, aliases] of Object.entries(PLAN_PROVIDER_ALIASES_LOCAL)) {
         if (aliases.includes(name)) return id
       }
-      return PLAN_PROVIDER_IDS_LOCAL.includes(name) ? name : null
+      return PLAN_PROVIDER_IDS_LOCAL.includes(name) ? name : inferPlanProviderIdLocal(provider, modelId)
     }
     function enabledPlanSetOfLocal(config) {
       const out = new Set()
@@ -1073,7 +1093,7 @@
       return false
     }
     function billingClassOfLocal(provider, modelId, config) {
-      let planId = planProviderIdOfLocal(provider)
+      let planId = planProviderIdOfLocal(provider, config, modelId)
       if (planId === null && isRoutedThirdPartyCallLocal(provider, modelId, config)) planId = 'go'
       const models = config?.planBilling?.models
       if (models !== null && typeof models === 'object') {
