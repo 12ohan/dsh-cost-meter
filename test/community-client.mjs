@@ -30,7 +30,7 @@ function fixture(storage = new Map(), blocked = false) {
   }
   const Community = factory(name => { assert.equal(name, 'react'); return React }).mount({ effect: effect => cleanups.push(effect()) })
   return {
-    render(locale = 'zh') { hook = 0; return Community({ locale }) },
+    render(locale = 'zh', footer = false) { hook = 0; return Community({ locale, footer }) },
     remount() { hooks = [] },
     sync(event) { listeners.get('storage')(event) },
     dispose() { for (const cleanup of cleanups) cleanup?.() },
@@ -49,22 +49,23 @@ assert.equal(qrLink.props.rel, 'noopener noreferrer')
 const close = nodes(notice).find(node => node.type === 'button')
 assert.equal(close.props['aria-label'], '关闭交流群提示')
 close.props.onClick()
-assert.equal(ui.render().type, 'div', 'closing replaces the notice with its permanent entry immediately')
-assert.equal(nodes(ui.render()).filter(node => node.type === 'button').length, 0)
+assert.equal(ui.render(), null, 'closing removes the top notice completely')
+assert.equal(ui.render('zh', true).type, 'footer', 'the permanent entry belongs in the settings footer')
+assert.equal(nodes(ui.render('zh', true)).filter(node => node.type === 'button').length, 0)
 ui.remount()
-assert.equal(ui.render().type, 'div', 'leaving and reopening settings preserves dismissal')
+assert.equal(ui.render(), null, 'leaving and reopening settings preserves dismissal')
 ui.dispose()
 assert.equal(ui.styles.length, 0)
 assert.equal(ui.listeners.size, 0)
 ui = fixture(storage)
-assert.equal(ui.render().type, 'div', 'a new module/browser session reads the saved dismissal')
-assert.match(nodes(ui.render('en')).find(node => node.type === 'a').props.href, /README\.md#community$/)
+assert.equal(ui.render(), null, 'a new module/browser session reads the saved dismissal')
+assert.match(nodes(ui.render('en', true)).find(node => node.type === 'a').props.href, /README\.md#community$/)
 ui.dispose()
 
 ui = fixture(new Map(), true)
 nodes(ui.render()).find(node => node.type === 'button').props.onClick()
 ui.remount()
-assert.equal(ui.render().type, 'div', 'unavailable storage never prevents closing or same-session reopening')
+assert.equal(ui.render(), null, 'unavailable storage never prevents closing or same-session reopening')
 ui.dispose()
 
 ui = fixture()
@@ -72,6 +73,6 @@ ui.render()
 ui.sync({ key: 'unrelated', newValue: '1' })
 assert.equal(ui.render().type, 'aside')
 ui.sync({ key: 'dsh-cost-meter:community-notice-seen', newValue: '1' })
-assert.equal(ui.render().type, 'div', 'another window can dismiss the notice through the storage event')
+assert.equal(ui.render(), null, 'another window can dismiss the notice through the storage event')
 ui.dispose()
 console.log('[ok] 交流群提示：立即关闭、重开与刷新持久化、英文入口、存储不可用兜底及监听清理')

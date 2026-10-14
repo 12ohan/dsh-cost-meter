@@ -2722,7 +2722,8 @@
           // (z-ai / Kimi / Qwen 等)不随该按钮更新——随插件版本发布维护,可在「拓展价格表」
           // 挂载/编辑或用「模型名匹配」为任意模型指定价格条目。
           el('p', { className: 'cm-note' }, t('syncScopeNote'))))
-        : null)
+        : null,
+        el(BillingStatistics, { state, api, load: api.loadCommunity, locale, quiet: true, footer: true }))
     }
 
     // ── 插件主体 ────────────────────────────────────────────────────────────
