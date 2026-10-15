@@ -558,7 +558,7 @@
         {
           id: 'dsh-cost-meter#costMeter/getTurnCost', service: 'costMeter', namespace: 'costMeter', method: 'getTurnCost', invocation: { kind: 'direct' },
           parameters: [rpcParam('sessionId', 'SessionId', codecOf(v => needStr(v, 'sessionId'))), ...['startSeq', 'endSeq'].map(name => rpcParam(name, 'TurnSeq', codecOf(v => { if (!Number.isSafeInteger(v) || v < 0) fail(name, 'nonnegative integer'); return v })))],
-          result: strictCodec('TurnCost', codecOf(v => ({ found: needBool(v.found, 'found'), cost: needNum(v.cost, 'cost'), apiCost: needNum(v.apiCost, 'apiCost'), rows: parseTurnRows(v.rows),
+          result: strictCodec('TurnCost', codecOf(v => ({ found: needBool(v.found, 'found'), ...(v.inherited === undefined ? {} : { inherited: needBool(v.inherited, 'inherited') }), cost: needNum(v.cost, 'cost'), apiCost: needNum(v.apiCost, 'apiCost'), rows: parseTurnRows(v.rows),
             calls: (Array.isArray(v.calls) ? v.calls : fail('calls', 'array')).map(c => ({ kind: needStr(c.kind, 'kind'), provider: needStr(c.provider, 'provider'), model: needStr(c.model, 'model'), atMs: needNum(c.atMs, 'atMs'), cost: needNum(c.cost, 'cost'), apiCost: needNum(c.apiCost, 'apiCost'), plan: needBool(c.plan, 'plan'), priced: needBool(c.priced, 'priced'), longContext: needBool(c.longContext, 'longContext'), rows: parseTurnRows(c.rows) })) }))),
         },
         {
@@ -1428,15 +1428,27 @@
           try {
             const value = await props.api.getSessionCost(props.sessionId)
             if (active) setSnapshot({ id: props.sessionId, include: config?.includeSubagentCost === true, value })
-          } catch { /* 旧服务无 RPC 时保留投影显示。 */ }
+          } catch {
+            // Older hosts may not provide this RPC. Finish the loading state,
+            // retaining an existing ledger snapshot or the projection fallback.
+            if (active) setSnapshot(previous => previous?.id === props.sessionId && previous.include === (config?.includeSubagentCost === true) ? previous : { id: props.sessionId, include: config?.includeSubagentCost === true, value: null })
+          }
           finally { pending = false }
         }
         void refresh()
         const timer = config?.includeSubagentCost === true ? setInterval(refresh, 10000) : null
         return () => { active = false; if (timer !== null) clearInterval(timer) }
       }, [props.sessionId, state?.meta?.now, projection, config?.includeSubagentCost])
-      const saved = snapshot && snapshot.id === props.sessionId && snapshot.include === (config?.includeSubagentCost === true) ? snapshot.value : null
-      return { usage: mergeSessionUsage(projection, saved, config?.includeSubagentCost === true, config), config }
+      const current = snapshot && snapshot.id === props.sessionId && snapshot.include === (config?.includeSubagentCost === true) ? snapshot : null
+      const saved = current?.value
+      return { usage: mergeSessionUsage(projection, saved, config?.includeSubagentCost === true, config), config,
+        pending: !!props.sessionId && !!props.api?.getSessionCost && !current,
+        unrecorded: saved?.found === false && (!config?.includeSubagentCost || !saved.subagentCount) }
+    }
+
+    function sessionCostStatus(state) {
+      const en = resolveLocale(state.config) === 'en'
+      return state.pending ? (en ? 'Loading session cost…' : '正在读取本会话费用…') : state.unrecorded ? (en ? 'Session cost: no ledger records' : '本会话暂无账本记录') : !state.usage ? (en ? 'Session cost unavailable' : '本会话费用暂不可用') : ''
     }
 
     function sessionCostParts(usage, config) {
@@ -1481,8 +1493,8 @@
         row.provider + ':' + row.model + ' · ' + names[row.bucket] + (row.plan ? ' (Plan)' : '') + ': ' + row.tokens.toLocaleString() + ' × ' + (row.priced ? money(row.rate) : '?') + ' / 1,000,000 ≈ ' + (row.priced ? money(row.cost) : '?'),
         !row.priced ? (en ? ' (price unavailable)' : '（未配置价格）') : row.bucket === 'reasoning' && row.rate === 0 ? (en ? ' (no separate charge)' : '（不单独收费）') : '')
       return el('details', { className: 'cm-note', style: { fontSize: 12, marginTop: 6 } },
-        el('summary', { style: { cursor: 'pointer' } }, en ? 'Turn cost' : '本轮费用', value?.found ? ' ≈ ' + money(config.showTotalWithPlan ? value.cost : value.apiCost) + (value.rows.some(r => !r.priced) ? (en ? ' + unpriced usage' : ' + 未定价用量') : '') : error ? ' ⚠' : ''),
-        error ? el('div', { role: 'alert' }, error) : !value ? (en ? 'Loading…' : '加载中…') : !value.found ? (en ? 'Complete usage records unavailable' : '没有完整用量记录') :
+        el('summary', { style: { cursor: 'pointer' }, title: en ? 'Log estimate at configured prices; session cost uses recorded ledger amounts.' : '本轮按日志和配置价格估算，本会话按账本已入账金额汇总。' }, en ? 'Turn cost' : '本轮费用', value?.found ? ' ≈ ' + money(config.showTotalWithPlan ? value.cost : value.apiCost) + (value.rows.some(r => !r.priced) ? (en ? ' + unpriced usage' : ' + 未定价用量') : '') : value?.inherited ? (en ? ' · inherited history' : ' · 继承历史') : error ? ' ⚠' : ''),
+        error ? el('div', { role: 'alert' }, error) : !value ? (en ? 'Loading…' : '加载中…') : !value.found ? value.inherited ? (en ? 'Inherited usage is not billed again in this conversation.' : '继承的历史用量不在本会话重复计费。') : (en ? 'Complete usage records unavailable' : '没有完整用量记录') :
           el(Fragment, null, el('p', null, en ? 'Estimated from recorded usage and configured prices; rates per 1M tokens.' : '按已记录用量和配置价格估算；单价单位为每百万 Token。'),
             el('p', null, 'API ≈ ' + money(value.apiCost) + ' · Plan ≈ ' + money(value.cost - value.apiCost) + (en ? ' (equivalent)' : '（等值）')),
             value.rows.map(rowView),
@@ -1493,8 +1505,10 @@
     }
 
     function SessionCost(props) {
-      const { usage, config } = useSessionUsage(props)
-      if (!usage || !config || (billedInput(usage) + (usage?.output ?? 0)) === 0) return null
+      const state = useSessionUsage(props), { usage, config } = state
+      if (!config) return null
+      const status = sessionCostStatus(state)
+      if (status) return el('div', { className: 'cm-chip' }, status)
       const t = makeT(resolveLocale(config))
       const { cost, planPart } = sessionCostParts(usage, config)
       const detail = [
@@ -1519,12 +1533,13 @@
     }
 
     function DockLine(props) {
-      const { usage, config } = useSessionUsage(props)
-      if (!usage || !config) return null
+      const state = useSessionUsage(props), { usage, config } = state
+      if (!config) return null
+      const status = sessionCostStatus(state)
+      if (status) return el('div', { className: 'cm-root', role: 'status', title: status }, status)
       const input = usage.input ?? 0
       const cache = (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
       const output = usage.output ?? 0
-      if (input + cache + output === 0) return null
       const t = makeT(resolveLocale(config))
       const { cost, planPart } = sessionCostParts(usage, config)
       // 缓存写入属于输入分母，但不是缓存命中；无输入时显示未知。
@@ -1540,9 +1555,13 @@
       const fullLine = t(planPart > 0 ? 'sessionLineSplit' : 'sessionLine', values)
       const modelDetail = modelCostDetail(usage, config)
       const compact = config.sessionCostCompact === true
-      // 紧凑模式只留金额;悬停保留完整费用行和模型分项。
-      return el('div', { className: 'cm-root', title: compact ? [fullLine, modelDetail].filter(Boolean).join('; ') : modelDetail },
-        compact ? t(planPart > 0 ? 'sessionLineSplitCompact' : 'sessionLineCompact', values) : fullLine)
+      // Keep the amount visible when native or peer-plugin statistics grow.
+      // Token and Plan details may truncate; the full line remains on hover.
+      const amount = t('sessionLineCompact', values)
+      const line = compact ? t(planPart > 0 ? 'sessionLineSplitCompact' : 'sessionLineCompact', values) : fullLine
+      return el('div', { className: 'cm-root cm-session-cost', title: [fullLine, modelDetail].filter(Boolean).join('; ') },
+        el('span', { className: 'cm-session-amount' }, amount),
+        el('span', { className: 'cm-session-detail' }, line.slice(amount.length)))
     }
 
     // ── 侧边栏:余额行 + 预算图框/今日徽章(纵向堆叠,位于设置按钮上方) ──────

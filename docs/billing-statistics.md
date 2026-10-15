@@ -94,6 +94,28 @@ API 费用是按上报用量和配置单价计算的估算，不是厂商账单�
 
 宿主启动后在后台准备最近查看的会话，回合结束后更新对应结果；会话入口也会预加载费用总览和分类图。计费结果和独立于价格的精简用量缓存都可跨重启保留，先显示已有数据，再后台更新。分类图不必等调用汇总读完，切换视图、排序和翻页共用计算结果。单价、套餐归属或子代理开关改变后可直接利用用量缓存重新计算，日志改变后才重新读取。缓存有容量限制，只保存计费字段，不保存对话正文、工具参数、返回内容或凭据。
 
+## Plugin compatibility / 插件兼容
+
+### 中文
+
+按截图中的版本核对了以下行为：
+
+- **dsh-codex-ui 1.1.38：**费用明细入口和会话金额继续使用 DSH 的插槽。统计栏变宽时优先保留金额，Token、缓存和 Plan 明细可缩短，悬停查看完整信息。账本仍在加载或没有当前会话记录时显示对应状态，不再短暂显示投影金额后消失。
+- **dsh-agency-agents 1.0.19：**专家通过 DSH 的标准子代理接口运行。开启“本会话费用包含子代理”即可包含专家及其后代，父账本不再次入账。普通分叉和继承的历史轮次不重复收费。
+- **billion-context 0.1.197：**压缩会改变实际发送的输入；部分内部压缩、重试和多轮请求未完整进入 DSH 的标准用量。检测到它的页面标识后，费用页说明当前覆盖范围，并提供代理统计入口。只根据 DSH 已上报的用量记账；不把代理的节省比例、默认价格或未知差额补入账本。此兼容处理没有收集代理内部全部调用。
+
+仅安装其他插件不能证明它影响费用；本次没有执行第三方插件，也没有发起模型请求。是否漏记额外调用，应以插件提供的逐次用量及厂商账单为依据。
+
+版本源码：[dsh-codex-ui](https://github.com/MichengAI/dsh-codex-ui/tree/4f82059f4df415320917b572811b0b6440179ac9)、[dsh-agency-agents](https://github.com/MichengAI/dsh-agency-agents/tree/576eeec833b34554bc89d11f70076e3e1b9eb9cd)、[billion-context](https://github.com/ranxianglei/billion-context/tree/3aeddc160864ca774e54817559d6984310e2a9ab)。
+
+### English
+
+- **dsh-codex-ui 1.1.38:** the entries use DSH slots. Composer statistics preserve the session amount while trimming secondary details, which remain available on hover. Loading and missing-ledger states stay visible without flashing a projection amount first.
+- **dsh-agency-agents 1.0.19:** experts use the standard DSH subagent interface. Enable subagent costs to include their descendants once. Ordinary forks and inherited turns are excluded from duplicate billing.
+- **billion-context 0.1.197:** only usage reported to DSH is included. Some internal compression, retries and additional requests are not fully exposed through the standard usage stream. When its page marker is present, cost views state this coverage and link to its statistics. Internal calls are not fully collected by this integration, and estimated savings or unknown differences never enter the ledger.
+
+Inspection used the published versions linked above. No third-party plugin code or model request was executed.
+
 ## Design references
 
 The organization of summary statistics, time ranges, conversation drill-down and on-demand details was informed by [dsh-context v0.62.0](https://github.com/bowenliang123/dsh-context/tree/v0.62.0), especially its [overview](https://github.com/bowenliang123/dsh-context/blob/v0.62.0/src/client/overview.ts) and [detail loading](https://github.com/bowenliang123/dsh-context/blob/v0.62.0/src/client/timelineSource.ts). This implementation uses dsh-cost-meter's existing ledger and pricing engine with its own layout.

@@ -1179,6 +1179,18 @@ window.__ModuleLoader__.load({
         el(Pager, { offset, count: detail.totalCalls, size: 50, onChange: n => { setOffset(n); setSelected(-1) }, text })) : null)
     }
 
+    function compressionBillingNotice(text) {
+      if (!window.__BILI__) return null
+      let href
+      try {
+        const origin = new URL(window.__BILI__.origin)
+        if (['http:', 'https:'].includes(origin.protocol) && !origin.username && !origin.password) href = origin.origin + '/__bili/'
+      } catch {}
+      return el('p', { className: 'cm-stat-note', 'data-billing-coverage': 'billion-context' },
+        text('已检测到 billion-context。此处统计它上报给 DSH 的用量；代理内部未上报的压缩、重试和追加请求未计入。', 'billion-context detected. These totals use its reported DSH usage; unreported internal compression, retries and additional requests are excluded.'),
+        href ? el('a', { href, target: '_blank', rel: 'noopener noreferrer', style: { marginInlineStart: 8 } }, text('查看代理统计', 'Open proxy statistics')) : null)
+    }
+
     function useStatisticsBasis(config, api, text) {
       const initial = () => ['api', 'plan', 'total'].includes(config.statisticsBasis) ? config.statisticsBasis : config.showTotalWithPlan ? 'total' : 'api'
       const [basis, setBasis] = useState(initial), [saving, setSaving] = useState(false), [error, setError] = useState('')
@@ -1200,6 +1212,7 @@ window.__ModuleLoader__.load({
       const money = n => formatMoneyUsd(n, { ...state.config, decimals: Math.max(n !== 0 && Math.abs(n) < .01 ? 8 : 4, state.config.decimals ?? 2) })
       const query = { sessionId, from: '', to: '', provider: '', model: '', basis, offset: 0 }
       return el('div', { className: 'cm-stat cm-stat-session', 'data-session-id': sessionId }, el('style', null, css),
+        compressionBillingNotice(text),
         el('div', { className: 'cm-stat-panel-head' }, el('p', { className: 'cm-stat-sub' }, text('当前对话 · 全部调用', 'This conversation · all calls')), button(text('刷新', 'Refresh'), () => setRevision(n => n + 1))),
         el(SessionDetail, { key: sessionId + ':' + basis, api, query, revision: refreshKey, money, formatTokens, text, overview: true },
           el(ContextCosts, { key: sessionId, api, sessionId, revision: refreshKey, money, text, compact: true, expanded: true })),
@@ -1235,6 +1248,7 @@ window.__ModuleLoader__.load({
       const top = data?.totals
       const metric = (label, value, sub) => el('div', { className: 'cm-stat-metric', key: label }, el('div', { className: 'cm-stat-sub' }, label), el('div', { className: 'cm-stat-value' }, value), el('div', { className: 'cm-stat-sub' }, sub))
       return el('div', { className: 'cm-stat' }, el('style', null, css),
+        compressionBillingNotice(text),
         contextIntegration ? el(ContextIntegrationSettings, contextIntegration) : null,
         el('header', { className: 'cm-stat-head' }, el('div', null, el('h2', null, text('计费统计', 'Cost statistics')), el('p', { className: 'cm-stat-sub' }, scope.id ? text('单对话 · ', 'Conversation · ') + (scope.title === scope.id ? data?.sessions[0]?.title || scope.title : scope.title) : text('全部对话 · 从总额查看每一笔调用', 'All conversations · from totals to individual calls'))),
           button(text('刷新', 'Refresh'), () => setRevision(n => n + 1))),
