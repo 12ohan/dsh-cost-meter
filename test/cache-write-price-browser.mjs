@@ -76,7 +76,7 @@ const card = name => page.locator('.cm-price-card').filter({ has: page.locator('
 const open = async (english = false) => {
   await page.goto(url); await page.waitForFunction(() => window.fixtureReady)
   await page.getByRole('tab', { name: english ? 'Pricing' : '价格', exact: true }).click()
-  await page.getByRole('button', { name: english ? 'Expand extended price catalog' : '展开拓展价格表', exact: true }).click()
+  await page.getByRole('button', { name: english ? 'Price table (USD / 1M tokens)' : '价格表(美元 / 1M tokens)', exact: true }).click()
   await page.locator('.cm-vendor-toggle').filter({ hasText: 'fixture' }).click()
   await card('cache-model').getByRole('spinbutton', { name: english ? 'USD · Cache write' : 'USD · 缓存写入', exact: true }).waitFor()
 }
@@ -123,7 +123,6 @@ try {
   assert.equal(Object.hasOwn(saved.prices.models['cache-deepseek'].offPeak, 'cacheWrite'), false)
   assert.deepEqual(saved.prices.models['cache-deepseek'].rateHistory, history)
   // The same card is also used by the default model and by directly shown models.
-  await page.getByText('价格表(美元 / 1M tokens)', { exact: true }).click()
   const fallback = page.locator('.cm-price-card').filter({ hasText: '默认回退' })
   await edit(fallback.locator('.cm-price-row').nth(1).getByRole('spinbutton').nth(2), '0.8')
   assert.equal(saved.prices.default.cacheWrite, .8)
@@ -131,10 +130,9 @@ try {
   assert.equal(Object.hasOwn(saved.prices.default, 'cacheWrite'), false)
   await edit(fallback.locator('.cm-price-row').nth(2).getByRole('spinbutton').nth(2), '0.9')
   assert.deepEqual(saved.prices.default.offPeak, { ...tier, cacheWrite: .9 }, 'adding a cache-write tier preserves the other base rates')
-  const beforeDirect = await page.evaluate(() => window.savedCount)
-  await card('cache-model').locator('..').getByRole('checkbox').click()
-  await page.waitForFunction(count => window.savedCount > count, beforeDirect)
-  assert.equal(await usd.inputValue(), '5.125', 'directly displayed cards retain the same editor')
+  await page.locator('.cm-vendor-toggle').filter({ hasText: 'fixture' }).click()
+  await page.locator('.cm-vendor-toggle').filter({ hasText: 'fixture' }).click()
+  assert.equal(await usd.inputValue(), '5.125', 'reopening a vendor retains the same editor')
   for (const [locale, scheme, width] of [['zh', 'light', 1100], ['zh', 'dark', 390], ['en', 'light', 390]]) {
     saved.locale = locale
     // Restore the catalog placement for the same responsive layout check.

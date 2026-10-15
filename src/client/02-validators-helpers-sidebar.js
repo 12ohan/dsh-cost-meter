@@ -451,8 +451,8 @@
         // 客户端据此沿用上一份,并按同一版本号回传以避免重复下发。
         pricesRev: typeof v.pricesRev === 'string' ? v.pricesRev : undefined,
         reconcile: v.reconcile === null || v.reconcile === undefined ? undefined : { ok: v.reconcile.ok === true, message: typeof v.reconcile.message === 'string' ? v.reconcile.message : '' },
-        // 扩展价格表目录(宿主只读下发;缺失时 UI 自动隐藏目录面板)。
-        priceCatalog: v.priceCatalog !== null && typeof v.priceCatalog === 'object' && !Array.isArray(v.priceCatalog) ? v.priceCatalog : null,
+        // 手改过价格的 OpenRouter 模型 id(缺失/畸形回落空表:不显示任何锁定标记)。
+        priceLockIds: Array.isArray(v.priceLockIds) ? v.priceLockIds.filter(id => typeof id === 'string') : [],
         meta: {
           ...(supportedLocale(v.meta?.locale) ? { locale: supportedLocale(v.meta.locale) } : {}),
           now: typeof v.meta?.now === 'number' ? v.meta.now : Date.now(),
@@ -515,17 +515,15 @@
       package: 'dsh-cost-meter',
       descriptors: [
         {
-          method: 'getState',
-          // pricesRev:客户端已持有的价格表版本号;一致时宿主省略整张价格表。
-          // acceptsUndefined 保持旧调用(不带参数)可用,等价于始终下发全量。
+          method: 'getStateSince',
+          // Keep getState zero-argument: DSH checks the exact client argument count.
           parameters: [rpcParam('pricesRev', 'PricesRev', codecOf(v => {
-            if (v === undefined || v === null) return undefined
             if (typeof v !== 'string') fail('pricesRev', 'price table revision')
             return v
-          }), true)],
+          }))],
           result: strictCodec('CostState', stateCodec),
         },
-        ...['getLocalState'].map(method => ({ method, result: strictCodec('CostState', stateCodec) })),
+        ...['getState', 'getLocalState'].map(method => ({ method, result: strictCodec('CostState', stateCodec) })),
         {
           method: 'updateConfig',
           parameters: [rpcParam('patch', 'ConfigPatch', patchCodec)],
@@ -533,6 +531,14 @@
         },
         {
           method: 'fetchPrices',
+          },
+        {
+          method: 'releasePriceLock',
+          // 与宿主侧 manifest 同口径:非空字符串 id;结果形如 FetchPricesResult。
+          parameters: [rpcParam('id', 'PriceLockId', codecOf(v => {
+            if (typeof v !== 'string' || v.length === 0) fail('id', 'OpenRouter model id')
+            return v
+          }))],
           },
         {
           method: 'refreshBalance',
