@@ -35,6 +35,7 @@
           if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) continue
           const num = x => (typeof x === 'number' && Number.isFinite(x) && x >= 0 ? x : 0)
           out[key] = {
+            ...parseFrozenMoney(raw),
             ...mapFields(raw, ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'cost'], num),
             // API 渠道金额(issue #64):缺席 = 旧数据按 cost 全额 API 口径。
             apiCost: raw.apiCost === undefined ? num(raw.cost) : num(raw.apiCost),
@@ -43,9 +44,12 @@
       }
       return out
     }
+    const frozenMoneyFields = ['costCny', 'apiCostCny', 'costEur', 'apiCostEur']
+    const parseFrozenMoney = row => Object.fromEntries(frozenMoneyFields.filter(key => Number.isFinite(row?.[key])).map(key => [key, row[key]]))
     function parseUsageFields(v, path) {
       needObject(v, path)
       const out = {
+        ...parseFrozenMoney(v),
         reasoning: v.reasoning === undefined ? 0 : needNum(v.reasoning, path + '.reasoning'),
         apiCost: v.apiCost === undefined ? undefined : needNum(v.apiCost, path + '.apiCost'),
         byModel: aggregateModelMap(v.byModel, path + '.byModel'),
@@ -156,6 +160,8 @@
         symbol: typeof v.symbol === 'string' ? v.symbol : '¥',
         decimals: needNum(v.decimals, path + '.decimals'),
         exchangeRate: needNum(v.exchangeRate, path + '.exchangeRate'),
+        exchangeRateAuto: v.exchangeRateAuto !== false,
+        fxRates: v.fxRates, exchangeRateDate: v.exchangeRateDate ?? '', exchangeRateCheckedAt: v.exchangeRateCheckedAt ?? 0,
         peakEnabled: v.peakEnabled === true,
         peakEffectiveAt: typeof v.peakEffectiveAt === 'string' ? v.peakEffectiveAt : '',
         peakWindows: Array.isArray(v.peakWindows)
@@ -588,8 +594,8 @@
         },
         {
           id: 'dsh-cost-meter#costMeter/getTurnCost', service: 'costMeter', namespace: 'costMeter', method: 'getTurnCost', invocation: { kind: 'direct' },
-          parameters: [rpcParam('sessionId', 'SessionId', codecOf(v => needStr(v, 'sessionId'))), ...['startSeq', 'endSeq'].map(name => rpcParam(name, 'TurnSeq', codecOf(v => { if (!Number.isSafeInteger(v) || v < 0) fail(name, 'nonnegative integer'); return v })))],
-          result: strictCodec('TurnCost', codecOf(v => ({ found: needBool(v.found, 'found'), ...(v.inherited === undefined ? {} : { inherited: needBool(v.inherited, 'inherited') }), cost: needNum(v.cost, 'cost'), apiCost: needNum(v.apiCost, 'apiCost'), rows: parseTurnRows(v.rows),
+          parameters: [rpcParam('sessionId', 'SessionId', codecOf(v => needStr(v, 'sessionId'))), ...['startSeq', 'endSeq'].map(name => rpcParam(name, 'TurnSeq', codecOf(v => { if (!Number.isSafeInteger(v) || v < 0) fail(name, 'nonnegative integer'); return v }))), { ...rpcParam('displayCurrency', 'DisplayCurrency', codecOf(v => { if (v !== undefined && !['USD', 'CNY', 'EUR'].includes(v)) fail('displayCurrency', 'currency'); return v })), acceptsUndefined: true }],
+          result: strictCodec('TurnCost', codecOf(v => ({ ...parseFrozenMoney(v), found: needBool(v.found, 'found'), ...(v.inherited === undefined ? {} : { inherited: needBool(v.inherited, 'inherited') }), cost: needNum(v.cost, 'cost'), apiCost: needNum(v.apiCost, 'apiCost'), rows: parseTurnRows(v.rows),
             calls: (Array.isArray(v.calls) ? v.calls : fail('calls', 'array')).map(c => ({ kind: needStr(c.kind, 'kind'), provider: needStr(c.provider, 'provider'), model: needStr(c.model, 'model'), atMs: needNum(c.atMs, 'atMs'), cost: needNum(c.cost, 'cost'), apiCost: needNum(c.apiCost, 'apiCost'), plan: needBool(c.plan, 'plan'), priced: needBool(c.priced, 'priced'), longContext: needBool(c.longContext, 'longContext'), rows: parseTurnRows(c.rows), ...(c.metering ? { metering: parseMetering(c.metering) } : {}) })) }))),
         },
         {
@@ -1055,6 +1061,9 @@
      * 预算/卡片/徽章/表格等全部金额展示统一走这里,保证同一开关下口径一致。
      */
     function displayCostOf(entry, config) {
+      const suffix = { CNY: 'Cny', EUR: 'Eur' }[config?.currency]
+      const saved = suffix && entry?.[(config?.showTotalWithPlan ? 'cost' : 'apiCost') + suffix]
+      if (Number.isFinite(saved)) return saved / (config.exchangeRate || 1)
       if (config !== null && typeof config === 'object' && config.showTotalWithPlan === true) {
         return Number(entry?.cost) || 0
       }
@@ -1436,14 +1445,14 @@
       const base = snapshot ? snapshot.own : projection
       if (!include || !snapshot?.subagentCount) return base
       const extra = snapshot.subagents, out = { ...base }
-      for (const key of ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'calls', 'cost']) out[key] = (base?.[key] ?? 0) + (extra?.[key] ?? 0)
+      for (const key of ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'calls', 'cost', ...frozenMoneyFields]) out[key] = (base?.[key] ?? 0) + (extra?.[key] ?? 0)
       out.apiCost = recordedApiCost(base, config) + moneyCostOf(extra)
       for (const key of ['byModel', 'byProviderModel']) {
         out[key] = { ...base?.[key] }
         for (const [id, row] of Object.entries(extra?.[key] ?? {})) {
           const combined = { ...out[key][id] }
           combined.apiCost = moneyCostOf(combined) + moneyCostOf(row)
-          for (const field of ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'calls', 'cost']) combined[field] = (combined[field] ?? 0) + (row[field] ?? 0)
+          for (const field of ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'calls', 'cost', ...frozenMoneyFields]) combined[field] = (combined[field] ?? 0) + (row[field] ?? 0)
           out[key][id] = combined
         }
       }
@@ -1488,6 +1497,10 @@
     }
 
     function sessionCostParts(usage, config) {
+      if (Number.isFinite(usage?.costCny) || Number.isFinite(usage?.costEur)) {
+        const total = displayCostOf(usage, { ...config, showTotalWithPlan: true }), api = displayCostOf(usage, { ...config, showTotalWithPlan: false })
+        return { cost: config.showTotalWithPlan ? total : api, planPart: config.showTotalWithPlan ? 0 : Math.max(0, total - api) }
+      }
       // Plan/API 双轨(issue #64):会话内存在 Plan 类模型时,徽章显示真金白银
       // (API)金额并在悬停明细中单列 Plan 等值;「含 Plan 总额」开启时回到
       // 单一总额口径(v1.6.0);无 Plan 用量时保持宿主精确成本快路径。
@@ -1503,7 +1516,7 @@
 
     function modelCostDetail(usage, config) {
       return Object.entries(usage?.byProviderModel ?? {}).filter(([, row]) => row.input || row.output || row.cacheRead || row.cacheWrite || row.reasoning)
-        .map(([id, row]) => id + ' ' + formatMoneyUsd(row.cost, config)).join('; ')
+        .map(([id, row]) => id + ' ' + formatMoneyUsd(displayCostOf(row, { ...config, showTotalWithPlan: true }), config)).join('; ')
     }
 
     function TurnCost(props) {
@@ -1529,10 +1542,10 @@
         row.provider + ':' + row.model + ' · ' + names[row.bucket] + (row.plan ? ' (Plan)' : '') + ': ' + row.tokens.toLocaleString() + ' × ' + (row.priced ? money(row.rate) : '?') + ' / 1,000,000 ≈ ' + (row.priced ? money(row.cost) : '?'),
         !row.priced ? (en ? ' (price unavailable)' : '（未配置价格）') : row.bucket === 'reasoning' && row.rate === 0 ? (en ? ' (no separate charge)' : '（不单独收费）') : '')
       return el('details', { className: 'cm-note', style: { fontSize: 12, marginTop: 6 } },
-        el('summary', { style: { cursor: 'pointer' }, title: en ? 'Log estimate at configured prices; session cost uses recorded ledger amounts.' : '本轮按日志和配置价格估算，本会话按账本已入账金额汇总。' }, en ? 'Turn cost' : '本轮费用', value?.found ? ' ≈ ' + money(config.showTotalWithPlan ? value.cost : value.apiCost) + (value.rows.some(r => !r.priced) ? (en ? ' + unpriced usage' : ' + 未定价用量') : '') : value?.inherited ? (en ? ' · inherited history' : ' · 继承历史') : error ? ' ⚠' : ''),
+        el('summary', { style: { cursor: 'pointer' }, title: en ? 'Log estimate at configured prices; session cost uses recorded ledger amounts.' : '本轮按日志和配置价格估算，本会话按账本已入账金额汇总。' }, en ? 'Turn cost' : '本轮费用', value?.found ? ' ≈ ' + money(displayCostOf(value, config)) + (value.rows.some(r => !r.priced) ? (en ? ' + unpriced usage' : ' + 未定价用量') : '') : value?.inherited ? (en ? ' · inherited history' : ' · 继承历史') : error ? ' ⚠' : ''),
         error ? el('div', { role: 'alert' }, error) : !value ? (en ? 'Loading…' : '加载中…') : !value.found ? value.inherited ? (en ? 'Inherited usage is not billed again in this conversation.' : '继承的历史用量不在本会话重复计费。') : (en ? 'Complete usage records unavailable' : '没有完整用量记录') :
           el(Fragment, null, el('p', null, en ? 'Estimated from recorded usage and configured prices; rates per 1M tokens.' : '按已记录用量和配置价格估算；单价单位为每百万 Token。'),
-            el('p', null, 'API ≈ ' + money(value.apiCost) + ' · Plan ≈ ' + money(value.cost - value.apiCost) + (en ? ' (equivalent)' : '（等值）')),
+            el('p', null, 'API ≈ ' + money(displayCostOf(value, { ...config, showTotalWithPlan: false })) + ' · Plan ≈ ' + money(displayCostOf(value, { ...config, showTotalWithPlan: true }) - displayCostOf(value, { ...config, showTotalWithPlan: false })) + (en ? ' (equivalent)' : '（等值）')),
             value.rows.map(rowView),
             el('details', null, el('summary', { style: { cursor: 'pointer' } }, (en ? 'Individual calls' : '逐次调用明细') + ' (' + value.calls.length + ')'),
               value.calls.map((call, i) => el('details', { key: i, style: { margin: '6px 0' } },

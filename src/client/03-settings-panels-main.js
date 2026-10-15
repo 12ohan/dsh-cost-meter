@@ -656,6 +656,7 @@
         if (!b || typeof b !== 'object') return
         const row = out[key] ?? (out[key] = Object.fromEntries([...fields, 'apiCost'].map(k => [k, 0])))
         for (const k of fields) row[k] += num(b[k])
+        for (const k of frozenMoneyFields) if (Number.isFinite(b[k])) row[k] = (row[k] ?? 0) + b[k]
         const sep = key.indexOf(':')
         row.apiCost += num(b.apiCost ?? (billingClassOfLocal(sep > 0 ? key.slice(0, sep) : 'deepseek', sep > 0 ? key.slice(sep + 1) : key, config) === 'plan' ? 0 : b.cost))
       }
@@ -1860,6 +1861,8 @@
       // 本轮草稿的 diff 基点(冻结基线):草稿存在期间不随轮询推进,
       // 保证防抖 diff 始终对照「草稿创建那一刻」的基线,只提交真正改动的键。
       const draftBaseRef = React.useRef(null)
+      const saveQueue = React.useRef(Promise.resolve()), saveGeneration = React.useRef(0), flushSave = React.useRef(null)
+      useEffect(() => () => { flushSave.current?.() }, [])
 
       useEffect(() => {
         if (state !== null) {
@@ -1887,13 +1890,15 @@
         }
       }, [draft])
 
-      // 配置改动 600ms 防抖后即时保存(无需点击保存按钮)。
+      // Short debounce plus a single write queue; stale responses cannot mark a newer draft saved.
       useEffect(() => {
+        const generation = ++saveGeneration.current
         if (draft === null || api === undefined) return
         const json = JSON.stringify(draft)
-        if (json === savedRef.current) return
+        if (json === savedRef.current) { flushSave.current = null; return }
         setSaveState(prev => (prev.status === 'saving' ? prev : { ...prev, status: 'saving' }))
-        const timer = setTimeout(() => {
+        const enqueue = () => { saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
+          if (generation !== saveGeneration.current) return
           // 只提交发生变化的顶层键(diff 补丁):多窗口同开时,旧窗口的草稿
           // 不再整份覆盖其它窗口已保存的改动(否则会互相回弹)。
           // diff 基点取草稿创建时冻结的 draftBaseRef:期间到达的新 state 只推进
@@ -1911,16 +1916,19 @@
             setSaveState({ status: 'saved', at: Date.now(), error: null })
             return
           }
-          api.updateConfig(patch).then(() => {
+          try {
+            await api.updateConfig(patch)
             savedRef.current = json
             // 保存成功后把 diff 基点推进到「基线 + 已提交补丁」的新配置,
             // 与服务端实际状态对齐,下一轮 diff 从这里算起。
             if (base !== null && typeof base === 'object') draftBaseRef.current = { ...base, ...patch }
-            setSaveState({ status: 'saved', at: Date.now(), error: null })
-          }, error => {
-            setSaveState({ status: 'error', at: 0, error: error?.message ?? String(error) })
-          })
-        }, 600)
+            if (generation === saveGeneration.current) setSaveState({ status: 'saved', at: Date.now(), error: null })
+          } catch (error) {
+            if (generation === saveGeneration.current) setSaveState({ status: 'error', at: 0, error: error?.message ?? String(error) })
+          }
+        }) }
+        flushSave.current = enqueue
+        const timer = setTimeout(enqueue, 120)
         return () => { clearTimeout(timer) }
       }, [draft, api])
 
@@ -2421,7 +2429,7 @@
         getDaySessions: async date => call('getDaySessions', [date]),
         // 跨全部日期的会话排行(issue #22 不分日期视角):支持费用/时间升降序与实时顺序。
         getSessionCost: async id => call('getSessionCost', [id]),
-        getTurnCost: async (id, start, end) => call('getTurnCost', [id, start, end]),
+        getTurnCost: async (id, start, end) => call('getTurnCost', [id, start, end, store.getSnapshot().state?.config?.currency]),
         getTopSessions: async (limit, sort, dir) => call('getTopSessions', [limit, sort, dir]),
         refreshBalance: async () => receive(costMeter.refreshBalance(), 'rpcBalanceFailed'),
         refreshGoQuota: async () => receive(costMeter.refreshGoQuota()),

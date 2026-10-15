@@ -220,7 +220,7 @@ window.__ModuleLoader__.load({
                 onChange: event => {
                   const preset = CURRENCY_PRESETS[event.target.value]
                   if (preset !== undefined && draft !== null) {
-                    setDraft({ ...draft, currency: event.target.value, ...preset })
+                    setDraft({ ...draft, currency: event.target.value, ...preset, exchangeRate: draft.exchangeRateAuto !== false ? draft.fxRates?.[event.target.value] ?? preset.exchangeRate : preset.exchangeRate })
                   }
                 },
               },
@@ -228,16 +228,9 @@ window.__ModuleLoader__.load({
                 el('option', { value: 'USD' }, t('currencyUsd')),
                 el('option', { value: 'EUR' }, t('currencyEur')))),
             el('div', { className: 'cm-field' },
-              el('label', null, t('symbolLabel')),
-              el('input', {
-                className: 'cm-input narrow', type: 'text',
-                value: draft?.symbol ?? '',
-                onChange: event => setField('symbol', event.target.value),
-              })),
-            el('div', { className: 'cm-field' },
               el('label', null, t('rateLabel')),
               // 清空不提交:汇率 0 会被服务端校验拒绝并整包报错,保留原值更友好。
-              numInput({ value: draft?.exchangeRate ?? 1, emptyMode: 'ignore' }, v => setField('exchangeRate', v))),
+              numInput({ value: draft?.exchangeRate ?? 1, emptyMode: 'ignore' }, v => setDraft({ ...draft, exchangeRate: v, exchangeRateAuto: false }))),
             el('div', { className: 'cm-field' },
               el('label', null, t('decimalsLabel')),
               numInput({ value: draft?.decimals ?? 2 }, v => setField('decimals', Math.min(10, Math.floor(v))))),

@@ -4353,7 +4353,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   const indexSrc = readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8')
   assert.ok(indexSrc.includes("includes('plan-autodetect-v1')"), 'plan-autodetect-v1 迁移标记接线')
   assert.ok(indexSrc.includes('suggestPlanAutoClasses'), '宿主调用归类建议函数')
-  assert.ok(/patch\.planBilling !== undefined \|\| patch\.codingPlans !== undefined \|\| patch\.goQuota !== undefined/.test(indexSrc), 'updateConfig 触碰分类相关键即重算 apiCost')
+  assert.ok(indexSrc.includes('JSON.stringify([before.planBilling, [...enabledPlanSetOf(before)]])') && indexSrc.includes('splitLedgerApiCost(ledger)'), '仅分类或启用套餐实际改变时重算 apiCost，显示修改不重算')
   // Go 目录精确别名(zen 路由真实 id 不再依赖宽泛包含)。
   const { DEFAULT_PROVIDER_PRICE_TABLE: TABLE_NOW } = await import('../lib/pricing.js')
   const geminiEntry = TABLE_NOW.google.models['gemini-3.1-pro']
@@ -6821,3 +6821,6 @@ await import('./billion-context-receipts.mjs')
 await import('./opendesign.mjs')
 await import('./prices-revision.mjs')
 console.log('[ok] 全部验证通过')
+
+await import('./exchange-rates.mjs')
+await import('./context-activity.mjs')
