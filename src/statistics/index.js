@@ -34,7 +34,7 @@ window.__ModuleLoader__.load({
       days: array(object({ ...bucketSpec, date: string })), models: array(object({ ...bucketSpec, key: string, provider: string, model: string, priced: boolean })),
       sessions: array(object({ ...bucketSpec, id: string, title: string })), providers: array(string), modelOptions: array(string),
       sessionCount: number, offset: number, unassignedCost: number, unmodeledCost: number })
-    const parseDetail = object({ refreshing: v => boolean(v ?? false), generatedAt: v => number(v ?? 0), refreshFailed: v => boolean(v ?? false), found: boolean, cost: number, apiCost: number, rows: array(costRow), calls: array(callRow), totalCalls: number, offset: number, recorded: buckets, agents: v => array(object({ ...bucketSpec, id: string, title: string }))(v ?? []),
+    const parseDetailBase = object({ refreshing: v => boolean(v ?? false), generatedAt: v => number(v ?? 0), refreshFailed: v => boolean(v ?? false), found: boolean, cost: number, apiCost: number, rows: array(costRow), calls: array(callRow), totalCalls: number, offset: number, recorded: buckets, agents: v => array(object({ ...bucketSpec, id: string, title: string }))(v ?? []),
       callShares: v => array(object({ index: number, cost: number, apiCost: number, tokens: number, calls: number, other: boolean, unpriced: boolean, call: v => v == null ? null : callRow(v) }))(v ?? []),
       kinds: array(object({ ...bucketSpec, kind: string, unpriced: boolean })), turns: array(object({ ...bucketSpec, sessionId, turn: nullableNumber, unpriced: boolean })), totalTurns: number, turnOffset: number,
       stepShares: object(Object.fromEntries(['cost', 'calls'].map(key => [key, array(object({ ...bucketSpec, sessionId, turn: nullableNumber, step: nullableNumber, other: boolean, unpriced: boolean }))]))) })
@@ -43,6 +43,7 @@ window.__ModuleLoader__.load({
     const parseCallInspection = v => ({ ...object({ found: boolean, kind: string, input: string, injected: string, skills: string, precedingTools: string, output: string, reasoning: string, truncated: boolean, totalTools: number, offset: number })(v), tools: parseInspection({ ...v, turn: 0, inputTruncated: false }).tools.map((tool, i) => ({ ...tool, durationMs: nullableNumber(v.tools[i].durationMs ?? null) })) })
     const contextKeys = ['system', 'tools', 'user', 'inject', 'skill', 'assistant', 'tool', 'other']
     const nonnegative = v => { if (number(v) < 0) throw new Error('Invalid context costs amount'); return v }
+    const parseDetail = v => ({ ...parseDetailBase(v), ...Object.fromEntries(['costCny', 'apiCostCny', 'costEur', 'apiCostEur'].filter(key => v[key] !== undefined).map(key => [key, number(v[key])])) })
     const contextRates = object(Object.fromEntries(['input', 'cacheRead', 'cacheWrite', 'output', 'reasoning'].map(key => [key, nonnegative])))
     const optionalRates = v => v === null ? null : contextRates(v)
     const parseContextCosts = object({ status: string, sessionId: string, generatedAt: number, revision: number, provider: string, model: string, basis: string,
