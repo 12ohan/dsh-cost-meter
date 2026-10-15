@@ -72,7 +72,12 @@ const server = createServer(async (request, response) => {
       assert.doesNotMatch(json, /PRIVATE-BODY/)
       sizes.push(Buffer.byteLength(json)); response.setHeader('content-type', 'application/json'); response.end(json)
     } else { response.setHeader('content-type', 'text/html; charset=utf-8'); response.end(html) }
-  } catch (error) { response.statusCode = 500; response.end(JSON.stringify({ error: String(error) })) }
+  } catch (error) {
+    console.error(error)
+    response.statusCode = 500
+    response.setHeader('content-type', 'application/json')
+    response.end(JSON.stringify({ error: 'Test fixture request failed' }))
+  }
 })
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
 const url = `http://127.0.0.1:${server.address().port}/`
