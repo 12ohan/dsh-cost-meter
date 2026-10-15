@@ -2576,108 +2576,10 @@
           })())
           : null),
         // 模型名匹配(自动匹配开关 + 未命中模型的手动指定)
-        (() => {
-          const overrides = draft?.priceOverrides ?? config.priceOverrides ?? {}
-          const dismissed = draft?.priceMatchDismissed ?? config.priceMatchDismissed ?? []
-          const pricesNow = draft?.prices ?? config.prices
-          const byProvider = state.today.byProviderModel ?? {}
-          // 今日出现但未命中价格条目的 provider:model 键:判定走 resolveClientPrice 完整
-          // 解析链(精确/归一化/宽泛/跨厂商兑底,按当前匹配模式),与计费口径一致——
-          // 路由 provider 前缀(go:/opencode: 等)下实际已正确计价的模型不再误报,
-          // 仅 DeepSeek 默认价兜底与完全未命中者需要人工指定。
-          const matchPrices = { prices: pricesNow, priceMatch: draft?.priceMatch ?? config.priceMatch }
-          const unmatchedKeys = Object.keys(byProvider).filter(key => {
-            if (dismissed.includes(key)) return false
-            if (overrides[key] !== undefined) return false // 已手动指定的键由下方 rows 展示
-            const sep = key.indexOf(':')
-            const provider = (sep > 0 ? key.slice(0, sep) : 'deepseek').toLowerCase()
-            const modelId = sep > 0 ? key.slice(sep + 1) : key
-            return resolveClientPrice(provider, modelId, matchPrices).matched !== true
-          })
-          const rows = [...new Set([...unmatchedKeys, ...Object.keys(overrides)])].filter(key => !dismissed.includes(key))
-          // 本月已命中价格且未手动指定的 provider:model 键(v1.6.11):同样允许
-          // 改挂其它条目或标记为本地模型(零消耗)。数据取 state.month.byProviderModel
-          // (比今日覆盖面广);override 写入后该键转入上方 rows(手动指定区)展示。
-          const monthByProvider = state.month?.byProviderModel ?? {}
-          const matchedKeys = Object.keys(monthByProvider).filter(key => {
-            if (dismissed.includes(key)) return false
-            if (overrides[key] !== undefined) return false
-            const sep = key.indexOf(':')
-            const provider = (sep > 0 ? key.slice(0, sep) : 'deepseek').toLowerCase()
-            const modelId = sep > 0 ? key.slice(sep + 1) : key
-            return resolveClientPrice(provider, modelId, matchPrices).matched === true
-          }).sort()
-  const targetOptions = [
-    // 「本地模型(零消耗)」哨兵(v1.6.11):__local__ 由服务端解析为未定价
-    // (token 照记、费用 0),历史桶随 updateConfig 即时归零。
-    { value: '__local__', label: t('overrideTargetLocal') },
-    { value: 'deepseek:__default__', label: t('overrideTargetDefault') },
-    // DeepSeek 目标必须带 'deepseek:' 前缀存储(issue #56):裸名会被按
-    // 「同渠道换名」解析,跨渠道映射(如 cephalon:x → deepseek-v4-flash)查无此价。
-    ...Object.keys(pricesNow.models ?? {}).map(id => ({ value: 'deepseek:' + id, label: 'DeepSeek · ' + id })),
-    ...Object.entries(pricesNow.providers ?? {}).flatMap(([p, table]) =>
-      Object.keys(table?.models ?? {}).map(id => ({ value: p + ':' + id, label: p + ' · ' + id }))),
-  ]
-          const setOverride = (key, value) => {
-            if (draft === null) return
-            const next = { ...(draft.priceOverrides ?? {}) }
-            if (value === '') delete next[key]
-            else next[key] = value
-            setDraft({ ...draft, priceOverrides: next })
-          }
-          const dismissMatch = key => {
-            if (draft === null) return
-            const next = { ...(draft.priceOverrides ?? {}) }
-            delete next[key]
-            setDraft({ ...draft, priceOverrides: next, priceMatchDismissed: [...new Set([...dismissed, key])] })
-          }
-          return el('div', null,
-            el('h3', { className: 'cm-h' }, t('priceMatchLabel')),
-            el('div', { className: 'cm-field' },
-              el('select', {
-                className: 'cm-input',
-                value: draft?.priceMatch === 'exact' ? 'exact' : 'auto',
-                onChange: event => setField('priceMatch', event.target.value),
-              },
-                el('option', { value: 'auto' }, t('priceMatchAuto')),
-                el('option', { value: 'exact' }, t('priceMatchExact')))),
-            el('p', { className: 'cm-note' }, t('priceMatchNote')),
-            rows.length > 0
-              ? el(Fragment, null,
-                el('h3', { className: 'cm-h' }, t('unmatchedTitle')),
-                el('p', { className: 'cm-hint' }, t('unmatchedHint')),
-                rows.map(key =>
-                  el('div', { key, className: 'cm-match-row' },
-                    el('span', null, prettyProviderKey(key)),
-                    el('select', {
-                      className: 'cm-input',
-                      value: overrides[key] ?? '',
-                      onChange: event => setOverride(key, event.target.value),
-                    },
-                      el('option', { value: '' }, '—'),
-                      targetOptions.map(o => el('option', { key: o.value, value: o.value }, o.label))),
-                    el('button', { className: 'cm-btn small', title: t('removePriceMatchHint'), onClick: () => dismissMatch(key) }, t('overrideRemove')))))
-              : el('p', { className: 'cm-hint' }, t('overrideNone')),
-            dismissed.length > 0 ? el('button', { className: 'cm-btn small', onClick: () => setField('priceMatchDismissed', []) }, t('restorePriceMatches', { count: dismissed.length })) : null,
-            // 已命中模型改映射(v1.6.11):默认「保持自动命中」,选择目标即写入手动覆盖。
-            matchedKeys.length > 0
-              ? el(Fragment, null,
-                el('h3', { className: 'cm-h' }, t('matchedTitle')),
-                el('p', { className: 'cm-hint' }, t('matchedHint')),
-                matchedKeys.map(key =>
-                  el('div', { key, className: 'cm-match-row' },
-                    el('span', null, prettyProviderKey(key)),
-                    el('select', {
-                      className: 'cm-input',
-                      value: '',
-                      onChange: event => { if (event.target.value !== '') setOverride(key, event.target.value) },
-                    },
-                      el('option', { value: '' }, t('matchedKeepAuto')),
-                      targetOptions.map(o => el('option', { key: o.value, value: o.value }, o.label))))))
-              : null)
-        })(),
+        el(BillingStatistics, { state, api, load: api.loadPricing, mode: 'matching', draft, setDraft, t, locale, resolveClientPrice, prettyProviderKey, setField }),
         // 拓展价格表(厂商/家族分类目录;挂载 ↔ 费用设置价格表)
         el(PriceCatalogPanel, { state, draft, setDraft, t }),
+        el(BillingStatistics, { state, api, load: api.loadPricing, mode: 'history', locale, disabled: busy || JSON.stringify(draft) !== savedRef.current }),
         // 官方价格同步(与价格表同组;自动保存状态已移至标签栏常驻)
         el('div', null,
           el('h3', { className: 'cm-h' }, t('dataSync')),
@@ -2816,6 +2718,7 @@
         loadStatistics: () => loadPage('statistics'),
         loadOpenRouter: () => loadPage('openrouter'),
         loadCommunity: () => loadPage('community'),
+        loadPricing: () => loadPage('pricing'),
         reload,
         updateConfig: async patch => {
           const { activeLocale: _local, ...savedPatch } = patch

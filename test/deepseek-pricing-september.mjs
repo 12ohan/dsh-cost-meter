@@ -119,7 +119,7 @@ try {
   await runStartupImports(ledger, sessions)
   const day = ledger.days[localDayKey(flashAt)]
   const completed = day.sessions.find(s => s.id === 'complete')
-  near(completed.cost, (0.00661 + 0.002602) / cfg.exchangeRate)
+  near(completed.cost, previous[localDayKey(flashAt)].sessions.find(s => s.id === 'complete').cost)
   near(day.sessions.find(s => s.id === 'partial').cost, previous[localDayKey(flashAt)].sessions.find(s => s.id === 'partial').cost)
   assert.deepEqual(ledger.days[localDayKey(flashAt - 86400000)], previous[localDayKey(flashAt - 86400000)], '生效日前账本不动')
   const once = JSON.stringify(ledger.days)

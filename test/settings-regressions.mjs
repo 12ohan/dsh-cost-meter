@@ -10,9 +10,10 @@ import { stateSchema } from '../lib/typert.host.js'
 const dir = new URL('../src/client/', import.meta.url)
 const source = readdirSync(dir).filter(name => name.endsWith('.js')).sort().map(name => readFileSync(new URL(name, dir), 'utf8')).join('')
 const code = source.replace('exports.apply = apply', 'exports.test = { PlanQuotaCard, CostSection, parseConfig, makeT, codingPlanWindowLabel }; exports.apply = apply')
-let active
+let active, pricing
 const react = {
-  createElement: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity) }),
+  createElement: (type, props, ...children) => type?.name === 'BillingStatistics' && props?.mode === 'matching'
+    ? pricing.Matching(props) : ({ type, props: props ?? {}, children: children.flat(Infinity) }),
   Fragment: 'fragment',
   useState: initial => {
     const runner = active, i = runner.cursor++
@@ -43,6 +44,10 @@ vm.runInNewContext(code, {
   setTimeout: fn => { timers.set(++timerId, fn); return timerId }, clearTimeout: id => timers.delete(id),
 })
 const ui = factory(name => name === 'react' ? react : {}).test
+vm.runInNewContext(readFileSync(new URL('../src/pricing/index.js', import.meta.url), 'utf8').replace('return { mount, CONTRIBUTION }', 'return { Matching }'), {
+  window: { __ModuleLoader__: { load: value => { factory = value.factory } } },
+})
+pricing = factory(name => name === 'react' ? react : {})
 function renderer(component, props) {
   const runner = { slots: [], cursor: 0, effects: [], dirty: false }
   return () => {
