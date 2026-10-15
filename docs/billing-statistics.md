@@ -102,9 +102,9 @@ API 费用是按上报用量和配置单价计算的估算，不是厂商账单�
 
 - **dsh-codex-ui 1.1.38：**费用明细入口和会话金额继续使用 DSH 的插槽。统计栏变宽时优先保留金额，Token、缓存和 Plan 明细可缩短，悬停查看完整信息。账本仍在加载或没有当前会话记录时显示对应状态，不再短暂显示投影金额后消失。
 - **dsh-agency-agents 1.0.19：**专家通过 DSH 的标准子代理接口运行。开启“本会话费用包含子代理”即可包含专家及其后代，父账本不再次入账。普通分叉和继承的历史轮次不重复收费。
-- **billion-context 0.1.197：**压缩会改变实际发送的输入；部分内部压缩、重试和多轮请求未完整进入 DSH 的标准用量。检测到它的页面标识后，费用页说明当前覆盖范围，并提供代理统计入口。只根据 DSH 已上报的用量记账；不把代理的节省比例、默认价格或未知差额补入账本。此兼容处理没有收集代理内部全部调用。
+- **billion-context：**原版 0.1.197 仍只统计上报给 DSH 的用量；本地配套兼容包 `0.1.197-cost-meter.1` 已接入内部压缩、重试和追加模型请求，费用页显示采集状态和缺失回执。原用量不重复收费，未上报的未知费用不估补，详见[逐次计费说明](billion-context-billing.md)。
 
-仅安装其他插件不能证明它影响费用；本次没有执行第三方插件，也没有发起模型请求。是否漏记额外调用，应以插件提供的逐次用量及厂商账单为依据。
+仅安装其他插件不能证明它影响费用；兼容验证使用本地模拟接口和固定版本的实际代码，没有发起付费模型请求。
 
 版本源码：[dsh-codex-ui](https://github.com/MichengAI/dsh-codex-ui/tree/4f82059f4df415320917b572811b0b6440179ac9)、[dsh-agency-agents](https://github.com/MichengAI/dsh-agency-agents/tree/576eeec833b34554bc89d11f70076e3e1b9eb9cd)、[billion-context](https://github.com/ranxianglei/billion-context/tree/3aeddc160864ca774e54817559d6984310e2a9ab)。
 
@@ -112,9 +112,9 @@ API 费用是按上报用量和配置单价计算的估算，不是厂商账单�
 
 - **dsh-codex-ui 1.1.38:** the entries use DSH slots. Composer statistics preserve the session amount while trimming secondary details, which remain available on hover. Loading and missing-ledger states stay visible without flashing a projection amount first.
 - **dsh-agency-agents 1.0.19:** experts use the standard DSH subagent interface. Enable subagent costs to include their descendants once. Ordinary forks and inherited turns are excluded from duplicate billing.
-- **billion-context 0.1.197:** only usage reported to DSH is included. Some internal compression, retries and additional requests are not fully exposed through the standard usage stream. When its page marker is present, cost views state this coverage and link to its statistics. Internal calls are not fully collected by this integration, and estimated savings or unknown differences never enter the ledger.
+- **billion-context:** the original 0.1.197 build exposes only its reported DSH usage. The paired local `0.1.197-cost-meter.1` build records internal compression, retries and additional model requests without charging the original host usage twice. Coverage and missing receipts remain visible; see the [request billing guide](billion-context-billing.md).
 
-Inspection used the published versions linked above. No third-party plugin code or model request was executed.
+Verification uses local synthetic endpoints and the pinned upstream code. No paid model request is made.
 
 ## Design references
 

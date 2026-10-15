@@ -23,7 +23,13 @@ window.__ModuleLoader__.load({
     const buckets = object(bucketSpec)
     const costRow = object({ provider: string, model: string, bucket: string, tokens: number, rate: number, cost: number, priced: boolean, plan: boolean })
     const sessionId = v => string(v ?? '')
-    const callRow = object({ sessionId, logSeq: v => nullableNumber(v ?? null), kind: string, turn: nullableNumber, step: nullableNumber, provider: string, model: string, atMs: number, cost: number, apiCost: number, plan: boolean, priced: boolean, longContext: boolean, rows: array(costRow) })
+    const meteringRow = object({ source: string, requestId: string, attempt: number, complete: boolean, status: string, upstream: string })
+    const callBase = object({ sessionId, logSeq: v => nullableNumber(v ?? null), kind: string, turn: nullableNumber, step: nullableNumber, provider: string, model: string, atMs: number, cost: number, apiCost: number, plan: boolean, priced: boolean, longContext: boolean, rows: array(costRow) })
+    const callRow = value => {
+      const row = callBase(value)
+      if (value.metering != null) row.metering = meteringRow(value.metering)
+      return row
+    }
     const parseStatistics = object({ from: string, to: string, retainedFrom: string, retainedTo: string, totals: buckets,
       days: array(object({ ...bucketSpec, date: string })), models: array(object({ ...bucketSpec, key: string, provider: string, model: string, priced: boolean })),
       sessions: array(object({ ...bucketSpec, id: string, title: string })), providers: array(string), modelOptions: array(string),
@@ -677,6 +683,9 @@ window.__ModuleLoader__.load({
         el('section', { className: 'cm-plan cm-call-bill', 'aria-label': text('本次计费明细', 'Call billing breakdown') },
           el('div', { className: 'cm-stat-panel-head' }, el('h3', null, call.plan ? text('Plan 等值费用', 'Plan equivalent') : text('API 费用', 'API cost')), el('strong', { className: 'cm-stat-value' }, call.priced ? money(call.cost) : '?')),
           el('p', { className: 'cm-stat-sub' }, call.provider + ' / ' + call.model + ' · ' + new Date(call.atMs).toLocaleString()),
+          call.metering ? el('p', { className: 'cm-stat-note' }, 'billion-context · ' + call.metering.upstream
+            + (call.metering.attempt > 1 ? text(' · 重试 ', ' · Retry ') + call.metering.attempt : '')
+            + (!call.metering.complete ? text(' · 仅含已收到的用量，未知费用未估补', ' · observed usage only; unknown charges are not inferred') : '')) : null,
           !compact ? el(CostBreakdown, { rows: chartRows, total: call.cost, label: text('本次费用构成', 'This call’s costs'), text, amounts: true, onSelect: row => setView(['output', 'reasoning'].includes(row.key) ? 'output' : 'input') }) : null,
           el('div', { className: 'cm-stat-scroll cm-step-rates' }, el('table', { className: 'cm-stat-table' },
             el('thead', null, el('tr', null, ...[text('计费项目', 'Component'), 'Tokens', text('单价 / 百万', 'Rate / 1M'), text('金额', 'Cost'), text('占比', 'Share')].map(label => el('th', { key: label }, label)))),
@@ -1179,15 +1188,19 @@ window.__ModuleLoader__.load({
         el(Pager, { offset, count: detail.totalCalls, size: 50, onChange: n => { setOffset(n); setSelected(-1) }, text })) : null)
     }
 
-    function compressionBillingNotice(text) {
-      if (!window.__BILI__) return null
+    function compressionBillingNotice(text, status) {
+      if (!window.__BILI__ && !status?.connected) return null
       let href
       try {
-        const origin = new URL(window.__BILI__.origin)
+        const origin = new URL(window.__BILI__?.origin)
         if (['http:', 'https:'].includes(origin.protocol) && !origin.username && !origin.password) href = origin.origin + '/__bili/'
       } catch {}
       return el('p', { className: 'cm-stat-note', 'data-billing-coverage': 'billion-context' },
-        text('已检测到 billion-context。此处统计它上报给 DSH 的用量；代理内部未上报的压缩、重试和追加请求未计入。', 'billion-context detected. These totals use its reported DSH usage; unreported internal compression, retries and additional requests are excluded.'),
+        status?.connected ? text('已接入 billion-context 的逐次请求，包括内部压缩、重试和追加请求。只从启用后开始采集，启用前的缺失记录无法补齐。', 'billion-context request metering is connected, including internal compression, retries and additional calls. Collection starts when enabled; earlier missing records cannot be recovered.')
+          + (status.failed ? text(' 用量读取失败，保留已有金额。', ' Usage refresh failed; saved amounts are retained.') : '')
+          + (status.uncovered ? text(' 未建立完整采集的请求：', ' Requests without the full metering bridge: ') + status.uncovered + text('；这些请求沿用 DSH 用量。', '; these requests retain DSH usage accounting.') : '')
+          + (status.unreported || status.partial ? text(' 没有完整用量回执的请求：', ' Requests without complete usage: ') + (status.unreported + status.partial) + text('；这些请求的未知费用没有估补。', '; unknown charges are not inferred.') : '')
+          : text('已检测到 billion-context。此处统计它上报给 DSH 的用量；代理内部未上报的压缩、重试和追加请求未计入。', 'billion-context detected. These totals use its reported DSH usage; unreported internal compression, retries and additional requests are excluded.'),
         href ? el('a', { href, target: '_blank', rel: 'noopener noreferrer', style: { marginInlineStart: 8 } }, text('查看代理统计', 'Open proxy statistics')) : null)
     }
 
@@ -1212,7 +1225,7 @@ window.__ModuleLoader__.load({
       const money = n => formatMoneyUsd(n, { ...state.config, decimals: Math.max(n !== 0 && Math.abs(n) < .01 ? 8 : 4, state.config.decimals ?? 2) })
       const query = { sessionId, from: '', to: '', provider: '', model: '', basis, offset: 0 }
       return el('div', { className: 'cm-stat cm-stat-session', 'data-session-id': sessionId }, el('style', null, css),
-        compressionBillingNotice(text),
+        compressionBillingNotice(text, state.billionContext),
         el('div', { className: 'cm-stat-panel-head' }, el('p', { className: 'cm-stat-sub' }, text('当前对话 · 全部调用', 'This conversation · all calls')), button(text('刷新', 'Refresh'), () => setRevision(n => n + 1))),
         el(SessionDetail, { key: sessionId + ':' + basis, api, query, revision: refreshKey, money, formatTokens, text, overview: true },
           el(ContextCosts, { key: sessionId, api, sessionId, revision: refreshKey, money, text, compact: true, expanded: true })),
@@ -1248,7 +1261,7 @@ window.__ModuleLoader__.load({
       const top = data?.totals
       const metric = (label, value, sub) => el('div', { className: 'cm-stat-metric', key: label }, el('div', { className: 'cm-stat-sub' }, label), el('div', { className: 'cm-stat-value' }, value), el('div', { className: 'cm-stat-sub' }, sub))
       return el('div', { className: 'cm-stat' }, el('style', null, css),
-        compressionBillingNotice(text),
+        compressionBillingNotice(text, state.billionContext),
         contextIntegration ? el(ContextIntegrationSettings, contextIntegration) : null,
         el('header', { className: 'cm-stat-head' }, el('div', null, el('h2', null, text('计费统计', 'Cost statistics')), el('p', { className: 'cm-stat-sub' }, scope.id ? text('单对话 · ', 'Conversation · ') + (scope.title === scope.id ? data?.sessions[0]?.title || scope.title : scope.title) : text('全部对话 · 从总额查看每一笔调用', 'All conversations · from totals to individual calls'))),
           button(text('刷新', 'Refresh'), () => setRevision(n => n + 1))),

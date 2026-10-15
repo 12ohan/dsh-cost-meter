@@ -16,6 +16,8 @@
 
 桌面端用户请按 [Desktop 安装说明](docs/install-troubleshooting.md#desktop-安装与更新)，使用应用自带的 CLI 和 `desktop` Profile。
 
+本地预览（未发布）：[billion-context 逐次计费](docs/billion-context-billing.md)需要配套兼容包；[OpenDesign 计费与查询](docs/opendesign-billing.md#中文)提供独立渠道价格，以及使用 Control Key 的工作区额度查询。
+
 启动报 **Ledger is busy** 且费用卡片消失时，参见[账本锁恢复说明](docs/ledger-lock-recovery.md#简体中文)。
 
 [![npm](https://img.shields.io/npm/v/dsh-cost-meter?label=npm)](https://www.npmjs.com/package/dsh-cost-meter)

@@ -1551,6 +1551,7 @@
     }
 
     const CODING_PLAN_ROWS = [
+      { id: 'opendesign', labelKey: 'codingPlanOpendesign' },
       { id: 'anthropic', labelKey: 'codingPlanAnthropic' },
       { id: 'zai', labelKey: 'codingPlanZai' },
       { id: 'minimax', labelKey: 'codingPlanMinimax' },
@@ -1640,6 +1641,10 @@
               ? el('p', { className: 'cm-note' }, live.message)
               : el('div', { className: 'cm-bal-line' }, t('codingPlanNotQueried'))
       const configNode = el(Fragment, null,
+        planId === 'opendesign' ? el('div', { className: 'cm-field' },
+          el('label', null, t('opendesignWorkspace')),
+          el('input', { className: 'cm-input', 'aria-label': t('opendesignWorkspace'), value: cfgEntry.workspaceId ?? '', onChange: e => setPlan('workspaceId', e.target.value) }),
+          el('p', { className: 'cm-note' }, t('opendesignNote'))) : null,
         planId === 'factory' ? el(Fragment, null,
           el('div', { className: 'cm-field' },
             el('label', null, t('factoryPool')),
@@ -1757,13 +1762,13 @@
               el('p', { className: 'cm-note' }, t('volcengineNote')))
             : el(Fragment, null,
               el('div', { className: 'cm-field' },
-                el('label', null, planId === 'mimo' ? 'Cookie (platform.xiaomimimo.com)' : planId === 'factory' ? 'Factory Token' : t('codingPlanKeyLabel'))),
+                el('label', null, planId === 'mimo' ? 'Cookie (platform.xiaomimimo.com)' : planId === 'factory' ? 'Factory Token' : planId === 'opendesign' ? 'OpenDesign Control Key' : t('codingPlanKeyLabel'))),
               el(CredentialField, {
                 target: 'codingPlans.' + planId,
                 configured: live.keyConfigured === true,
                 source: live.keySource,
                 t, api,
-                placeholder: planId === 'mimo' ? 'api-platform_serviceToken=…; userId=…' : planId === 'factory' ? 'FACTORY_API_KEY' : 'sk-…',
+                placeholder: planId === 'mimo' ? 'api-platform_serviceToken=…; userId=…' : planId === 'factory' ? 'FACTORY_API_KEY' : planId === 'opendesign' ? 'OPENDESIGN_CONTROL_KEY' : 'sk-…',
               })))
       return el(QuotaCard, {
         name: t(labelKey), enabled, saved: config.codingPlans?.[planId], busy, open, errorMsg: msg,

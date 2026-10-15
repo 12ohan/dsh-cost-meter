@@ -54,6 +54,10 @@
       for (const key of ['input', 'output', 'cacheRead', 'cacheWrite', 'calls', 'cost']) out[key] = needNum(v[key], path + '.' + key)
       return out
     }
+    function parseMetering(v) {
+      return v == null ? undefined : { source: needStr(v.source, 'source'), requestId: needStr(v.requestId, 'requestId'), attempt: needNum(v.attempt, 'attempt'),
+        complete: needBool(v.complete, 'complete'), status: needStr(v.status, 'status'), upstream: needStr(v.upstream, 'upstream') }
+    }
     function parseTurnRows(rows) {
       return (Array.isArray(rows) ? rows : fail('rows', 'array')).map(r => ({ provider: needStr(r.provider, 'provider'), model: needStr(r.model, 'model'), bucket: needStr(r.bucket, 'bucket'), tokens: needNum(r.tokens, 'tokens'), rate: needNum(r.rate, 'rate'), cost: needNum(r.cost, 'cost'), priced: needBool(r.priced, 'priced'), plan: needBool(r.plan, 'plan') }))
     }
@@ -193,6 +197,7 @@
                 apiKey: typeof e.apiKey === 'string' ? e.apiKey : '',
                 ...(id === 'minimax' ? { baseUrl: typeof e.baseUrl === 'string' ? e.baseUrl : '' } : {}),
                 ...(id === 'factory' ? { orgId: typeof e.orgId === 'string' ? e.orgId : '', factoryPool: ['core', 'both'].includes(e.factoryPool) ? e.factoryPool : 'standard' } : {}),
+                ...(id === 'opendesign' ? { workspaceId: typeof e.workspaceId === 'string' ? e.workspaceId : '' } : {}),
                 ...(id === 'qwen' ? { quotaSource: ['cli', 'bailian'].includes(e.quotaSource) ? e.quotaSource : 'local' } : {}),
                 // SCNet / 千问本地计量字段(issue #26/#78):其余厂商无此键,缺省剔除。
                 ...(typeof e.planCredits === 'number' && Number.isFinite(e.planCredits) && e.planCredits > 0 ? { planCredits: e.planCredits } : {}),
@@ -430,6 +435,8 @@
         // Token Plan 统计(issue #64):宽容解析,缺失/畸形回落 null(UI 隐藏面板)。
         planStats: parsePlanStats(v.planStats),
         history: Array.isArray(v.history) ? v.history.map((d, i) => parseDay(d, path + '.history[' + i + ']')) : [],
+        billionContext: v.billionContext?.protocol === 1 ? { protocol: 1, connected: v.billionContext.connected === true, failed: v.billionContext.failed === true,
+          requests: Number(v.billionContext.requests) || 0, unreported: Number(v.billionContext.unreported) || 0, partial: Number(v.billionContext.partial) || 0, uncovered: Number(v.billionContext.uncovered) || 0 } : undefined,
         externalUsage: v.externalUsage && Array.isArray(v.externalUsage.sources) ? {
           fetchedAt: Number(v.externalUsage.fetchedAt) || 0,
           stale: v.externalUsage.stale === true,
@@ -559,7 +566,7 @@
           id: 'dsh-cost-meter#costMeter/getTurnCost', service: 'costMeter', namespace: 'costMeter', method: 'getTurnCost', invocation: { kind: 'direct' },
           parameters: [rpcParam('sessionId', 'SessionId', codecOf(v => needStr(v, 'sessionId'))), ...['startSeq', 'endSeq'].map(name => rpcParam(name, 'TurnSeq', codecOf(v => { if (!Number.isSafeInteger(v) || v < 0) fail(name, 'nonnegative integer'); return v })))],
           result: strictCodec('TurnCost', codecOf(v => ({ found: needBool(v.found, 'found'), ...(v.inherited === undefined ? {} : { inherited: needBool(v.inherited, 'inherited') }), cost: needNum(v.cost, 'cost'), apiCost: needNum(v.apiCost, 'apiCost'), rows: parseTurnRows(v.rows),
-            calls: (Array.isArray(v.calls) ? v.calls : fail('calls', 'array')).map(c => ({ kind: needStr(c.kind, 'kind'), provider: needStr(c.provider, 'provider'), model: needStr(c.model, 'model'), atMs: needNum(c.atMs, 'atMs'), cost: needNum(c.cost, 'cost'), apiCost: needNum(c.apiCost, 'apiCost'), plan: needBool(c.plan, 'plan'), priced: needBool(c.priced, 'priced'), longContext: needBool(c.longContext, 'longContext'), rows: parseTurnRows(c.rows) })) }))),
+            calls: (Array.isArray(v.calls) ? v.calls : fail('calls', 'array')).map(c => ({ kind: needStr(c.kind, 'kind'), provider: needStr(c.provider, 'provider'), model: needStr(c.model, 'model'), atMs: needNum(c.atMs, 'atMs'), cost: needNum(c.cost, 'cost'), apiCost: needNum(c.apiCost, 'apiCost'), plan: needBool(c.plan, 'plan'), priced: needBool(c.priced, 'priced'), longContext: needBool(c.longContext, 'longContext'), rows: parseTurnRows(c.rows), ...(c.metering ? { metering: parseMetering(c.metering) } : {}) })) }))),
         },
         {
           method: 'getTopSessions',
@@ -809,7 +816,8 @@
       }
     }
 
-    const SCOPED_PRICE_PROVIDERS = new Set(['openrouter', 'opencode-zen', 'opencode-go', 'opencode-go-plus', 'zen', 'opencode'])
+    const OPENDESIGN_PROVIDER_IDS = ['opendesign', 'open-design', 'open-design-api', 'amr-link.open-design.ai']
+    const SCOPED_PRICE_PROVIDERS = new Set(['openrouter', 'opencode-zen', 'opencode-go', 'opencode-go-plus', 'zen', 'opencode', ...OPENDESIGN_PROVIDER_IDS])
     const MODEL_VENDOR_PREFIXES = {
       openai: /^(?:gpt|o\d|codex)/i, anthropic: /^claude/i, google: /^gemini/i,
       deepseek: /^deepseek/i, moonshot: /^kimi/i, 'z-ai': /^glm/i, xai: /^grok/i,
@@ -903,6 +911,8 @@
         if (own === null) targetProvider = 'opencode-go'
         else targetModel = own
       }
+      if (OPENDESIGN_PROVIDER_IDS.includes(targetProvider) && targetProvider !== 'opendesign'
+        && priceModelHit(targetModel, prices.providers?.[targetProvider]?.models ?? {}, targetProvider, mode, prices) === null) targetProvider = 'opendesign'
       // 本地推理来源零价守卫(与 pricing.js 同口径,置于覆盖之后、目录匹配之前)。
       if (isLocalOriginClient(targetProvider, targetModel)) {
         return { entry: null, priced: false, billingMode: 'flat', matched: false }
@@ -1029,6 +1039,7 @@
     // ── Plan/API 双轨分类(issue #64):与 lib/plan-billing.js 同逻辑的镜像实现
     //    (bundle 无法导入 Node 模块,修改时两处同步)。──
     const PLAN_PROVIDER_ALIASES_LOCAL = {
+      opendesign: OPENDESIGN_PROVIDER_IDS,
       go: ['go', 'zen', 'opencode', 'opencode-go', 'opencode-go-plus'],
       codex: ['codex', 'openai-codex', 'dsh-openai-codex'],
       'volcengine-agent': ['volcengine-agent', 'ark-agent-plan', 'volcengine-agent-plan'],
@@ -1041,8 +1052,9 @@
       mimo: ['mimo', 'xiaomimimo', 'mimo-token-plan', 'xiaomi-token-plan', 'xiaomi-token-plan-cn', 'xiaomi-token-plan-sgp', 'xiaomi-token-plan-ams'],
       factory: ['factory', 'droid', 'factory-a', 'factory-g', 'factory-o'],
     }
-    const PLAN_PROVIDER_IDS_LOCAL = ['anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'scnet', 'volcengine', 'qwen', 'mimo', 'factory', 'go', 'codex', 'volcengine-agent', 'tencent-coding', 'tencent-token', 'baidu-coding']
+    const PLAN_PROVIDER_IDS_LOCAL = ['opendesign', 'anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'scnet', 'volcengine', 'qwen', 'mimo', 'factory', 'go', 'codex', 'volcengine-agent', 'tencent-coding', 'tencent-token', 'baidu-coding']
     const PLAN_NAME_HINTS_LOCAL = {
+      opendesign: 'opendesign|open[._-]?design',
       codex: 'codex|chatgpt', 'baidu-coding': 'baidu|qianfan|百度|千帆',
       'tencent-coding': 'tencent|tokenhub|腾讯',
       anthropic: 'anthropic|claude', zai: 'z[._-]?ai|zhipu|glm|智谱', minimax: 'minimax|海螺',
@@ -1501,6 +1513,7 @@
             el('details', null, el('summary', { style: { cursor: 'pointer' } }, (en ? 'Individual calls' : '逐次调用明细') + ' (' + value.calls.length + ')'),
               value.calls.map((call, i) => el('details', { key: i, style: { margin: '6px 0' } },
                 el('summary', { style: { cursor: 'pointer', overflowWrap: 'anywhere' } }, '#' + (i + 1) + ' ' + kinds[call.kind] + ' · ' + call.provider + ':' + call.model + ' · ' + new Date(call.atMs).toLocaleTimeString() + ' · ' + (call.plan ? 'Plan ' : 'API ') + (call.priced ? '≈ ' + money(call.cost) : (en ? 'price unavailable' : '未配置价格')) + (call.longContext ? (en ? ' · long context' : ' · 长上下文价格') : '')),
+                call.metering ? el('p', null, 'billion-context · ' + call.metering.upstream + (call.metering.attempt > 1 ? (en ? ' · Retry ' : ' · 重试 ') + call.metering.attempt : '') + (!call.metering.complete ? (en ? ' · partial usage' : ' · 用量回执不完整') : '')) : null,
                 call.rows.map(rowView))))))
     }
 
@@ -2818,7 +2831,7 @@
       volcengine: 'Ark',
       qwen: 'Qwen',
       mimo: 'MiMo',
-      factory: 'Factory',
+      factory: 'Factory', opendesign: 'OpenDesign',
     }
 
     function QuotaStrip(props) {

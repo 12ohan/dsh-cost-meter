@@ -16,6 +16,8 @@ Per-conversation cost · daily totals · OpenCode Go subscription quota display 
 
 Desktop users: follow the [Desktop installation instructions](docs/install-troubleshooting.md#desktop-安装与更新) for the application's own CLI and `desktop` Profile.
 
+Local preview (unreleased): [billion-context request billing](docs/billion-context-billing.md) requires its paired compatibility archive. [OpenDesign billing and quota queries](docs/opendesign-billing.md#english) include scoped public prices and workspace-specific Control Key queries.
+
 If startup reports **Ledger is busy** and the cost widgets are missing, see [ledger lock recovery](docs/ledger-lock-recovery.md#english).
 
 [![npm](https://img.shields.io/npm/v/dsh-cost-meter?label=npm)](https://www.npmjs.com/package/dsh-cost-meter)

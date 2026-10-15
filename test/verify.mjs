@@ -1083,6 +1083,7 @@ await assert.rejects(queryCodingPlan('nobody', 'sk-x', 'zh', stubT), error => er
 
 // 5.6) 端点白名单全部为官方域名(凭据安全)。
 const officialHosts = {
+  opendesign: ['amr-api.open-design.ai'],
   factory: ['api.factory.ai'],
   anthropic: ['api.anthropic.com'],
   zai: ['api.z.ai', 'open.bigmodel.cn'],
@@ -6793,4 +6794,6 @@ await import('./mimo-v26-pricing.mjs')
 await import('./host-locale.mjs')
 await import('./host-locale-client.mjs')
 await import('./conversation-totals.mjs')
+await import('./billion-context-billing.mjs')
+await import('./opendesign.mjs')
 console.log('[ok] 全部验证通过')

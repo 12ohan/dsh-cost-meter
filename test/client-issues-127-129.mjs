@@ -94,6 +94,9 @@ const usage = (input, cost, apiCost) => ({ input, output: 0, cacheRead: 0, cache
 const snapshot = (own, subagents = usage(0, 0, 0), found = true) => ({ own, subagents, found, subagentCount: subagents.input > 0 ? 1 : 0 })
 const e = environment()
 const inheritedTurn = { found: false, inherited: true, cost: 0, apiCost: 0, rows: [], calls: [] }
+const proxyMetering = { source: 'billion-context', requestId: 'id', attempt: 2, complete: false, status: 'cancelled', upstream: 'https://api.example.com' }
+const proxyCall = { kind: 'model', provider: 'fixture', model: 'm', atMs: 1, cost: 0, apiCost: 0, plan: false, priced: true, longContext: false, rows: [], metering: proxyMetering }
+assert.equal(e.ui.CONTRIBUTION.descriptors.find(row => row.method === 'getTurnCost').result.create().parse({ ...inheritedTurn, found: true, calls: [proxyCall] }).calls[0].metering.attempt, 2)
 assert.equal(e.ui.CONTRIBUTION.descriptors.find(row => row.method === 'getTurnCost').result.create().parse(inheritedTurn).inherited, true,
   'the shipped RPC codec preserves inherited-turn identity')
 for (const locale of ['en', 'zh']) {
