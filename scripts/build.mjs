@@ -15,12 +15,20 @@
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { transform } from 'esbuild'
+import { transform, build } from 'esbuild'
 import { runInNewContext } from 'node:vm'
 import assert from 'node:assert/strict'
 import { javascriptLiteral } from './javascript-literal.mjs'
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+
+// A single import installs the local proxy observer before loading price/UI
+// dependencies. Bundle its parser too, avoiding asynchronous dependency loading
+// while the host starts other plugins in parallel.
+await build({ entryPoints: [resolve(projectRoot, 'src/bootstrap.js')], outfile: resolve(projectRoot, 'lib/bootstrap.js'),
+  bundle: true, platform: 'node', format: 'esm', external: ['./index.js'], minify: true, target: 'node20', legalComments: 'inline',
+  banner: { js: '// Generated from src/bootstrap.js by scripts/build.mjs; do not edit.\n/*! Bundles Acorn.\n' + readFileSync(resolve(projectRoot, 'node_modules/acorn/LICENSE'), 'utf8').replaceAll('\r\n', '\n') + '\n*/' } })
+assert.ok(Buffer.byteLength(readFileSync(resolve(projectRoot, 'lib/bootstrap.js'))) <= 262144, 'bootstrap exceeds DSH STORE bound')
 
 const ORDERED_FRAGMENT = /^\d{2}-[a-z0-9-]*\.js$/
 const clientDir = resolve(projectRoot, 'src/client')
