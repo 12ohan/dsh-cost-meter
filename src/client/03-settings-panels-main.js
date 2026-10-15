@@ -2662,6 +2662,16 @@
       let lastPoll = Date.now()
       let reloading = false
       let active = true, retrySeconds = 1
+      // 宿主在价格表版本未变时省略 config.prices(占轮询载荷 56%):此时沿用上一份,
+      // 保证 config.prices 在客户端始终存在(渲染与改价逻辑都按它非空处理)。
+      // 版本号相同即价格表逐字节相同,因此沿用上一份与用新下发的那份等价;
+      // 版本号缺失(旧宿主)或不相同时一律用新下发的那份(其中必含完整价格表)。
+      const withCarriedPrices = (next, previous) => {
+        if (typeof next?.pricesRev !== 'string' || next.pricesRev !== previous?.pricesRev) return next
+        const carried = previous?.config?.prices
+        if (carried === undefined) return next
+        return { ...next, config: { ...next.config, prices: carried } }
+      }
       const reload = async () => {
         if (!active || reloading) return // 并发防抖:轮询/手动刷新/重连不叠加 getState,避免乱序覆盖
         reloading = true
@@ -2669,13 +2679,16 @@
         const prev = store.getSnapshot()
         if (prev.state === null) store.set({ ...prev, status: 'loading' })
         try {
-          const state = await call(prev.state === null ? 'getLocalState' : 'getState')
+          // 已知价格表版本号时回传:宿主版本一致就不重发 config.prices(占轮询载荷
+          // 56%)。首屏(getLocalState)不发,保证拿到的第一份必定完整。
+          const knownRev = prev.state?.pricesRev
+          const state = await call(prev.state === null ? 'getLocalState' : 'getState', prev.state === null ? [] : [knownRev ?? null])
           if (!active) return
           retrySeconds = 1
-          store.set({ status: 'ready', error: null, state })
+          store.set({ status: 'ready', error: null, state: withCarriedPrices(state, prev.state) })
           if (prev.state === null) {
             const fresh = await call('getState')
-            if (active) store.set({ status: 'ready', error: null, state: fresh })
+            if (active) store.set({ status: 'ready', error: null, state: withCarriedPrices(fresh, state) })
           }
           // activeLocale 只属于本客户端快照,持久化配置始终保留 auto。
         } catch (error) {

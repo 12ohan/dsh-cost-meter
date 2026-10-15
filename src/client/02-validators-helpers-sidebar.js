@@ -447,6 +447,9 @@
           combined: Object.fromEntries(['today', 'month', 'total', 'history'].map(k => [k, k === 'history' ? (v.externalUsage.combined.history ?? []).map(d => parseDay(d, path + '.external.history')) : parseDay(v.externalUsage.combined[k], path + '.external.' + k)])),
         } : null,
         config: parseConfig(v.config, path + '.config'),
+        // 价格表版本号:宿主在版本未变时会省略 config.prices(占载荷 56%),
+        // 客户端据此沿用上一份,并按同一版本号回传以避免重复下发。
+        pricesRev: typeof v.pricesRev === 'string' ? v.pricesRev : undefined,
         reconcile: v.reconcile === null || v.reconcile === undefined ? undefined : { ok: v.reconcile.ok === true, message: typeof v.reconcile.message === 'string' ? v.reconcile.message : '' },
         // 扩展价格表目录(宿主只读下发;缺失时 UI 自动隐藏目录面板)。
         priceCatalog: v.priceCatalog !== null && typeof v.priceCatalog === 'object' && !Array.isArray(v.priceCatalog) ? v.priceCatalog : null,
@@ -511,7 +514,18 @@
     const CONTRIBUTION = {
       package: 'dsh-cost-meter',
       descriptors: [
-        ...['getState', 'getLocalState'].map(method => ({ method, result: strictCodec('CostState', stateCodec) })),
+        {
+          method: 'getState',
+          // pricesRev:客户端已持有的价格表版本号;一致时宿主省略整张价格表。
+          // acceptsUndefined 保持旧调用(不带参数)可用,等价于始终下发全量。
+          parameters: [rpcParam('pricesRev', 'PricesRev', codecOf(v => {
+            if (v === undefined || v === null) return undefined
+            if (typeof v !== 'string') fail('pricesRev', 'price table revision')
+            return v
+          }), true)],
+          result: strictCodec('CostState', stateCodec),
+        },
+        ...['getLocalState'].map(method => ({ method, result: strictCodec('CostState', stateCodec) })),
         {
           method: 'updateConfig',
           parameters: [rpcParam('patch', 'ConfigPatch', patchCodec)],
