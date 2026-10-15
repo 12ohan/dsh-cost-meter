@@ -10,6 +10,25 @@ permissions:
   contents: read
 
 jobs:
+  billion-context-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install billing adapter and actual upstream releases
+        run: |
+          npm install -g pnpm
+          pnpm install --frozen-lockfile
+          mkdir -p .tmp-billion-matrix
+          npm pack billion-context@0.1.181 billion-context@0.1.190 billion-context@0.1.197 --ignore-scripts --pack-destination .tmp-billion-matrix
+      - name: Verify automatic interface compatibility and actual native/proxy billing
+        run: |
+          node test/billion-context-compatibility.mjs
+          for version in 0.1.181 0.1.190 0.1.197; do
+            DSH_TEST_BILLION_PACKAGE="$PWD/.tmp-billion-matrix/billion-context-$version.tgz" node test/billion-context-billing.mjs
+          done
   context-costs:
     runs-on: ubuntu-latest
     steps:
@@ -48,6 +67,7 @@ jobs:
           node test/statistics-warmup.mjs
           node test/cost-views-browser.mjs
           node test/pricing-theme-browser.mjs
+          node test/billion-context-compatibility-browser.mjs
           node test/cache-write-price-browser.mjs
           node test/model-stats-browser.mjs
           node test/factory-quota-browser.mjs
@@ -61,6 +81,8 @@ jobs:
             .tmp-context-regression-browser/report.json
             .tmp-pricing-theme-browser/*.png
             .tmp-pricing-theme-browser/report.json
+            .tmp-billion-notice-browser/*.png
+            .tmp-billion-notice-browser/report.json
             .tmp-cache-write-price-browser/*.png
             .tmp-cache-write-price-browser/report.json
             .tmp-model-stats-browser/*.png
@@ -335,4 +357,4 @@ jobs:
       # 的产物差异都会让 CI 变红,杜绝把过期 bundle 发布出去。
       - name: Check client bundle is in sync with src
         shell: bash
-        run: node scripts/build.mjs && git diff --exit-code lib/client.js lib/client.statistics.js lib/client.openrouter.js lib/client.community.js
+        run: node scripts/build.mjs && git diff --exit-code lib/client.js lib/client.statistics.js lib/client.openrouter.js lib/client.community.js lib/client.pricing.js
