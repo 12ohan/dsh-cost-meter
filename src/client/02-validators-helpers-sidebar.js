@@ -438,8 +438,6 @@
         } : null,
         config: parseConfig(v.config, path + '.config'),
         reconcile: v.reconcile === null || v.reconcile === undefined ? undefined : { ok: v.reconcile.ok === true, message: typeof v.reconcile.message === 'string' ? v.reconcile.message : '' },
-        // 扩展价格表目录(宿主只读下发;缺失时 UI 自动隐藏目录面板)。
-        priceCatalog: v.priceCatalog !== null && typeof v.priceCatalog === 'object' && !Array.isArray(v.priceCatalog) ? v.priceCatalog : null,
         meta: {
           ...(supportedLocale(v.meta?.locale) ? { locale: supportedLocale(v.meta.locale) } : {}),
           now: typeof v.meta?.now === 'number' ? v.meta.now : Date.now(),

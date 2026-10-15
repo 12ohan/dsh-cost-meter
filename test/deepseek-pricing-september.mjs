@@ -18,7 +18,7 @@ let now = flashAt, factory, changedDraft
 class Clock extends Date { static now() { return now } }
 const directory = new URL('../src/client/', import.meta.url)
 const source = readdirSync(directory).filter(n => n.endsWith('.js')).sort().map(n => readFileSync(new URL(n, directory), 'utf8')).join('')
-vm.runInNewContext(source.replace('exports.apply = apply', 'exports.test = { priceAt, tierFor, normalizeClientPrice, parseConfig, resolveClientPrice, makeT, PriceCard, catalogPriceText }; exports.apply = apply'), {
+vm.runInNewContext(source.replace('exports.apply = apply', 'exports.test = { priceAt, tierFor, normalizeClientPrice, parseConfig, resolveClientPrice, makeT, PriceCard }; exports.apply = apply'), {
   Date: Clock, navigator: { language: 'en' }, window: { __ModuleLoader__: { load: value => { factory = value.factory } }, localStorage: { getItem: () => null } },
 })
 const el = (type, props, ...children) => ({ type, props: props ?? {}, children })
@@ -138,7 +138,8 @@ try {
   const state = await service.getState()
   stateSchema.parse(state)
   assert.equal(state.config.prices.models['deepseek-v4-flash'].cacheMiss, 1)
-  assert.equal(state.priceCatalog.deepseek['DeepSeek v4']['deepseek-v4-flash'].cacheMiss, 1)
+  // 目录快照不再随 state 下发;目录自身的币种口径直接由 buildPriceCatalog 断言。
+  assert.equal(buildPriceCatalog('CNY').deepseek['DeepSeek v4']['deepseek-v4-flash'].cacheMiss, 1)
   const projection = __testProjection.makeCostUsageProjection({ config: state.config })
   let projected = projection.init()
   projected = projection.apply(projected, { type: 'request/header', seq: 0, time: flashAt, data: { header: { config: { provider: 'deepseek', model: 'deepseek-v4-flash' } } } })

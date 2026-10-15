@@ -1992,7 +1992,7 @@
       }
       const priceCards = tab !== 'pricing' || draft === null ? [] : Object.keys(draft.prices.models)
         .filter(modelId => {
-          // priceTableDisplay 按模型门控:缺省 DeepSeek 模型直接显示;显式 false 的收入拓展价格表。
+          // priceTableDisplay 按模型门控:缺省直接显示;显式 false 的收入厂商折叠分组。
           const displayMap = draft?.priceTableDisplay ?? config.priceTableDisplay ?? {}
           const value = displayMap['deepseek:' + modelId]
           return typeof value === 'boolean' ? value : true
@@ -2422,12 +2422,11 @@
                 el('span', null, t('budgetDetailLabel'))))),
           el('p', { className: 'cm-note' }, t('badgeNote'))))
         : null,
-        // ── 价格:价格表、模型名匹配、拓展价格表、峰谷计价与提示、官方价格同步 ──
+        // ── 价格:峰谷计价、价格表、模型名匹配、官方价格同步、OpenRouter 公开报价 ──
         tab === 'pricing' ? el(Fragment, { key: 'pricing' },
-        el(BillingStatistics, { state, api, load: api.loadOpenRouter }),
         // 峰谷计价与提示(独立面板:启用/提示开关、样式切换、时段条预览)
         el(PeakPanel, { state, draft, setDraft, t }),
-        // 价格表(可折叠,默认收起;priceTableDisplay 按模型门控:未勾选直接显示的模型收入拓展价格表,该开关只决定展示位置)
+        // 价格表(可折叠,默认收起;priceTableDisplay 按模型门控:未勾选直接显示的模型收入厂商折叠分组)
         el('div', null,
           collapseHeader(priceOpen, () => setPriceOpen(!priceOpen), t('priceTableTitle')),
           priceOpen ? el('div', { className: 'cm-collapse-body' },
@@ -2608,10 +2607,13 @@
           el('p', { className: 'cm-note' },
             t('lastSync', { time: config.fetchedAt !== null ? new Date(config.fetchedAt).toLocaleString() : t('neverSynced') })
             + t('source', { source: config.priceSource === 'official' ? t('sourceOfficial') : t('sourceBundled') })),
-          // 同步范围消歧(issue #85):同步按钮只抓 DeepSeek 官方定价页,第三方扩展目录价
-          // (z-ai / Kimi / Qwen 等)不随该按钮更新——随插件版本发布维护,可在「拓展价格表」
-          // 挂载/编辑或用「模型名匹配」为任意模型指定价格条目。
-          el('p', { className: 'cm-note' }, t('syncScopeNote'))))
+          // 同步范围消歧(issue #85):同步按钮只抓 DeepSeek 官方定价页,第三方目录价
+          // (z-ai / Kimi / Qwen 等)不随该按钮更新——随插件版本发布维护,可在价格表
+          // 展开对应厂商编辑,或用「模型名匹配」为任意模型指定价格条目。
+          el('p', { className: 'cm-note' }, t('syncScopeNote'))),
+        // OpenRouter 公开报价(只读查阅,非必做设置):放在价格标签末尾,先呈现要操作的
+        // 设置项;它本身是按需加载块,靠后渲染等于延后加载,不增加首屏开销。
+        el(BillingStatistics, { state, api, load: api.loadOpenRouter }))
         : null,
         el(BillingStatistics, { state, api, load: api.loadCommunity, locale, quiet: true, footer: true }))
     }
