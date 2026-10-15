@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- 按 2026-10-15 官方资料新增 19 条渠道模型价格（12 个新模型 ID），补齐 Claude Haiku 5.5、Gemini 4 Argon、Mistral Large 4、OpenCode 新模型和 OpenAI 专项模型；修正直连 Sonnet 5.5 与 Zen GPT-6.1 Sol 的缓存读取价，保留直连与网关差异。
+- 套餐归属新增 Codex / ChatGPT、火山 Agent Plan、腾讯 Coding Plan、腾讯 Token Plan、百度千帆 Coding Plan；支持手动选择、明确套餐名称识别及 Go Plus 别名。新归属不会虚构厂商剩余额度。
+- 新价格以独立迁移应用，保留用户自定义单价、取消挂载、套餐覆盖及已记账金额。更新公开价格校验器以支持 OpenCode 新文档地址和促销划线价。
+
 - 修复 #271：拓展价格表和直接显示的价格卡支持编辑缓存写入价，包含第三方 USD/CNY 及 DeepSeek 基础、峰谷档；留空恢复缓存读取价，显式 0 保留。感谢 @XHPAN 提出需求。
 
 ## [1.8.26] - 2026-10-14

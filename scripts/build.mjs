@@ -116,10 +116,10 @@ if (cssResult.warnings.length) throw new Error('client CSS contains build warnin
 // Store repeated native-theme and component prefixes once; restore before injection.
 // This is lossless text packing: the actual stylesheet and cascade do not change.
 const compactCss = cssResult.code.trim()
-assert.ok(!/[\x01-\x05]/.test(compactCss), 'CSS packing markers must be unused')
-const packedCss = compactCss.replaceAll('font-size:', '\x05').replaceAll('color:var(--dsw-alias-', '\x04').replaceAll('var(--dsw-alias-', '\x01').replaceAll('.cm-', '\x02').replaceAll('background:', '\x03')
-assert.equal(packedCss.replaceAll('\x05', 'font-size:').replaceAll('\x04', 'color:var(--dsw-alias-').replaceAll('\x01', 'var(--dsw-alias-').replaceAll('\x02', '.cm-').replaceAll('\x03', 'background:'), compactCss)
-src = src.replace(cssMatch[0], () => `const css = ${javascriptLiteral(packedCss)}.replaceAll("\\x05","font-size:").replaceAll("\\x04","color:var(--dsw-alias-").replaceAll("\\x01","var(--dsw-alias-").replaceAll("\\x02",".cm-").replaceAll("\\x03","background:")`)
+assert.ok(!/[\x01-\x07]/.test(compactCss), 'CSS packing markers must be unused')
+const packedCss = compactCss.replaceAll('align-items:', '\x07').replaceAll('border-radius:', '\x06').replaceAll('font-size:', '\x05').replaceAll('color:var(--dsw-alias-', '\x04').replaceAll('var(--dsw-alias-', '\x01').replaceAll('.cm-', '\x02').replaceAll('background:', '\x03')
+assert.equal(packedCss.replaceAll('\x07', 'align-items:').replaceAll('\x06', 'border-radius:').replaceAll('\x05', 'font-size:').replaceAll('\x04', 'color:var(--dsw-alias-').replaceAll('\x01', 'var(--dsw-alias-').replaceAll('\x02', '.cm-').replaceAll('\x03', 'background:'), compactCss)
+src = src.replace(cssMatch[0], () => `const css = ${javascriptLiteral(packedCss)}.replaceAll("\\x07","align-items:").replaceAll("\\x06","border-radius:").replaceAll("\\x05","font-size:").replaceAll("\\x04","color:var(--dsw-alias-").replaceAll("\\x01","var(--dsw-alias-").replaceAll("\\x02",".cm-").replaceAll("\\x03","background:")`)
 const result = await transform(src, {
   minify: true,
   keepNames: false,
