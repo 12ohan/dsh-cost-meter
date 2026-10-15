@@ -980,9 +980,12 @@
           : null)
     }
 
-    /** 已挂载的第三方模型价格卡(与 DeepSeek 卡片同区展示,可编辑/取消挂载)。 */
+    /** 已挂载的第三方模型价格卡(与 DeepSeek 卡片同区展示,可编辑/取消挂载)。
+     *  OpenRouter 条目若价格已偏离同步基线,标注「已自定义」并提供交回自动同步的入口。
+     *  锁定判定由宿主下发(state.priceLockIds,与刷新跳过覆盖同源),前端不自行推断。 */
     function ProviderPriceCard(props) {
-      const { provider, modelId, entry, draft, setDraft, t } = props
+      const { provider, modelId, entry, draft, setDraft, t, api, lockedIds } = props
+      const locked = Array.isArray(lockedIds) && lockedIds.includes(modelId)
       const writeModels = models => {
         const providers = { ...(draft.prices.providers ?? {}) }
         const table = providers[provider] ?? {}
@@ -1013,6 +1016,10 @@
           el('span', { className: 'cm-price-name' }, modelId),
           el(Fragment, null,
             entry?.unpriced === true ? el('span', { className: 'cm-price-legacy' }, t('catalogUnpriced')) : null,
+            locked ? el('span', { className: 'cm-price-locked', title: t('priceLockHint') }, t('priceLockBadge')) : null,
+            locked && typeof api?.releasePriceLock === 'function'
+              ? el('button', { className: 'cm-btn small', onClick: () => void api.releasePriceLock(modelId) }, t('priceLockRelease'))
+              : null,
             el('button', { className: 'cm-btn small danger', onClick: remove }, t('unmountBtn')))),
         entry?.unpriced === true
           ? null
@@ -2452,6 +2459,8 @@
           (() => {
             const displayMap = draft?.priceTableDisplay ?? config.priceTableDisplay ?? {}
             const providers = draft?.prices?.providers ?? {}
+            // 手改过价格的 OpenRouter 模型(宿主下发,与刷新跳过覆盖同源)。
+            const lockIds = state.priceLockIds ?? []
             // 逐模型显示开关:缺省显示(与 DeepSeek 价格卡片一致);显式 false 收入折叠分组。
             const editableIds = p => Object.keys(providers[p]?.models ?? {}).filter(id => displayMap[p + ':' + id] !== false)
             const groups = Object.keys(providers)
@@ -2472,7 +2481,7 @@
                 },
                   el('span', null, (vendorOpen ? '▾ ' : '▸ ') + (CATALOG_VENDOR_LABELS[p] ?? p) + ' · ' + ids.length + ' ' + t('mountedSuffix'))),
                 vendorOpen
-                  ? ids.map(id => el(ProviderPriceCard, { key: p + ':' + id, provider: p, modelId: id, entry: providers[p].models[id], draft, setDraft, t }))
+                  ? ids.map(id => el(ProviderPriceCard, { key: p + ':' + id, provider: p, modelId: id, entry: providers[p].models[id], draft, setDraft, t, api, lockedIds: p === 'openrouter' ? lockIds : [] }))
                   : null)
             })
           })())
@@ -2728,6 +2737,8 @@
           return state
         },
         fetchPrices: async () => receive(costMeter.fetchPrices()),
+        // 交回自动同步(OpenRouter 手改价):成功即刷新本地快照,失败抛出带原因的错误。
+        releasePriceLock: async id => receive(costMeter.releasePriceLock({ id }), 'rpcSyncFailed', true),
         resetHistory: async () => {
           const state = await call('resetHistory')
           store.set({ status: 'ready', error: null, state })

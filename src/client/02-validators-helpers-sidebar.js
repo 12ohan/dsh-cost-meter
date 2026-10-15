@@ -438,6 +438,8 @@
         } : null,
         config: parseConfig(v.config, path + '.config'),
         reconcile: v.reconcile === null || v.reconcile === undefined ? undefined : { ok: v.reconcile.ok === true, message: typeof v.reconcile.message === 'string' ? v.reconcile.message : '' },
+        // 手改过价格的 OpenRouter 模型 id(缺失/畸形回落空表:不显示任何锁定标记)。
+        priceLockIds: Array.isArray(v.priceLockIds) ? v.priceLockIds.filter(id => typeof id === 'string') : [],
         meta: {
           ...(supportedLocale(v.meta?.locale) ? { locale: supportedLocale(v.meta.locale) } : {}),
           now: typeof v.meta?.now === 'number' ? v.meta.now : Date.now(),
@@ -507,6 +509,14 @@
         },
         {
           method: 'fetchPrices',
+          },
+        {
+          method: 'releasePriceLock',
+          // 与宿主侧 manifest 同口径:非空字符串 id;结果形如 FetchPricesResult。
+          parameters: [rpcParam('id', 'PriceLockId', codecOf(v => {
+            if (typeof v !== 'string' || v.length === 0) fail('id', 'OpenRouter model id')
+            return v
+          }))],
           },
         {
           method: 'refreshBalance',
