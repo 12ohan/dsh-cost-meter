@@ -5,7 +5,6 @@
 import assert from 'node:assert/strict'
 import './zai-candidates.mjs'
 import './statistics-cache.mjs'
-import './statistics-warmup.mjs'
 import './ledger-concurrency.mjs'
 import './ledger-lock-recovery.mjs'
 import './external-usage.mjs'
@@ -108,6 +107,10 @@ globalThis.fetch = async (url, init) => {
   throw new Error('Regression network request requires an explicit in-process mock')
 }
 process.on('exit', () => { globalThis.fetch = defaultFetch })
+
+// This fixture temporarily changes DSH_HOME. Static imports with top-level await
+// run concurrently, so wait until the other home-changing fixtures have finished.
+await import('./statistics-warmup.mjs')
 
 // 每个验证进程使用独立临时目录，双时区同时执行时不互相删除账本。
 const suiteRoot = mkdtempSync(join(osTmpdir(), 'cm-verify-'))

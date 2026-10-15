@@ -144,11 +144,17 @@ try {
     assert.equal((await api.getContextCosts({ sessionId: 'selected' })).status, 'session-unavailable')
     assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/getContextCosts', { query: { sessionId: 'selected' } }])
     const prefetchStart = calls.length
-    await Promise.all([Page.prefetch({ state, sessionId: 'selected' }), Page.prefetch({ state, sessionId: 'selected' })])
-    const prefetched = calls.slice(prefetchStart).filter(([name]) => ['costMeter/getSessionBilling', 'costMeter/getContextCosts'].includes(name))
-    assert.equal(prefetched.length, 1, 'concurrent preloads share one billing request; context measurement stays off the overview critical path')
-    await Page.prefetch({ state, sessionId: 'selected' })
-    assert.equal(calls.length, prefetchStart + 1, 'immediate repeated preloads reuse the fresh snapshot')
+    const preloadResults = await Promise.all([Page.prefetch({ state, sessionId: 'selected' }), Page.prefetch({ state, sessionId: 'selected' })])
+    for (const results of preloadResults) {
+      assert.equal(results.length, 2, 'conversation preloads include billing and trajectory snapshots')
+      assert.ok(results.every(result => result.status === 'fulfilled'), 'both preload endpoints pass the real gateway and response validation')
+    }
+    assert.deepEqual(calls.slice(prefetchStart).map(([name]) => name).sort(), ['costMeter/getSessionBilling', 'costMeter/getSessionTrajectory'],
+      'concurrent preloads share one request per snapshot; context measurement and call bodies stay off the overview critical path')
+    const prefetchedCount = calls.length
+    const repeatedPreload = await Page.prefetch({ state, sessionId: 'selected' })
+    assert.ok(repeatedPreload.every(result => result.status === 'fulfilled'), 'repeated preloads return both cached snapshots')
+    assert.equal(calls.length, prefetchedCount, 'immediate repeated preloads reuse both fresh snapshots without another RPC')
     assert.equal((await first.api.loginCodingPlan('qwen')).message, 'synthetic login response')
     assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/loginCodingPlan', { provider: 'qwen' }], 'login RPC reaches the real gateway with its provider parameter')
     for (const fn of listeners.get('pointerover') ?? []) fn({ target: { closest: () => null } })
