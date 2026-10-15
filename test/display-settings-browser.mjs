@@ -35,6 +35,7 @@ window.changeLocale=locale=>window.setConfig({locale});
 const api={loadDisplay:async()=>Display,loadCommunity:async()=>()=>null,loadStatistics:async()=>()=>null,updateConfig:async patch=>{
   if(window.failSave)throw Error('synthetic save failure');const config=await window.saveConfig(patch);window.patches.push(patch);state={...state,config:parseConfig(config,'config')};return publish()}};
 function useCost(){const[value,setValue]=React.useState(state);React.useEffect(()=>{window.listeners.add(setValue);return()=>window.listeners.delete(setValue)},[]);return{state:value,status:'ready'}}
+window.attachFixtureSidebar=container=>createRoot(container).render(h(SidebarFooter,{useCost,api,wide:true}));
 function App(){return h(React.Fragment,null,h(CostSection,{useCost,api}),h('div',{id:'actual-sidebar',hidden:true},h(SidebarFooter,{useCost,api,wide:true})))}
 const root=createRoot(document.getElementById('root'));window.remount=()=>root.render(h(App,{key:++window.mounts}));window.remount();
 `
@@ -68,6 +69,12 @@ try {
   await page.goto(url);await page.getByRole('tab',{name:'显示',exact:true}).click();await page.locator('.cm-display').waitFor()
   await page.locator('.cm-display').screenshot({path:join(output,'initial.png')})
   const item = key => page.locator('.cm-preview [data-display="' + key + '"]')
+  const chooseStyle = async label => {
+    await page.locator('.cm-preview-style-trigger').click()
+    await page.getByRole('button',{name:label,exact:true}).click()
+    await page.keyboard.press('Escape')
+  }
+  assert.equal(await page.locator('.cm-preview .cm-preview-style-trigger').count(),1,'style controls live inside the preview')
   assert.equal(await page.locator('.cm-display-details').evaluate(n=>n.open),false)
   assert.equal(await page.locator('.cm-display input[type=checkbox]:visible').count(),0,'primary UI is the preview')
   assert.equal(await item('balance').getAttribute('aria-pressed'),'true')
@@ -92,10 +99,10 @@ try {
   await page.waitForFunction(()=>window.current().hideSessionCostHeader&&window.current().hideSessionCostDock&&window.current().hideTurnCost)
   assert.ok(saved.hideSessionCostHeader&&saved.hideSessionCostDock&&saved.hideTurnCost,'rapid changes survive autosave')
   await item('badge').click();await page.waitForFunction(()=>window.current().position==='dock')
-  await page.getByRole('button',{name:'简洁',exact:true}).click();await page.waitForFunction(()=>window.current().sidebarSimple===true)
+  await chooseStyle('简洁');await page.waitForFunction(()=>window.current().sidebarSimple===true)
   await page.evaluate(()=>window.remount());await page.getByRole('tab',{name:'显示',exact:true}).click();await page.locator('.cm-display').waitFor()
   assert.equal(await item('session-header').getAttribute('aria-pressed'),'false','saved toggles survive reopening')
-  await page.getByRole('button',{name:'标准',exact:true}).click();await item('session-header').click();await item('session-dock').click();await item('turn').click()
+  await chooseStyle('标准');await item('session-header').click();await item('session-dock').click();await item('turn').click()
   await item('peak').click();await item('strip-plans').click()
   await page.waitForFunction(()=>window.current().hideTurnCost===false&&window.current().peakNotice===true)
   for (const theme of ['light','dark']) {
@@ -104,11 +111,16 @@ try {
       await page.setViewportSize({width,height:1000});await page.locator('.cm-display').scrollIntoViewIfNeeded()
       assert.equal(await page.locator('.cm-preview').evaluate(n=>n.scrollWidth>n.clientWidth+1),false,`preview fits ${theme}/${width}`)
       await page.locator('.cm-display').screenshot({path:join(output,`${theme}-${width}.png`)})
+      await page.locator('.cm-preview-style-trigger').click()
+      const picker=await page.locator('.cm-preview-style-panel').boundingBox()
+      assert.ok(picker.x>=0&&picker.x+picker.width<=width,`style picker fits ${theme}/${width}`)
+      await page.locator('.cm-display').screenshot({path:join(output,`style-${theme}-${width}.png`)})
+      await page.keyboard.press('Escape')
     }
   }
   await page.setViewportSize({width:1500,height:1050})
   await page.evaluate(()=>document.documentElement.dataset.theme='light')
-  await page.getByRole('button',{name:'简洁',exact:true}).click()
+  await chooseStyle('简洁')
   await page.getByRole('button',{name:'放大预览',exact:true}).click()
   await page.getByRole('dialog',{name:'桌面显示预览'}).waitFor()
   assert.equal(await page.locator('.cm-native-desktop').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ')[0]),'280px')
@@ -117,6 +129,14 @@ try {
   await page.waitForFunction(before=>document.querySelector('[data-display="badge"]').getAttribute('aria-pressed')!==before,badgeBefore)
   await page.mouse.move(1400,20)
   await page.locator('.cm-display-dialog').screenshot({path:join(output,'desktop-expanded.png')})
+  await page.locator('.cm-preview-style-trigger').click()
+  await page.getByRole('button',{name:'紧凑',exact:true}).click()
+  await page.getByRole('button',{name:'分段',exact:true}).click()
+  await page.waitForFunction(()=>window.current().sidebarStyle==='compact'&&!window.current().sidebarSimple&&window.current().peakStyle==='classic')
+  assert.equal(saved.peakEnabled,true,'changing peak appearance preserves peak pricing')
+  await page.keyboard.press('Escape')
+  assert.equal(await page.locator('.cm-display-dialog[open]').count(),1,'Escape closes the style picker before the expanded preview')
+  assert.equal(await page.locator('.cm-preview-style-trigger').evaluate(n=>n===document.activeElement),true)
   await page.keyboard.press('Escape')
   assert.equal(await page.locator('dialog[open]').count(),0)
   assert.equal(await page.getByRole('button',{name:'放大预览',exact:true}).evaluate(n=>n===document.activeElement),true)
@@ -165,12 +185,23 @@ try {
   assert.equal(await live.locator('[data-cm-live-key="balance"]').evaluate(n=>n.style.opacity),balanceBefore?'1':'0.26')
   await page.evaluate(()=>{const style=document.createElement('style');style.textContent='#host-fixture .peer-extension{background:rgb(39,48,65)!important;border-radius:4px!important}';document.head.appendChild(style)})
   await page.waitForFunction(()=>document.querySelector('.cm-live-frame')?.contentDocument.querySelector('.peer-extension')?.style.backgroundColor==='rgb(39, 48, 65)')
+  await page.evaluate(()=>{
+    const slot=document.querySelector('#host-fixture .cm-native-sidebar-footer');slot.replaceChildren();window.attachFixtureSidebar(slot)
+  })
+  await chooseStyle('Simple')
+  await page.waitForFunction(()=>document.querySelector('.cm-live-frame')?.contentDocument.querySelector('.cm-footer-stack.simple'))
+  await chooseStyle('Standard')
+  await page.waitForFunction(()=>{const node=document.querySelector('.cm-live-frame')?.contentDocument.querySelector('.cm-footer-stack');return node&&!node.classList.contains('simple')&&!node.classList.contains('compact')})
+  assert.equal(await live.locator('.peer-extension').evaluate(n=>n.style.backgroundColor),'rgb(39, 48, 65)','switching layout preserves skin and peer plugin output')
   await page.getByRole('button',{name:'Expand preview',exact:true}).click()
   await page.locator('.cm-live-hit[data-display="balance"]').waitFor()
   await page.locator('.cm-display-dialog').screenshot({path:join(output,'live-skin-and-plugin.png')})
+  await page.locator('.cm-preview-style-trigger').click()
+  await page.locator('.cm-display-dialog').screenshot({path:join(output,'live-style-picker.png')})
+  await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
   assert.deepEqual(errors,[]);assert.deepEqual(external,[])
-  writeFileSync(join(output,'result.json'),JSON.stringify({themes:2,widths:[1100,720,390],autosave:true,keyboard:true,liveDOM:true,skinAndPeerPlugin:true,alignment,externalRequests:external.length,browserErrors:errors.length},null,2))
+  writeFileSync(join(output,'result.json'),JSON.stringify({themes:2,widths:[1100,720,390],autosave:true,keyboard:true,inlineStylePicker:true,liveStyleSwitch:true,liveDOM:true,skinAndPeerPlugin:true,alignment,externalRequests:external.length,browserErrors:errors.length},null,2))
   console.log('[ok] visual display settings: native settings autosave, visibility gates, reopen, keyboard, save error, 2 themes / 3 widths, zero external requests')
 } catch(error) {
   await page.screenshot({path:join(output,'failure.png'),fullPage:true})

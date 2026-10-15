@@ -81,6 +81,7 @@ function captureDisplayFrame(frame, references) {
   // Add faded examples only for controls that are currently absent. They join the
   // actual native slot, so skins and other plugins still determine the surrounding layout.
   const sideSlot = copyMap.get(footer ?? first('._2H3hWW_settingsArea') ?? sidebar)
+  if (sideSlot) sideSlot.dataset.cmStyleAnchor = 'true'
   const headerSlot = copyMap.get(first('.Dc7zOa_titleRow'))
   const input = first('.RlGAzG_root'), inputCopy = copyMap.get(input)
   const dockSlot = copyMap.get(first('.RlGAzG_dock'))
@@ -117,9 +118,10 @@ function captureDisplayFrame(frame, references) {
   return { html:'<!doctype html>'+out.documentElement.outerHTML, width:rect.width, height:rect.height, scroll, nodes:count }
 }
 
-function LiveDesktopPreview({ scene, items, expanded, onSource }) {
+function LiveDesktopPreview({ scene, items, controls, savedAppearance, expanded, onSource }) {
   const stage = React.useRef(null), iframe = React.useRef(null), captureRef = React.useRef(null)
   const [snapshot,setSnapshot] = React.useState(null), [positions,setPositions] = React.useState({})
+  const [controlAnchor,setControlAnchor] = React.useState(null)
   const host = React.useMemo(displayHostFrame,[])
   const latest = React.useRef(items);latest.current=items
   const readPositions = React.useCallback(() => {
@@ -128,6 +130,8 @@ function LiveDesktopPreview({ scene, items, expanded, onSource }) {
     for(const node of doc.querySelectorAll('[data-cm-live-key]')) {
       const r=node.getBoundingClientRect();if(r.width>0&&r.height>0)next[node.dataset.cmLiveKey]={left:r.left,top:r.top,width:r.width,height:r.height,example:node.dataset.cmLiveExample==='true'}
     }
+    const anchor = doc.querySelector('[data-cm-style-anchor]')?.getBoundingClientRect()
+    setControlAnchor(anchor ? { left:anchor.left,top:anchor.top,width:anchor.width,height:anchor.height } : null)
     setPositions(next)
   },[])
   React.useLayoutEffect(() => {
@@ -136,7 +140,7 @@ function LiveDesktopPreview({ scene, items, expanded, onSource }) {
     const capture=()=>{
       if(closed||!stage.current)return
       try { const next=captureDisplayFrame(host,[...stage.current.querySelectorAll('[data-display]')]);setSnapshot(next);onSource(true) }
-      catch { onSource(false) }
+      catch { setSnapshot(null);onSource(false) }
     }
     captureRef.current=capture
     timer=setTimeout(capture,0)
@@ -150,6 +154,13 @@ function LiveDesktopPreview({ scene, items, expanded, onSource }) {
     return()=>{closed=true;clearTimeout(timer);theme.disconnect();css.disconnect();window.removeEventListener('resize',schedule);captureRef.current=null}
   },[host,onSource])
   React.useEffect(()=>{
+    if (!host) return
+    // Read the actual card after the shared configuration store has re-rendered
+    // it. This preserves third-party CSS and never mounts sidebar controllers twice.
+    const frame = requestAnimationFrame(()=>captureRef.current?.())
+    return()=>cancelAnimationFrame(frame)
+  },[host,savedAppearance])
+  React.useEffect(()=>{
     const doc=iframe.current?.contentDocument;if(!doc)return
     for(const item of items){const node=doc.querySelector(`[data-cm-live-key="${item.key}"]`);if(node)node.style.opacity=item.props['aria-pressed'] && node.dataset.cmLiveExample!=='true'?'1':'.26'}
   },[items,positions])
@@ -161,7 +172,7 @@ function LiveDesktopPreview({ scene, items, expanded, onSource }) {
   }
   return el(Fragment,null,
     host ? el('div',{ref:stage,className:'cm-preview-reference','aria-hidden':true,inert:''},el('div',{className:'cm-native-desktop',style:{position:'relative',left:0,margin:0}},scene)) : null,
-    el(PreviewCanvas,{expanded,width:snapshot?.width,height:snapshot?.height,live:!!snapshot},snapshot ?
+    el(PreviewCanvas,{expanded,controls,controlAnchor,width:snapshot?.width,height:snapshot?.height,live:!!snapshot},snapshot ?
       el(Fragment,null,el('iframe',{ref:iframe,title:'DSH appearance preview',sandbox:'allow-same-origin',srcDoc:snapshot.html,onLoad:load,tabIndex:-1,'aria-hidden':true,className:'cm-live-frame',style:{width:snapshot.width,height:snapshot.height}}),
         ...items.map(item=>{const p=positions[item.key];return p?el('div',{...item.props,key:item.key,className:'cm-live-hit',style:{left:p.left,top:p.top,width:p.width,height:p.height}},el('span',{className:'cm-display-item-tag'},item.props['aria-label'])):null})) : scene),
     snapshot ? el('button',{type:'button',className:'cm-btn small cm-live-refresh',onClick:()=>captureRef.current?.()},'↻ ', items[0]?.props['aria-label']?.includes('点击')?'刷新当前界面':'Refresh current page') : null)

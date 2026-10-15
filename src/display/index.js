@@ -15,17 +15,69 @@ window.__ModuleLoader__.load({
     /* DISPLAY_LIVE_SOURCE */
 
     // Preserve the desktop layout at every settings-pane width.
-    function PreviewCanvas({ children, expanded, width = 1280, height = 800, live = false }) {
-      const ref = React.useRef(null)
+    function PreviewCanvas({ children, controls, controlAnchor, expanded, width = 1280, height = 800, live = false }) {
+      const ref = React.useRef(null), desktop = React.useRef(null), control = React.useRef(null)
       const [scale, setScale] = useState(.6)
       React.useLayoutEffect(() => {
-        const update = () => setScale(Math.max(.05, Math.min(ref.current.clientWidth / width, expanded ? (window.innerHeight - 150) / height : Infinity)))
+        const update = () => {
+          const canvas = ref.current, next = Math.max(.05, Math.min(canvas.clientWidth / width, expanded ? (window.innerHeight - 150) / height : Infinity))
+          setScale(next)
+          if (!control.current) return
+          const box = canvas.getBoundingClientRect(), footer = desktop.current.querySelector('.cm-native-sidebar-footer')?.getBoundingClientRect()
+          const right = live && controlAnchor ? canvas.clientWidth / 2 + (controlAnchor.left + controlAnchor.width - width / 2) * next : footer ? footer.right - box.left : 272 * next
+          const top = live && controlAnchor ? controlAnchor.top * next : footer ? footer.top - box.top : 480 * next
+          const left = Math.max(8, Math.min(canvas.clientWidth - 68, right - 62))
+          control.current.style.left = left + 'px'
+          control.current.style.top = Math.max(8, Math.min(height * next - 38, top - 34)) + 'px'
+          control.current.style.setProperty('--cm-picker-left', (Math.max(8, Math.min(left, canvas.clientWidth - 284)) - left) + 'px')
+          control.current.style.setProperty('--cm-picker-width', Math.min(276, canvas.clientWidth - 16) + 'px')
+        }
         const observer = new ResizeObserver(update)
         observer.observe(ref.current); window.addEventListener('resize', update); update()
         return () => { observer.disconnect(); window.removeEventListener('resize', update) }
-      }, [expanded, width, height])
+      }, [expanded, width, height, live, controlAnchor, children, scale])
       return el('div', { ref, className: 'cm-preview', style: { height: height * scale } },
-        el('div', { className: live ? 'cm-live-desktop' : 'cm-native-desktop', style: { width, height, marginLeft: -width / 2, transform: 'scale(' + scale + ')' } }, children))
+        el('div', { className: 'cm-preview-screen' },
+          el('div', { ref: desktop, className: live ? 'cm-live-desktop' : 'cm-native-desktop', style: { width, height, marginLeft: -width / 2, transform: 'scale(' + scale + ')' } }, children)),
+        el('div', { ref: control, className: 'cm-preview-style-control' }, controls))
+    }
+
+    function PreviewStylePicker({ mode, peakStyle, onMode, onPeak, text }) {
+      const [open, setOpen] = useState(false)
+      const root = React.useRef(null), trigger = React.useRef(null), panel = React.useRef(null)
+      const id = React.useId()
+      const close = () => { setOpen(false); trigger.current?.focus() }
+      React.useEffect(() => {
+        if (!open) return
+        panel.current.querySelector('[aria-pressed=true]')?.focus({ preventScroll: true })
+        const outside = event => { if (!root.current?.contains(event.target)) setOpen(false) }
+        document.addEventListener('pointerdown', outside, true)
+        return () => document.removeEventListener('pointerdown', outside, true)
+      }, [open])
+      return el('div', { ref: root, className: 'cm-preview-style-picker', onKeyDown: event => {
+        if (event.key === 'Escape' && open) { event.preventDefault(); event.stopPropagation(); close() }
+        if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key) && event.target.closest('[role=group]')) {
+          event.preventDefault()
+          const buttons = [...event.target.closest('[role=group]').querySelectorAll('button')], index = buttons.indexOf(event.target)
+          buttons[(index + (['ArrowLeft','ArrowUp'].includes(event.key) ? -1 : 1) + buttons.length) % buttons.length]?.focus()
+        }
+      } },
+        el('button', { ref: trigger, type: 'button', className: 'cm-preview-style-trigger', 'aria-label': text('侧栏样式', 'Sidebar style'),
+          'aria-expanded': open, 'aria-controls': open ? id : undefined, 'aria-haspopup': 'dialog', onClick: () => setOpen(!open) },
+          el(Native.IconSlidersTwoOutlineRegular, { size: 14 }), text('样式', 'Style')),
+        open ? el('div', { ref: panel, id, className: 'cm-preview-style-panel', role: 'dialog', 'aria-label': text('侧栏外观', 'Sidebar appearance') },
+          el('div', { className: 'cm-preview-style-title' }, text('侧栏外观', 'Sidebar appearance'),
+            el('button', { type: 'button', 'aria-label': text('关闭样式选择', 'Close style picker'), onClick: close }, el(Native.IconCloseOutlineRegular, { size: 14 }))),
+          el('div', { className: 'cm-preview-style-options', role: 'group', 'aria-label': text('侧栏布局', 'Sidebar layout') },
+            ...[['simple', text('简洁', 'Simple')], ['standard', text('标准', 'Standard')], ['compact', text('紧凑', 'Compact')]].map(([value, label]) =>
+              el('button', { key: value, type: 'button', 'aria-pressed': mode === value, onClick: () => onMode(value) },
+                el('span', { className: 'cm-style-sample ' + value, 'aria-hidden': true }, ...[0,1,2,3].map(i => el('i', { key: i }))), el('span', null, label)))),
+          el('div', { className: 'cm-preview-peak-title' }, text('峰谷条', 'Peak / off-peak bar')),
+          el('div', { className: 'cm-preview-peak-options', role: 'group', 'aria-label': text('峰谷条样式', 'Peak bar style') },
+            ...[['compact', text('细条', 'Slim')], ['classic', text('分段', 'Segmented')]].map(([value, label]) =>
+              el('button', { key: value, type: 'button', 'aria-pressed': peakStyle === value, onClick: () => onPeak(value) },
+                el('i', { className: 'cm-style-peak-sample ' + value, 'aria-hidden': true }), label))),
+          el('p', null, text('直接查看效果，更改自动保存', 'See the result here. Changes save automatically.'))) : null)
     }
 
     function DisplaySettings(props) {
@@ -97,8 +149,9 @@ window.__ModuleLoader__.load({
             config.sessionCostCompact === true ? null : el('span', { className: 'cm-session-detail' }, text(' · 输入 128K · 输出 4K', ' · In 128K · Out 4K')))) : null
       const cornerOn = config.corner?.enabled === true
       const mode = simple ? 'simple' : config.sidebarStyle === 'compact' ? 'compact' : 'standard'
-      const modeButton = (value, label) => el('button', { key: value, type: 'button', 'aria-pressed': mode === value,
-        onClick: () => set({ sidebarSimple: value === 'simple', sidebarSimplePromptSeen: true, ...(value === 'simple' ? {} : { sidebarStyle: value }) }) }, label)
+      const stylePicker = el(PreviewStylePicker, { mode, peakStyle: config.peakStyle === 'classic' ? 'classic' : 'compact', text,
+        onMode: value => set({ sidebarSimple: value === 'simple', sidebarSimplePromptSeen: true, ...(value === 'simple' ? {} : { sidebarStyle: value }) }),
+        onPeak: value => set({ peakStyle: value }) })
       const native = (name, ...children) => el('div', { className: 'cm-native-' + name }, ...children)
       const icon = (name, size = 16) => el(Native[name], { size })
       const meta = (name, label) => native('meta', icon(name, 14), label)
@@ -153,7 +206,9 @@ window.__ModuleLoader__.load({
               el('span', { className: 'cm-native-dock-stat', 'aria-hidden': true }, icon('IconDatabaseOutlineRegular', 14), text('128K tok · 缓存命中 98%', '128K tok · 98% cache')),
               session('dock'), badge('dock'), corner,
               el('span', { className: 'cm-native-dock-context', 'aria-hidden': true }, el('i', { className: 'cm-native-context-ring' }), '29%')))))
-      const preview = el(LiveDesktopPreview, { scene, items, expanded, onSource: setLiveSource })
+      const savedConfig = props.state.config
+      const savedAppearance = JSON.stringify([savedConfig.sidebarSimple, savedConfig.sidebarStyle, savedConfig.peakStyle])
+      const preview = el(LiveDesktopPreview, { scene, items, expanded, controls: stylePicker, savedAppearance, onSource: setLiveSource })
       return el('section', { className: 'cm-display', 'aria-label': text('交互式显示设置', 'Interactive display settings') },
         el('div', { className: 'cm-display-heading' },
           el('div', null, el('h3', null, text('点击界面，选择显示内容', 'Choose what appears on your screen')),
@@ -168,10 +223,7 @@ window.__ModuleLoader__.load({
           el('div', { className: 'cm-display-dialog-head' }, text('点击项目，调整显示', 'Click items to adjust the display'),
             el('button', { type: 'button', className: 'cm-display-dialog-close', 'aria-label': text('关闭预览', 'Close preview'), autoFocus: true, onClick: () => setExpanded(false) }, icon('IconCloseOutlineRegular'))),
           preview, el('div', { className: 'cm-display-feedback', role: 'status', 'aria-live': 'polite' }, feedback || text('更改会自动保存', 'Changes save automatically'))) : preview,
-        el('div', { className: 'cm-display-toolbar' },
-          el('div', { className: 'cm-display-style' }, text('侧栏样式', 'Sidebar style'),
-            el('div', { className: 'cm-display-segments', role: 'group', 'aria-label': text('侧栏样式', 'Sidebar style') }, modeButton('simple', text('简洁', 'Simple')), modeButton('standard', text('标准', 'Standard')), modeButton('compact', text('紧凑', 'Compact')))),
-          el('span', { className: 'cm-display-feedback', role: 'status', 'aria-live': 'polite' }, feedback || text('更改会自动保存', 'Changes save automatically'))),
+        el('div', { className: 'cm-display-toolbar' }, el('span', { className: 'cm-display-feedback', role: 'status', 'aria-live': 'polite' }, feedback || text('更改会自动保存', 'Changes save automatically'))),
         el('div', { className: 'cm-display-footnote' },
           el('p', null, liveSource ? text('已显示的项目直接取自当前界面；隐藏或未配置的项目用淡化示例占位。', 'Visible items come from your current page. Hidden or unconfigured items use faded examples.') : text('预算、余额和额度使用示例数据；这里仅调整显示。', 'Budget, balance and quota values are examples; these controls change visibility.')),
           el('button', { type: 'button', className: 'cm-btn small', onClick: () => onNavigate('quotas') }, text('配置额度 →', 'Set up quotas →'))),
@@ -285,21 +337,6 @@ window.__ModuleLoader__.load({
                 onChange: event => setField('sidebarTodayMetric', event.target.value) },
                 el('option', { value: 'cost' }, t('sidebarTodayCost')),
                 el('option', { value: 'tokens' }, t('sidebarTodayTokens')))),
-            el('label', { className: 'cm-check' },
-              el('input', { type: 'checkbox', checked: draft?.sidebarSimple === true,
-                onChange: event => { if (draft) setDraft({ ...draft, sidebarSimple: event.target.checked, sidebarSimplePromptSeen: true }) } }),
-              el('span', null, t('sidebarSimple'))),
-            el('div', { className: 'cm-field' }, el('span', { className: 'cm-hint' }, t('sidebarSimpleNote'))),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('sidebarStyleLabel')),
-              el('select', {
-                className: 'cm-input',
-                value: draft?.sidebarStyle ?? 'standard',
-                disabled: draft?.sidebarSimple === true,
-                onChange: event => setField('sidebarStyle', event.target.value),
-              },
-                el('option', { value: 'standard' }, t('sidebarStyleStandard')),
-                el('option', { value: 'compact' }, t('sidebarStyleCompact')))),
             el('div', { className: 'cm-field' },
               el('label', null, t('balanceDisplayLabel')),
               el('select', {
