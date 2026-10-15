@@ -44,6 +44,9 @@ jobs:
           node test/context-costs-regression-browser.mjs
           node test/context-costs-browser.mjs
           node test/session-costs-browser.mjs
+          node test/statistics-cache.mjs
+          node test/statistics-warmup.mjs
+          node test/cost-views-browser.mjs
           node test/pricing-theme-browser.mjs
           node test/model-stats-browser.mjs
           node test/factory-quota-browser.mjs
