@@ -530,6 +530,7 @@
       return el('input', {
         className: 'cm-input narrow',
         type: 'number', step: 'any', min: '0',
+        placeholder: props.placeholder, title: props.title, 'aria-label': props.label,
         value: typeof value === 'number' ? String(value) : '',
         onChange: event => {
           const text = event.target.value
@@ -550,6 +551,12 @@
       })
     }
 
+    function cacheWriteInput(tier, label, t, onChange, fallback = 0) {
+      return numInput({ value: tier?.cacheWrite ?? null, emptyMode: 'clear',
+        placeholder: String(tier?.cacheHit ?? tier?.cachedInput ?? tier?.cacheMiss ?? tier?.input ?? fallback),
+        label: label + ' · ' + t('flatCacheWrite'), title: t('cacheWriteFallback') }, onChange)
+    }
+
     function PriceCard(props) {
       const { modelId, entry: rawEntry, isDefault, draft, setDraft, t } = props
       const entry = priceAt(rawEntry)
@@ -563,55 +570,19 @@
         return next
       }
       const setTier = (tierKey, field, value) => {
-        // 清空输入(emptyMode:'clear' 回传 null):
-        //  - offPeak/peak 档位字段 → 从档位对象中删除;档位删空则整键移除,
-        //    恢复「无该档、按基础价计」状态。此前空串被提交成显式 0 价,
-        //    normalizePrice 会保留该档,之后所有调用按 0 计费(静默变免费)。
-        //  - 基础价三桶为必填结构 → 忽略清空(numInput 'ignore' 不回调)。
-        if (value === null) {
-          if (isDefault) {
-            const def = editablePrice(draft.prices.default ?? { cacheHit: 0, cacheMiss: 0, output: 0 })
-            const tier = { ...(def[tierKey] ?? {}) }
-            delete tier[field]
-            const next = { ...def }
-            if (Object.keys(tier).length > 0) next[tierKey] = tier
-            else delete next[tierKey]
-            setDraft({ ...draft, prices: { ...draft.prices, default: next } })
-            return
-          }
-          const models = { ...draft.prices.models }
-          const current = editablePrice(models[modelId] ?? { cacheHit: 0, cacheMiss: 0, output: 0 })
-          const tier = { ...(current[tierKey] ?? {}) }
-          delete tier[field]
-          const next = { ...current }
-          if (Object.keys(tier).length > 0) next[tierKey] = tier
+        const raw = isDefault ? draft.prices.default : draft.prices.models[modelId]
+        const next = editablePrice(raw ?? { cacheHit: 0, cacheMiss: 0, output: 0 })
+        const tier = tierKey === 'base' ? next : { ...(next[tierKey] ?? (value === null ? {} : normalizeClientTier(next))) }
+        // 可选写入价清空后恢复读取价；显式 0 保留。基础价其余三项忽略清空。
+        if (value === null) delete tier[field]
+        else tier[field] = Math.max(0, value)
+        if (tierKey !== 'base') {
+          if (Object.keys(tier).length) next[tierKey] = tier
           else delete next[tierKey]
-          models[modelId] = next
-          setDraft({ ...draft, prices: { ...draft.prices, models } })
-          return
         }
-        const nextField = Math.max(0, value)
-        if (isDefault) {
-          const def = editablePrice(draft.prices.default ?? { cacheHit: 0, cacheMiss: 0, output: 0 })
-          let next = { ...def }
-          if (tierKey === 'base') next[field] = nextField
-          else {
-            const tier = { ...(next[tierKey] ?? {}), [field]: nextField }
-            next = { ...next, [tierKey]: tier }
-          }
-          setDraft({ ...draft, prices: { ...draft.prices, default: next } })
-          return
-        }
-        const models = { ...draft.prices.models }
-        const current = editablePrice(models[modelId] ?? { cacheHit: 0, cacheMiss: 0, output: 0 })
-        let next = { ...current }
-        if (tierKey === 'base') next[field] = nextField
-        else {
-          const tier = { ...(current[tierKey] ?? {}), [field]: nextField }
-          next = { ...current, [tierKey]: tier }
-        }
-        models[modelId] = next
-        setDraft({ ...draft, prices: { ...draft.prices, models } })
+        const prices = isDefault ? { ...draft.prices, default: next }
+          : { ...draft.prices, models: { ...draft.prices.models, [modelId]: next } }
+        setDraft({ ...draft, prices })
       }
       const remove = () => {
         const models = { ...draft.prices.models }
@@ -625,6 +596,7 @@
           el('span', null, label),
           numInput({ value: tier?.cacheHit ?? null, emptyMode }, v => setTier(tierKey, 'cacheHit', v)),
           numInput({ value: tier?.cacheMiss ?? null, emptyMode }, v => setTier(tierKey, 'cacheMiss', v)),
+          cacheWriteInput(tier, label, t, v => setTier(tierKey, 'cacheWrite', v), entry.cacheHit),
           numInput({ value: tier?.output ?? null, emptyMode }, v => setTier(tierKey, 'output', v)))
       }
       return el('div', { className: 'cm-price-card' },
@@ -634,10 +606,10 @@
             entry?.legacy === true ? el('span', { className: 'cm-price-legacy' }, t('legacyModel')) : null,
             isDefault ? el('span', { className: 'cm-price-legacy' }, t('defaultFallback')) : null,
             isDefault ? null : el('button', { className: 'cm-btn small danger', onClick: remove }, t('remove')))),
-        // 列头与第三方价格卡(ProviderPriceCard)同款:命中 / 未命中(输入)/ 输出。
+        // 与第三方价格卡一样，分别编辑输入、缓存读写与输出。
         el('div', { className: 'cm-price-row' },
           el('span', null, ''),
-          el('span', null, t('flatCached')), el('span', null, t('flatInput')), el('span', null, t('flatOutput'))),
+          el('span', null, t('flatCached')), el('span', null, t('flatInput')), el('span', null, t('flatCacheWrite')), el('span', null, t('flatOutput'))),
         tierRow(t('tierBase'), 'base'),
         tierRow(t('tierOffPeak'), 'offPeak'),
         tierRow(t('tierPeak'), 'peak'),
@@ -1125,6 +1097,7 @@
         if (draft === null) return
         const models = { ...((draft.prices.providers ?? {})[provider]?.models ?? {}) }
         models[modelId] = { ...(models[modelId] ?? {}), [field]: Math.max(0, value) }
+        if (value === null) delete models[modelId][field]
         writeModels(models)
       }
       const setCny = (field, value) => {
@@ -1132,6 +1105,7 @@
         const models = { ...((draft.prices.providers ?? {})[provider]?.models ?? {}) }
         const current = models[modelId] ?? {}
         models[modelId] = { ...current, cny: { ...current.cny, [field]: Math.max(0, value) } }
+        if (value === null) delete models[modelId].cny[field]
         writeModels(models)
       }
       const remove = () => {
@@ -1151,17 +1125,19 @@
           : el(Fragment, null,
             el('div', { className: 'cm-price-row' },
               el('span', null, ''),
-              el('span', null, t('flatInput')), el('span', null, t('flatCached')), el('span', null, t('flatOutput'))),
+              el('span', null, t('flatInput')), el('span', null, t('flatCached')), el('span', null, t('flatCacheWrite')), el('span', null, t('flatOutput'))),
             el('div', { className: 'cm-price-row' },
               el('span', null, 'USD'),
               // 第三方三桶为必填计价结构:清空不提交(保留原值),避免误清成 0 价免费。
               numInput({ value: entry?.input ?? null, emptyMode: 'ignore' }, v => setNum('input', v)),
               numInput({ value: entry?.cachedInput ?? null, emptyMode: 'ignore' }, v => setNum('cachedInput', v)),
+              cacheWriteInput(entry, 'USD', t, v => setNum('cacheWrite', v)),
               numInput({ value: entry?.output ?? null, emptyMode: 'ignore' }, v => setNum('output', v))),
             entry?.cny ? el('div', { className: 'cm-price-row' },
               el('span', null, 'CNY'),
               numInput({ value: entry.cny.cacheMiss, emptyMode: 'ignore' }, v => setCny('cacheMiss', v)),
               numInput({ value: entry.cny.cacheHit, emptyMode: 'ignore' }, v => setCny('cacheHit', v)),
+              cacheWriteInput(entry.cny, 'CNY', t, v => setCny('cacheWrite', v)),
               numInput({ value: entry.cny.output, emptyMode: 'ignore' }, v => setCny('output', v))) : null))
     }
 
