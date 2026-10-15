@@ -93,7 +93,7 @@ window.__ModuleLoader__.load({
       '.cm-qguide p{margin:0;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary)}',
       '.cm-qguide .cm-buttons{display:flex;gap:8px;justify-content:flex-end}',
       '.cm-section{display:flex;flex-direction:column;gap:20px;padding:4px 2px 24px;font-size:13px;color:var(--dsw-alias-label-primary)}',
-      '.cm-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}',
+      '.cm-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:12px}',
       '.cm-cards-toggle{display:flex;align-items:center;gap:6px;margin:-6px 2px 0 auto;width:fit-content;font-size:12px;color:var(--dsw-alias-label-tertiary);cursor:pointer;user-select:none}',
       '.cm-cards-toggle:hover{color:var(--dsw-alias-label-primary)}',
       '.cm-cards-toggle input{margin:0;cursor:pointer}',

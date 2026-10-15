@@ -1581,7 +1581,7 @@
         ...(planPart > 0 ? [t('sessionDetailPlan', { amount: formatMoneyUsd(planPart, config) })] : []),
         modelCostDetail(usage, config),
       ].filter(Boolean).join('; ')
-      return el(Tooltip, { label: detail, side: 'top', delayMs: 500 },
+      return el(Tooltip, { portal: true, label: detail, side: 'top', delayMs: 500 },
         el('div', { className: 'cm-chip' }, planPart > 0
           ? t('costChipPlan', { amount: formatMoneyUsd(cost, config) })
           : t('cost', { amount: formatMoneyUsd(cost, config) })))
@@ -1791,7 +1791,7 @@
       const refresh = useClickRefresh(api ? () => api.refreshBalance() : null)
       if (!balance || balance.status === 'off') return null
       if (balance.status === 'error') {
-        return el(Tooltip, { label: [t('balanceQueryFailed', { message: balance.message || t('unknownError') }), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
+        return el(Tooltip, { portal: true, label: [t('balanceQueryFailed', { message: balance.message || t('unknownError') }), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
           el('div', { className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
             wide ? el(Fragment, null, t('balance'), ' ', el('span', { className: 'cm-num' }, t('queryFailed'))) : '⚠'))
       }
@@ -1806,7 +1806,7 @@
         ...(state.reconcile?.ok === false ? ['⚠ ' + state.reconcile.message] : []),
         ...clickRefreshTipLines(t, refresh),
       ].join('; ')
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? el(Fragment, null, el('span', { className: 'cm-balance-name' }, t('balance'), rechargeLinkEl(t)), el('span', { className: 'cm-num cm-bal-amt' }, formatBalanceMoney(balance.totalBalance, state.config, balance.currency)), state.reconcile?.ok === false ? ' ⚠' : '') : el(WalletIcon, { size: 16 })))
     }
@@ -1837,7 +1837,7 @@
           el('span', { className: 'cm-balance-name' }, el('span', { className: 'cm-bbox-label' }, t('balance')), rechargeLinkEl(t)),
           el('span', { className: 'cm-bbox-pct cm-num cm-bal-amt' }, remaining)),
         el(BalanceBar, { segments, direction: barDirectionOf(config, 'balance') }))
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { className: 'cm-bbox clickable' + (wide ? '' : ' rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? body : el('div', { className: 'cm-bbox-rail cm-num' }, Math.round(segments.remainingPct) + '%')))
     }
@@ -1959,7 +1959,7 @@
       const refresh = useClickRefresh(api ? () => api.refreshCustomBalance(index) : null)
       const view = customBalanceBoxBody(state, config, t, snapshot, entry)
       const detail = [customBalanceDetailText(snapshot, config, t, state, entry), ...clickRefreshTipLines(t, refresh)].join(' · ')
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { className: 'cm-bbox clickable' + (view.level === 'ok' ? '' : ' ' + view.level) + (wide ? '' : ' rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? view.body : el('div', { className: 'cm-bbox-rail cm-num' }, view.rail)))
     }
@@ -1982,13 +1982,13 @@
       const refresh = useClickRefresh(api ? () => api.refreshCustomBalance(index) : null)
       const label = resolveCustomBalanceLabel(entry ?? config.customBalance ?? {}, resolveLocale(config))
       if (custom.status === 'error') {
-        return el(Tooltip, { label: [custom.message || t('unknownError'), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
+        return el(Tooltip, { portal: true, label: [custom.message || t('unknownError'), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
           el('div', { className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
             wide ? el(Fragment, null, el('span', { className: 'cm-bal-label', title: label }, label), el('span', { className: 'cm-num cm-bal-amt' }, t('queryFailed'))) : '⚠'))
       }
       const amount = formatCustomBalanceMoney(custom.remaining, config, custom, entry)
       const detail = [customBalanceDetailText(custom, config, t, state, entry), ...clickRefreshTipLines(t, refresh)].join(' · ')
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? el(Fragment, null, el('span', { className: 'cm-bal-label', title: label }, label), el('span', { className: 'cm-num cm-bal-amt' }, amount)) : el(WalletIcon, { size: 16 })))
     }
@@ -2061,7 +2061,7 @@
       }
       if (chips.length === 0) return null
       return el('div', { className: 'cm-corner' },
-        chips.map(c => el(Tooltip, { key: c.key, label: c.tip, side: 'top', delayMs: 500 },
+        chips.map(c => el(Tooltip, { portal: true, key: c.key, label: c.tip, side: 'top', delayMs: 500 },
           el('span', { className: 'cm-corner-chip' + (c.key === 'model-top' ? ' cm-model-top' : '') + (c.level === 'ok' ? '' : ' ' + c.level) }, c.text))))
     }
 
@@ -2265,7 +2265,7 @@
       const chipText = view.nextIntoPeak
         ? t('nextPeakIn', { time: countdownText(view, now, t) })
         : t('nextOffPeakIn', { time: countdownText(view, now, t) })
-      return el(Tooltip, { label: t(keys.notice), side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: t(keys.notice), side: 'right', delayMs: 300 },
         el('div', { className: 'cm-peak-strip ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off') },
           el('div', { className: 'cm-peak-track' },
             el('div', { className: 'cm-peak-segment cm-peak-high' }),
@@ -2288,7 +2288,7 @@
       const chipText = view.nextIntoPeak
         ? t('nextPeakIn', { time: countdownText(view, now, t) })
         : t('nextOffPeakIn', { time: countdownText(view, now, t) })
-      return el(Tooltip, { label: t(keys.notice), side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: t(keys.notice), side: 'right', delayMs: 300 },
         el('div', { className: 'cm-peak-classic ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off') },
           el('div', { className: 'cm-peak-classic-marker', style: { left: view.weekend || view.holiday ? '50%' : view.inPeak ? '25%' : '75%' } }),
           el('div', { className: 'cm-peak-track' },
@@ -2315,7 +2315,7 @@
         ? t('nextPeakIn', { time: countdownText(view, now, t) })
         : t('nextOffPeakIn', { time: countdownText(view, now, t) })
       const detail = [t(keys.notice), chipText]
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { className: 'cm-peak-rail ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off'), 'aria-label': detail.join('; ') },
           el('div', { className: 'cm-peak-rail-track' },
             el('div', { className: 'cm-peak-rail-segment cm-peak-rail-high' }),
@@ -2339,7 +2339,7 @@
         ? t('nextPeakIn', { time: countdownText(view, now, t) })
         : t('nextOffPeakIn', { time: countdownText(view, now, t) })
       const detail = [t(keys.notice), chipText]
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { className: 'cm-peak-rail-classic ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off'), 'aria-label': detail.join('; ') },
           el('div', { className: 'cm-peak-rail-classic-track' },
             el('div', { className: 'cm-peak-rail-classic-segment peak' }),
@@ -2445,7 +2445,7 @@
             : '')),
         t('goQuotaFetchedAt', { time: goQuota.fetchedAt > 0 ? new Date(goQuota.fetchedAt).toLocaleTimeString() : '—' }),
       ].join('; ')
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { className: 'cm-bbox' + (view.level === 'ok' ? '' : ' ' + view.level) + (wide ? '' : ' rail') },
           wide ? view.body : el('div', { className: 'cm-bbox-rail cm-num' }, view.rail)))
     }
@@ -2552,7 +2552,7 @@
       const rail = el(Fragment, null,
         el('div', { className: 'cm-bbox-rail cm-num' }, fiveView.text),
         el('div', { className: 'cm-bbox-rail cm-num' }, sevenView.text))
-      return el(Tooltip, { label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
           ...hoverProps, className: 'cm-bbox cm-mm' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '')
             + (refresh ? ' clickable' + (refresh.busy ? ' busy' : '') : ''),
@@ -2676,7 +2676,7 @@
         el('div', { className: 'cm-mm-title' }, t('codexQuotaTitle')),
         view.row)
       const rail = el('div', { className: 'cm-bbox-rail cm-num' }, view.label === null ? '—' : view.label + '%')
-      return el(Tooltip, { label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
           ...hoverProps, className: 'cm-bbox cm-mm clickable' + (view.level === 'ok' ? '' : ' ' + view.level)
             + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''),
@@ -2742,7 +2742,7 @@
       const railText = pcts.length > 0
         ? pcts.slice(0, 2).map(p => simpleBarByDirection(p, planDirection).label + '%').join(' ')
         : (typeof entries[0][1]?.text === 'string' ? entries[0][1].text : '—')
-      return el(Tooltip, { label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', { ...hoverProps, className: 'cm-bbox cm-mm clickable' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide === false
             ? el('div', { className: 'cm-bbox-rail cm-num' }, railText)
@@ -2839,7 +2839,7 @@
       const pcts = rows.filter(r => r.view).map(r => r.view.label).filter(p => p !== null)
       const railText = pcts.length > 0 ? pcts.slice(0, 2).map(p => p + '%').join(' ') : (rows[0].text ?? '—')
       const rail = el('div', { className: 'cm-bbox-rail cm-num' }, railText)
-      return el(Tooltip, { label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
           ...hoverProps, className: 'cm-bbox cm-mm clickable' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''),
           ...clickableRefreshProps(refresh.busy, refresh.run),
@@ -3039,7 +3039,7 @@
           if (!busy && api) tipLines.push(t('clickToRefresh'))
           if (busy) tipLines.push(t('refreshing'))
           if (err) tipLines.push('⚠ ' + t('balanceRefreshFailed', { message: err }))
-          return el(Tooltip, { key: c.key, label: tipLines.join('; '), side: 'bottom', delayMs: 400 },
+          return el(Tooltip, { portal: true, key: c.key, label: tipLines.join('; '), side: 'bottom', delayMs: 400 },
             el('span', {
               className: 'cm-qchip' + (api ? ' action' : '') + (c.level === 'ok' ? '' : ' ' + c.level),
               ...(api ? clickableRefreshProps(busy, () => doRefresh(c.key)) : {}),
@@ -3207,12 +3207,12 @@
             total: formatMoneyUsd(displayCostOf(state.total, config), config),
           }),
         ].join('; ')
-        if (props.summary === true) return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+        if (props.summary === true) return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
           el('div', { className: 'cm-simple-summary' + (level === 'ok' ? '' : ' ' + level), tabIndex: 0 },
             el('span', null, t('todayBudget', { period: t(PERIOD_KEYS[budget.period] ?? 'periodMonth') })),
             el('span', { className: 'cm-num' }, todayValue + ' / ' + formatMoneyValue(amount, config))))
         const view = budgetBoxBody(state, config, t)
-        return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+        return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
           el('div', { className: 'cm-bbox' + (level === 'ok' ? '' : ' ' + level) + (wide ? '' : ' rail') },
             wide ? view.body : el('div', { className: 'cm-bbox-rail cm-num' }, view.rail)))
       }
@@ -3228,7 +3228,7 @@
         t('monthCost', { amount: formatMoneyUsd(displayCostOf(state.month, config), config) }),
         t('totalCost', { amount: formatMoneyUsd(displayCostOf(state.total, config), config) }),
       ].join('; ')
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el(Fragment, null,
           el('div', { className: 'cm-foot' + (wide ? '' : ' cm-foot-rail') },
             wide ? el(Fragment, null, t('today'), ' ', el('span', { className: 'cm-num' }, todayValue)) : el(WalletIcon, { size: 16 })),
