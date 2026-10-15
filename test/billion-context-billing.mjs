@@ -169,6 +169,18 @@ try {
   await bridge.ingest(); near(ledger.sumDays().cost, before)
   await bridge.ingest(); near(ledger.sumDays().cost, before)
   assert.equal(ledger.sumDays().calls, 8, 'restart and repeated ingestion never repeat a committed call')
+  const originalConfig = ledger.config, updated = structuredClone(originalConfig)
+  for (const bucket of Object.keys(price)) updated.prices.providers.fixture.models.main[bucket] *= 5
+  ledger.config = updated
+  const unchangedDetail = await getSessionBilling(ledger, ctx, query)
+  near(unchangedDetail.cost, before)
+  near((await getTurnCost(ledger, ctx, 'root', 1, 4)).cost, 1450 / 1e6)
+  hostEvents.set('price-after-edit', [...hostEvents.get('root').slice(0, 3)])
+  await run('price-after-edit')
+  const newPrice = await getSessionBilling(ledger, ctx, { ...query, sessionId: 'price-after-edit' })
+  near(newPrice.cost, 1500 / 1e6)
+  near(newPrice.recorded.cost, newPrice.cost)
+  ledger.config = originalConfig
   for (const mode of ['google-array', 'unknown', 'partial']) {
     hostEvents.set('coverage-' + mode, [...hostEvents.get('root').slice(0, 3)])
     await run('coverage-' + mode, mode)

@@ -2,14 +2,14 @@
 
 ## English
 
-This local, unpublished preview addresses [#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274), requested by @playgithub. It adds an OpenDesign price channel and read-only workspace quota queries. It does not install OpenDesign, create an account or change a model route.
+This development update addresses [#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274), requested by @playgithub. It adds an OpenDesign price channel and read-only workspace quota queries; it is not yet in the npm release. It does not install OpenDesign, create an account or change a model route.
 
 ### Conversation costs
 
 - The offline catalog contains 35 token-priced models checked on **2026-10-15**, from the [official public API](https://amr-api.open-design.ai/api/v1/public/model-prices). Prices are **USD per 1M tokens**, with cache read/write rates and long-context tiers where provided. The long tier applies to the entire request only above its input threshold, including cached input.
 - Provider IDs `opendesign`, `open-design`, `open-design-api` and `amr-link.open-design.ai`, including DSH's `llm-` prefix, use this separate catalog. A custom price under the original alias takes priority. Other provider IDs can use the existing explicit price mapping and plan-assignment controls.
 - OpenDesign prices never serve as fallback prices for another provider. Unknown OpenDesign models stay unpriced; the plugin does not borrow a direct-vendor price.
-- **Settings → Cost → Prices → Sync official prices** also refreshes the public OpenDesign catalog. A used/enabled OpenDesign channel refreshes at startup and hourly. No key or model request is needed. User-edited prices, removed models and previously recorded amounts stay intact on refresh or failure. Details use the configured pricing rules and expose a recorded-versus-replayed difference when prices change.
+- **Settings → Cost → Prices → Sync official prices** also refreshes the public OpenDesign catalog. A used/enabled OpenDesign channel refreshes at startup and hourly. No key or model request is needed. User-edited prices and removed models stay intact. Saved price versions preserve existing details when rates change; recalculation is explicit and retains the original amounts. A historical price version that was never captured cannot be reconstructed.
 
 OpenDesign uses shared subscription allowances and can fall back to its wallet; see its [model-credit rules](https://open-design.ai/model-credits/). Calls default to **Plan-equivalent cost**, which is not a subscription payment or a cash bill. Set wallet-funded calls to **API** in the billing-classification controls, or assign individual models explicitly. DSH's standard usage response does not identify each request's funding source, account-specific discount, image charge or automatic top-up. Those amounts are not invented from the list price or balance movement.
 
@@ -39,14 +39,14 @@ Endpoint provenance: the official Cloud bundles `cloud-root-B21Emo2w.js` and `pr
 
 ## 中文
 
-本地预览实现了 @playgithub 在 [#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274) 提出的接入需求，尚未推送或发布。不会安装 OpenDesign、注册账户或改变模型路由。
+本次开发更新实现了 @playgithub 在 [#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274) 提出的接入需求，尚未进入 npm 正式版。不会安装 OpenDesign、注册账户或改变模型路由。
 
 ### 会话计费
 
 - 从[官方公开价表](https://amr-api.open-design.ai/api/v1/public/model-prices)加入 **35 个模型**，核对日期为 **2026-10-15**。单位为 **美元／百万 Token**，包含已公布的缓存读取、缓存写入和长上下文价格。超过输入阈值后，整次请求使用长档，输入阈值包含缓存输入。
 - `opendesign`、`open-design`、`open-design-api`、`amr-link.open-design.ai` 及其 `llm-` 前缀使用独立目录；原渠道中手工配置的价格优先。其他自定义名称可通过既有价格映射和套餐归属入口关联。
 - 未收录的 OpenDesign 模型标为未定价，不借用直连厂商价格；其他渠道也不会使用 OpenDesign 价作为兜底。
-- **设置 → 费用 → 价格 → 同步官方价格**会同步公开目录。已使用或开启 OpenDesign 时，启动和每小时也会刷新；不需要密钥，不调用模型。自定义价格、取消挂载和已记账金额保留。价格规则改变后，可用明细按当前配置回放，并显示与原账本的差额。
+- **设置 → 费用 → 价格 → 同步官方价格**会同步公开目录。已使用或开启 OpenDesign 时，启动和每小时也会刷新；不需要密钥，不调用模型。自定义价格、取消挂载和已保存价格版本的历史明细保留。历史重算需要主动确认并保留原金额；未保存过的历史价格版本无法还原。
 
 OpenDesign 的 API 与客户端共用套餐，套餐用尽后可以继续扣钱包，详见[官方额度规则](https://open-design.ai/zh/model-credits/)。因此默认计入 **Plan 等值费用**，不把额度当成现金支出。钱包付款可在计费分类中设为 **API**，也可逐模型配置。DSH 的标准用量回执没有逐次扣款来源、账户折扣、图片费用或自动充值金额，这些金额不会通过公开单价或余额变化猜算。
 
@@ -63,4 +63,4 @@ OpenDesign 的 API 与客户端共用套餐，套餐用尽后可以继续扣钱�
 
 公开价表已经直接读取；认证查询与中英文设置使用模拟数据验证，覆盖大整数、零余额、串工作区／成员、认证失败、价格持久化等情况。**没有真实账户验证，没有调用付费模型。**真实账户的 Control Key 权限与服务端响应需要在配置后核对。
 
-官方明确支持 DSH，说明这条 issue 有可执行的接入需求；仅凭“便宜、可能流行”的一句话，不能认定为广告。未修改该 issue 的状态或发送评论。
+官方明确支持 DSH，说明这条 issue 有可执行的接入需求；仅凭“便宜、可能流行”的一句话，不能认定为广告。
