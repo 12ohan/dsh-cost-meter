@@ -645,145 +645,13 @@
           ? el('p', { className: 'cm-note' }, t('datedPriceNote')) : null)
     }
 
-    // ── 拓展价格表面板(厂商/家族分类目录 + 挂载/取消挂载) ─────────────
+    // ── 厂商展示名(价格表分组标题用) ────────────────────────────────────
 
     const CATALOG_VENDOR_LABELS = {
       deepseek: 'DeepSeek', openai: 'OpenAI', anthropic: 'Anthropic', google: 'Google Gemini',
       moonshot: 'Moonshot (Kimi)', 'z-ai': 'Z.ai / 智谱', xai: 'xAI', alibaba: '阿里云百炼',
       minimax: 'MiniMax', tencent: '腾讯混元', xiaomi: '小米', upstage: 'Upstage', nvidia: 'NVIDIA', mistral: 'Mistral',
       meta: 'Meta', meituan: '美团 LongCat', 'opencode-go': 'OpenCode Go',
-    }
-
-    /** 目录条目价格摘要(美元;峰谷两档写 谷/峰)。 */
-    function catalogPriceText(entry, t, currency = 'USD') {
-      entry = priceAt(entry)
-      if (entry === null || typeof entry !== 'object') return ''
-      if (entry.unpriced === true) return t('catalogUnpriced')
-      if (currency === 'CNY' && entry.cny) entry = entry.cny
-      const usd = n => (currency === 'CNY' ? '¥' : '$') + String(n)
-      const pk = entry.peak !== null && typeof entry.peak === 'object' ? entry.peak : null
-      if (pk !== null) return usd(entry.cacheMiss) + '/' + usd(pk.cacheMiss) + ' in · ' + usd(entry.output) + '/' + usd(pk.output) + ' out'
-      return usd(entry.cacheMiss ?? entry.input ?? 0) + ' in · ' + usd(entry.output ?? 0) + ' out'
-    }
-
-    function PriceCatalogPanel(props) {
-      const { state, draft, setDraft, t } = props
-      const [open, setOpen] = useState(false)
-      // 厂商默认全部折叠;点开某厂商后仅展开该厂商。
-      const [openVendors, setOpenVendors] = useState({})
-      const catalog = state.priceCatalog
-      if (catalog === null || typeof catalog !== 'object') return null
-      const prices = draft?.prices ?? state.config.prices
-      // 「在费用设置直接显示」开关(按模型):仅决定价格卡是否在费用设置「价格表」区直接显示,
-      // 不影响挂载与计费;不直接显示的模型其价格卡在本面板内可编辑。
-      const displayMap = draft?.priceTableDisplay ?? state.config.priceTableDisplay ?? {}
-      // 「在费用设置直接显示」精确到单个模型:键 'provider:modelId',值显式布尔;
-      // 缺省 = 默认策略(DeepSeek 模型直接显示,第三方收入拓展表)。只决定展示位置,不影响挂载与计费。
-      const isDirect = (provider, modelId) => {
-        const value = displayMap[provider + ':' + modelId]
-        return typeof value === 'boolean' ? value : provider === 'deepseek'
-      }
-      const setDirect = (provider, modelId, value) => {
-        if (draft === null) return
-        setDraft({ ...draft, priceTableDisplay: { ...displayMap, [provider + ':' + modelId]: value } })
-      }
-      const isMounted = (provider, modelId) => provider === 'deepseek'
-        ? prices.models?.[modelId] !== undefined
-        : prices.providers?.[provider]?.models?.[modelId] !== undefined
-      const mount = (provider, modelId, entry) => {
-        if (draft === null) return
-        const copy = JSON.parse(JSON.stringify(entry))
-        if (provider === 'deepseek') {
-          setDraft({ ...draft, prices: { ...draft.prices, models: { ...draft.prices.models, [modelId]: copy } } })
-          return
-        }
-        const providers = { ...(draft.prices.providers ?? {}) }
-        const table = providers[provider] ?? {}
-        providers[provider] = { ...table, models: { ...(table.models ?? {}), [modelId]: copy } }
-        setDraft({ ...draft, prices: { ...draft.prices, providers } })
-      }
-      const unmount = (provider, modelId) => {
-        if (draft === null) return
-        if (provider === 'deepseek') {
-          const models = { ...draft.prices.models }
-          delete models[modelId]
-          setDraft({ ...draft, prices: { ...draft.prices, models } })
-          return
-        }
-        const providers = { ...(draft.prices.providers ?? {}) }
-        const table = providers[provider]
-        if (table !== undefined && table.models !== undefined) {
-          const models = { ...table.models }
-          delete models[modelId]
-          providers[provider] = { ...table, models }
-          setDraft({ ...draft, prices: { ...draft.prices, providers } })
-        }
-      }
-      // 厂商顺序:DeepSeek 居首,其余按字母序;每家默认折叠,标题可点开。
-      const providerIds = Object.keys(catalog).sort((a, b) => (a === 'deepseek' ? -1 : b === 'deepseek' ? 1 : a.localeCompare(b)))
-      const countModels = provider => Object.values(catalog[provider]).reduce((n, fam) => n + Object.keys(fam).length, 0)
-      // DeepSeek 目录模型集合:目录之外手动新增的已挂载模型也要能切换直接显示/编辑。
-      const dsCatalogIds = new Set(Object.values(catalog.deepseek ?? {}).flatMap(fam => Object.keys(fam)))
-      const dsExtraMounted = Object.keys(prices.models ?? {}).filter(id => !dsCatalogIds.has(id)).sort()
-      // 单个模型行:已挂载且未直接显示 → 目录内可编辑卡片(带切回直接显示的开关);
-      // 其余 → 只读行(已挂载的带直接显示开关与挂载/取消挂载按钮)。
-      const renderModel = (provider, modelId, entry) => {
-        const mounted = isMounted(provider, modelId)
-        const direct = isDirect(provider, modelId)
-        const directToggle = mounted
-          ? el('label', { className: 'cm-check cm-vendor-display', title: t('catalogDisplayHint') },
-              el('input', {
-                type: 'checkbox',
-                checked: direct,
-                onChange: event => setDirect(provider, modelId, event.target.checked),
-              }),
-              el('span', null, t('catalogDisplayLabel')))
-          : null
-        if (mounted && !direct && draft !== null) {
-          const card = provider === 'deepseek'
-            ? el(PriceCard, { key: modelId, modelId, entry: prices.models[modelId], isDefault: false, draft, setDraft, t })
-            : el(ProviderPriceCard, { key: modelId, provider, modelId, entry: prices.providers?.[provider]?.models?.[modelId], draft, setDraft, t })
-          return el('div', { key: modelId, className: 'cm-catalog-mounted' }, directToggle, card)
-        }
-        return el('div', { key: modelId, className: 'cm-catalog-row' },
-          el('span', { className: 'cm-catalog-id' }, modelId),
-          el('span', { className: 'cm-catalog-price' }, catalogPriceText(entry, t, provider === 'deepseek' || entry?.cny ? prices.currency : 'USD')),
-          mounted ? el('span', { className: 'cm-catalog-tag' }, t('mountedTag')) : null,
-          directToggle,
-          el('button', { className: 'cm-btn small', disabled: !mounted && entry?.unpriced === true, onClick: () => (mounted ? unmount(provider, modelId) : mount(provider, modelId, entry)) },
-            mounted ? t('unmountBtn') : t('mountBtn')))
-      }
-      return el('div', { className: 'cm-budget', style: { marginTop: '8px' } },
-        el('div', { className: 'cm-budget-head' },
-          el('h3', { className: 'cm-h' }, t('catalogTitle')),
-          el('button', { className: 'cm-toggle-btn', onClick: () => setOpen(o => !o) }, open ? t('catalogCollapse') : t('catalogOpen'))),
-        open
-          ? el(Fragment, null,
-            el('p', { className: 'cm-note' }, t('catalogNote')),
-            providerIds.map(provider => {
-              const vendorOpen = openVendors[provider] === true
-              return el('div', { key: provider },
-                el('div', {
-                  className: 'cm-catalog-vendor cm-vendor-toggle',
-                  onClick: () => setOpenVendors(v => ({ ...v, [provider]: !vendorOpen })),
-                },
-                  el('span', null, (vendorOpen ? '▾ ' : '▸ ') + (CATALOG_VENDOR_LABELS[provider] ?? provider) + ' · ' + countModels(provider))),
-                vendorOpen
-                  ? el(Fragment, null,
-                    provider === 'deepseek' ? el('p', { className: 'cm-hint' }, t('catalogDeepseekNote')) : null,
-                    Object.keys(catalog[provider]).sort().map(family =>
-                      el('div', { key: family },
-                        el('div', { className: 'cm-catalog-family' }, family),
-                        Object.keys(catalog[provider][family]).sort().map(modelId =>
-                          renderModel(provider, modelId, catalog[provider][family][modelId])))),
-                    provider === 'deepseek' && dsExtraMounted.length > 0
-                      ? el('div', null,
-                          el('div', { className: 'cm-catalog-family' }, t('catalogCustomModels')),
-                          dsExtraMounted.map(id => renderModel('deepseek', id, null)))
-                      : null)
-                  : null)
-            }))
-          : null)
     }
 
     /** provider 展示名归一:历史请求携带的 'zen' 是错误叫法,统一展示为 'go'。 */
@@ -1968,6 +1836,9 @@
       const [busy, setBusy] = useState(false)
       // 价格表折叠开关(默认收起,保持设置页简洁;三角按钮展开)。
       const [priceOpen, setPriceOpen] = useState(false)
+      // 第三方厂商分组折叠状态(默认全部收起):拓展价格表面板移除后,第三方价格卡片
+      // 改由价格表内的厂商分组承载,展开某厂商才渲染其卡片,避免一次渲染数百张卡片。
+      const [openVendors, setOpenVendors] = useState({})
       // 设置页当前标签(issue #29):概览/额度/用量/价格/显示;仅切可见分区,不拆配置与保存逻辑。
       const [tab, setTab] = useState('overview')
       // 自动保存状态:idle(无改动) | saving | saved | error。
@@ -2576,20 +2447,35 @@
               onChange: event => setNewModelId(event.target.value),
             }),
             el('button', { className: 'cm-btn small', onClick: addModel, disabled: newModelId.trim().length === 0 }, t('addModel'))),
-          // 已挂载的第三方 provider 模型(仅逐模型勾选了「在费用设置直接显示」的条目;其余在拓展价格表内展示与编辑)
+          // 已挂载的第三方 provider 模型:按厂商分组折叠,展开后即可编辑价格或取消挂载。
+          // (拓展价格表面板移除后,这里是第三方价格的唯一编辑入口;默认全部收起,
+          //  因此不会因挂载模型多而一次渲染数百张卡片。)
           (() => {
             const displayMap = draft?.priceTableDisplay ?? config.priceTableDisplay ?? {}
             const providers = draft?.prices?.providers ?? {}
-            const directIds = p => Object.keys(providers[p]?.models ?? {}).filter(id => displayMap[p + ':' + id] === true)
+            // 逐模型显示开关:缺省显示(与 DeepSeek 价格卡片一致);显式 false 收入折叠分组。
+            const editableIds = p => Object.keys(providers[p]?.models ?? {}).filter(id => displayMap[p + ':' + id] !== false)
             const groups = Object.keys(providers)
-              .filter(p => directIds(p).length > 0)
+              .filter(p => editableIds(p).length > 0)
               .sort((a, b) => a.localeCompare(b))
             if (groups.length === 0) return null
-            return groups.map(p =>
-              el('div', { key: p },
-                el('div', { className: 'cm-catalog-vendor' }, (CATALOG_VENDOR_LABELS[p] ?? p) + ' · ' + t('mountedSuffix')),
-                directIds(p).sort().map(id =>
-                  el(ProviderPriceCard, { key: p + ':' + id, provider: p, modelId: id, entry: providers[p].models[id], draft, setDraft, t }))))
+            return groups.map(p => {
+              const ids = editableIds(p).sort()
+              const vendorOpen = openVendors[p] === true
+              return el('div', { key: p },
+                el('div', {
+                  className: 'cm-catalog-vendor cm-vendor-toggle',
+                  role: 'button',
+                  tabIndex: 0,
+                  'aria-expanded': String(vendorOpen),
+                  onClick: () => setOpenVendors(v => ({ ...v, [p]: !vendorOpen })),
+                  onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setOpenVendors(v => ({ ...v, [p]: !vendorOpen })) } },
+                },
+                  el('span', null, (vendorOpen ? '▾ ' : '▸ ') + (CATALOG_VENDOR_LABELS[p] ?? p) + ' · ' + ids.length + ' ' + t('mountedSuffix'))),
+                vendorOpen
+                  ? ids.map(id => el(ProviderPriceCard, { key: p + ':' + id, provider: p, modelId: id, entry: providers[p].models[id], draft, setDraft, t }))
+                  : null)
+            })
           })())
           : null),
         // 模型名匹配(自动匹配开关 + 未命中模型的手动指定)
@@ -2693,8 +2579,6 @@
                       targetOptions.map(o => el('option', { key: o.value, value: o.value }, o.label))))))
               : null)
         })(),
-        // 拓展价格表(厂商/家族分类目录;挂载 ↔ 费用设置价格表)
-        el(PriceCatalogPanel, { state, draft, setDraft, t }),
         // 官方价格同步(与价格表同组;自动保存状态已移至标签栏常驻)
         el('div', null,
           el('h3', { className: 'cm-h' }, t('dataSync')),
