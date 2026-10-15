@@ -1986,12 +1986,11 @@ const sampleState = {
   },
   history: [],
   config: sanitizeConfig({}),
-  priceCatalog: buildPriceCatalog(),
   meta: { now: Date.now(), timezoneOffsetMinutes: 0, dayKey: '2026-08-17', monthKey: '2026-08' },
 }
 const stateCheck = stateSchema.safeParse(sampleState)
-assert.ok(stateCheck.success, '完整快照(含未核价目录/文本窗口/新配置键)通过 strict codec: ' + JSON.stringify(stateCheck.error?.issues?.slice(0, 2)))
-console.log('[ok] stateSchema 漂移回归(目录/文本窗口/新配置键)通过')
+assert.ok(stateCheck.success, '完整快照(含文本窗口/新配置键)通过 strict codec: ' + JSON.stringify(stateCheck.error?.issues?.slice(0, 2)))
+console.log('[ok] stateSchema 漂移回归(文本窗口/新配置键)通过')
 
 // 7.3 新增 coding plan 解析器与端点白名单。
 assert.equal(parseOpenRouterCredits({ data: { total_credits: 10, total_usage: 2.5 } }).credits.percent, 25, 'OpenRouter 已用%')
@@ -3754,11 +3753,13 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   // 显示:语言 + 显示设置分组。
   between("t('languageLabel')", branch.display, branch.pricing, '语言选择在显示标签')
   between("t('displaySettings')", branch.display, branch.pricing, '显示设置分组在显示标签')
-  // 价格:峰谷 + 价格表 + 匹配 + 拓展目录 + 官方同步。
+  // 价格:峰谷 + 价格表 + 匹配 + 官方同步 + OpenRouter 公开报价。
   between('el(PeakPanel, { state, draft, setDraft, t })', branch.pricing, tabsSrc.length, '峰谷计价面板在价格标签')
   between("t('priceTableTitle')", branch.pricing, tabsSrc.length, '价格表在价格标签')
-  between('el(PriceCatalogPanel, { state, draft, setDraft, t })', branch.pricing, tabsSrc.length, '拓展价格表在价格标签')
   between("t('dataSync')", branch.pricing, tabsSrc.length, '官方价格同步在价格标签')
+  // 拓展价格表面板已移除:第三方价格卡片改由价格表内的厂商折叠分组承载。
+  assert.ok(!tabsSrc.includes('PriceCatalogPanel'), '拓展价格表面板已移除')
+  between('el(BillingStatistics, { state, api, load: api.loadOpenRouter })', branch.pricing, tabsSrc.length, 'OpenRouter 公开报价在价格标签')
   console.log('[ok] 设置页标签分组(五标签结构/双语文案/样式/保存徽章全局化/面板归属)通过')
 }
 

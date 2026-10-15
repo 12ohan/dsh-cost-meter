@@ -161,6 +161,39 @@ try {
   const afterBrowse = await api.getState()
   assert.deepEqual(afterBrowse.config, beforeBrowse.config, 'browsing does not change configured prices')
   assert.deepEqual(afterBrowse.today, beforeBrowse.today, 'browsing does not change recorded costs')
+  // 手改价可见性(前端「已自定义」标记 + 交回自动同步):判定必须与刷新跳过覆盖同源,
+  // 否则会出现「显示不会被覆盖、实际被覆盖」的静默错误。
+  {
+    const modelsNow = () => api.getState().then(s => s.config.prices.providers.openrouter.models)
+    const lockedOf = async () => (await api.getState()).priceLockIds ?? []
+    await api.fetchPrices()
+    assert.deepEqual(await lockedOf(), [], '自动同步写入的价格不应标记为已自定义')
+    // 用同步源确实会下发的模型(vendor/service):交回自动同步只对目录条目的下一次
+    // 覆盖有意义,内置快照里目录不再提供的模型不会被刷新写回。
+    const target = 'vendor/service'
+    // 手改一个真实生效的费率桶:cacheMiss 是 normalizePrice 的主桶(completeTier
+    // 依次取 cacheMiss ?? input),改 input 只会在别名层叠加、指纹不变。
+    const edited = { ...(await modelsNow())[target], cacheMiss: 42 }
+    await api.updateConfig({ prices: { providers: { openrouter: { models: { [target]: edited } } } } })
+    assert.deepEqual(await lockedOf(), [target], '手改过的条目应下发为已锁定')
+    const wireLocked = JSON.parse(JSON.stringify(await api.getState()))
+    stateSchema.parse(wireLocked)
+    CLIENT_CONTRIBUTION.descriptors.find(d => d.method === 'getState').result.create().parse(wireLocked)
+    assert.deepEqual(wireLocked.priceLockIds, [target], '锁定清单经 RPC codec 下发')
+    await api.fetchPrices()
+    assert.equal((await modelsNow())[target].cacheMiss, 42, '已锁定的条目不被同步覆盖')
+    assert.deepEqual(await lockedOf(), [target], '同步后仍为已锁定')
+    const released = await api.releasePriceLock(target)
+    assert.equal(released.ok, true, released.message)
+    assert.deepEqual(await lockedOf(), [], '交回自动同步后不再锁定')
+    const releasedWire = JSON.parse(JSON.stringify(released.state))
+    stateSchema.parse(releasedWire)
+    await api.fetchPrices()
+    assert.equal((await modelsNow())[target].cacheMiss, 2, '交回后下一次同步写入官方价')
+    const missing = await api.releasePriceLock('vendor/does-not-exist')
+    assert.equal(missing.ok, false, '未知 id 交回应报错而不是静默成功')
+    assert.deepEqual(await lockedOf(), [], '未知 id 不应产生锁定记录')
+  }
   for (const options of [[true, true], [false, true], [true, false], [false, false]]) {
     ;[officialOk, directoryOk] = options
     const beforeCalls = directoryCalls, result = await api.fetchPrices()
