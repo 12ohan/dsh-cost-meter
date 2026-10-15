@@ -33,12 +33,14 @@ const initialState = { config: sanitizeConfig({ locale: 'zh' }), today: day, mon
 const code = `
 import React from ${literal(req.resolve('react'))};
 import {createRoot} from ${literal(req.resolve('react-dom/client'))};
-window.__ModuleLoader__={load:mod=>window.costUI=mod.factory(name=>name==='react'?React:{Tooltip:({children})=>children})};
+window.__ModuleLoader__={load:mod=>{const value=mod.factory(name=>name==='react'?React:{Tooltip:({children})=>children});if(mod.chunk==='client.pricing.js')window.priceUI=value;else window.costUI=value}};
 ${client}
+${readSource('src/pricing/index.js')}
 const {CostSection,parseConfig}=window.costUI.preview;
 const state=${literal(initialState)};state.config=parseConfig(state.config,'config');
-window.patches=[];
-const api={loadOpenRouter:async()=>()=>null,updateConfig:async patch=>{window.patches.push(patch)}};
+window.patches=[];window.reprices=[];
+const pricing=window.priceUI.mount({effect:fn=>fn(),get:key=>key==='remote'?{$mount:async()=>()=>{}}:{getRepricingHistory:async()=>({ok:true,value:window.reprices.length?[{at:1792050000000,before:1,after:2,days:1,sessions:1,skipped:0}]:[]}),repriceHistory:async confirmed=>{window.reprices.push(confirmed);return {ok:true,value:{ok:true,message:'已重算，原金额已保留。'}}}}});
+const api={reload:async()=>{},loadPricing:()=>pricing,loadOpenRouter:async()=>()=>null,updateConfig:async patch=>{window.patches.push(patch)}};
 createRoot(document.getElementById('root')).render(React.createElement(CostSection,{useCost:()=>({state,status:'ready'}),api}));
 window.fixtureReady=true;
 `
@@ -108,14 +110,39 @@ try {
     checks.push({ theme, selectors: colors.length, options: colors.reduce((sum, select) => sum + select.options.length, 0) })
   }
   const model = page.locator('.cm-match-row select').first()
+  const search = page.locator('.cm-match-row input[type=search]').first()
+  await search.fill('opencode gpt')
+  const filtered = await model.locator('option').allTextContents()
+  assert.ok(filtered.length > 1 && filtered.slice(1).every(label => /opencode/i.test(label) && /gpt/i.test(label)))
+  assert.equal(await page.evaluate(() => window.patches.length), 0, 'searching never saves a mapping')
+  await search.fill('no-model-matches-this-query')
+  await page.getByRole('status').filter({ hasText: '没有匹配的模型' }).waitFor()
+  assert.equal(await model.inputValue(), '', 'empty results do not change the selected mapping')
+  await search.press('Escape')
+  assert.equal(await search.inputValue(), '')
   await model.selectOption('__local__')
   await page.waitForFunction(() => window.patches.length === 1)
   assert.deepEqual(await page.evaluate(() => window.patches[0]), { priceOverrides: { 'fixture:unknown': '__local__' } }, 'the actual dropdown still saves only the chosen model override')
+  await search.fill('claude')
+  assert.equal(await model.inputValue(), '__local__', 'filtering retains an existing selection even when it does not match')
+  const reprice = page.getByRole('button', { name: '按当前价格重算历史', exact: true })
+  await reprice.click()
+  await page.getByRole('alert').filter({ hasText: '这会改变历史费用' }).waitFor()
+  assert.deepEqual(await page.evaluate(() => window.reprices), [], 'warning does not execute recalculation')
+  await page.getByRole('button', { name: '取消', exact: true }).click()
+  assert.deepEqual(await page.evaluate(() => window.reprices), [], 'cancel leaves history untouched')
+  await reprice.click()
+  await page.getByRole('button', { name: '确认重算', exact: true }).click()
+  await page.waitForFunction(() => window.reprices.length === 1)
+  assert.deepEqual(await page.evaluate(() => window.reprices), [true])
+  await page.getByText('重算记录 · 原金额已保留', { exact: true }).click()
+  await page.getByRole('columnheader', { name: '原金额', exact: true }).waitFor()
   assert.deepEqual(external, [], 'theme test sends no external requests')
   assert.deepEqual(errors, [], 'settings render without browser errors')
   writeFileSync(join(output, 'report.json'), JSON.stringify({ checks, baseline, errors, external }, null, 2) + '\n')
   console.log(JSON.stringify({ checks, selectionSaved: true, browserErrors: errors.length, externalRequests: external.length }))
 } catch (error) {
+  console.error(await page.locator('.cm-repricing').evaluateAll(nodes => nodes.map(node => node.outerHTML)))
   console.error(JSON.stringify({ browserErrors: errors, styles: await page.evaluate(() => [...document.styleSheets].flatMap(sheet => [...sheet.cssRules].filter(rule => rule.selectorText?.includes('option')).map(rule => rule.cssText))), sample: await page.locator('select.cm-input').evaluateAll(selects => selects.map(select => ({html: select.outerHTML.slice(0, 180), background: getComputedStyle(select).backgroundColor, options: [...select.options].slice(0,2).map(option=>({html:option.outerHTML,color:getComputedStyle(option).color,background:getComputedStyle(option).backgroundColor}))}))) }))
   throw error
 } finally {

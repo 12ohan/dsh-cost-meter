@@ -39,13 +39,13 @@ try {
   ledger.days['2026-09-17'] = { cost: 18, apiCost: 18, byProviderModel: structuredClone(buckets),
     sessions: [{ id: 'session', cost: 18, apiCost: 18, byProviderModel: structuredClone(buckets) }] }
   const untouched = ['openrouter:qwen/qwen3.8-flash', 'custom/model:example', 'openrouter:vendor/mapped']
-  assert.equal(repairOpenRouterLedger(ledger).recostedBuckets, 2)
-  assert.equal(ledger.days['2026-09-17'].byProviderModel[key].cost, 0.1)
+  assert.equal(repairOpenRouterLedger(ledger).recostedBuckets, 0)
+  assert.equal(ledger.days['2026-09-17'].byProviderModel[key].cost, 0, 'versioned history keeps its original amount until explicit recalculation')
   for (const id of untouched) {
     assert.deepEqual(ledger.days['2026-09-17'].byProviderModel[id], buckets[id])
     assert.deepEqual(ledger.days['2026-09-17'].sessions[0].byProviderModel[id], buckets[id])
   }
-  assert.equal(ledger.days['2026-09-17'].cost, 18.1)
+  assert.equal(ledger.days['2026-09-17'].cost, 18)
   assert.equal(repairOpenRouterLedger(ledger).recostedBuckets, 0)
   assert.ok(!ledger.migrations.includes('pricing-openrouter-v1'), 'offline snapshot leaves catalog migration pending')
 
@@ -71,7 +71,7 @@ try {
   assert.equal(calls, 1)
   assert.equal(ledger.config.locale, 'en', 'concurrent settings preserved')
   assert.equal(ledger.config.prices.providers.openrouter.models['vendor/edited'].input, 42)
-  assert.equal(ledger.days['2026-09-17'].byProviderModel[liveKey].cost, 2, 'first online refresh repairs non-snapshot models')
+  assert.equal(ledger.days['2026-09-17'].byProviderModel[liveKey].cost, 0, 'even the first public catalog refresh preserves recorded amounts')
   assert.ok(ledger.migrations.includes('pricing-openrouter-v1'))
   const history = structuredClone(ledger.days)
   price = '0.000004'; await controller.refresh()

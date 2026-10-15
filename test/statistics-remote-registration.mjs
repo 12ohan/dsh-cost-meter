@@ -11,6 +11,7 @@ import { execFileSync } from 'node:child_process'
 import vm from 'node:vm'
 import { sanitizeConfig, applyConfigPatch } from '../lib/store.js'
 import { TYPERT } from '../lib/typert.host.js'
+import { buildPriceCatalog } from '../lib/pricing.js'
 import { billingStatistics } from '../lib/billing-statistics.js'
 import { getSessionBilling } from '../lib/turn-cost.js'
 import { getTurnInspection } from '../lib/turn-inspection.js'
@@ -34,7 +35,7 @@ function moduleFrom(source, require) {
   let factory
   vm.runInNewContext(source, {
     window: { __ModuleLoader__: { load: value => { factory = value.factory } } }, navigator: { language: 'en' },
-    document: { querySelector: () => ({}),
+    document: { querySelector: () => null, createElement: () => ({ dataset: {}, remove() {} }), head: { appendChild() {} },
       addEventListener(name, fn) { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(fn) },
       removeEventListener(name, fn) { listeners.get(name)?.delete(fn) }, hidden: false },
     setInterval: fn => { timers.add(fn); return fn }, clearInterval: fn => timers.delete(fn),
@@ -50,12 +51,13 @@ const pluginSource = file => baseline
   : readFileSync(new URL('../lib/' + file, import.meta.url), 'utf8')
 const statistics = moduleFrom(pluginSource('client.statistics.js'), () => React)
 const catalog = baseline ? null : moduleFrom(pluginSource('client.openrouter.js'), () => React)
+const pricing = baseline ? null : moduleFrom(pluginSource('client.pricing.js'), () => React)
 let loadCalls = 0, failLoad = false
 const requireMain = id => id === 'react' ? React : {}
 requireMain.async = async id => {
-  assert.ok(['./client.statistics.js', './client.openrouter.js'].includes(id)); loadCalls++
+  assert.ok(['./client.statistics.js', './client.openrouter.js', './client.pricing.js'].includes(id)); loadCalls++
   if (failLoad) { failLoad = false; throw new Error('synthetic chunk load failure') }
-  return id === './client.statistics.js' ? statistics : catalog
+  return id === './client.statistics.js' ? statistics : id === './client.pricing.js' ? pricing : catalog
 }
 const main = moduleFrom(pluginSource('client.js'), requireMain)
 const client = new Context()
@@ -69,6 +71,10 @@ class Connection extends Service {
         if (['costMeter/getState', 'costMeter/getLocalState'].includes(endpoint)) return { ok: true, value: state }
         if (endpoint === 'costMeter/updateConfig') { state.config = applyConfigPatch(state.config, payload.args.patch).config; return { ok: true, value: state } }
         if (endpoint === 'costMeter/getOpenRouterCatalog') return { ok: true, value: { fetchedAt: '2026-10-09T05:00:00Z', stale: false, error: '', models: [] } }
+        if (endpoint === 'costMeter/getRepricingHistory') return { ok: true, value: [] }
+        if (endpoint === 'costMeter/getPriceCatalog') return { ok: true, value: buildPriceCatalog() }
+        if (endpoint === 'costMeter/releasePriceLock') return { ok: true, value: { ok: payload.args.id !== 'missing', message: payload.args.id, state } }
+        if (endpoint === 'costMeter/repriceHistory') return { ok: true, value: { ok: true, message: 'synthetic recalculation' } }
         if (endpoint === 'costMeter/getContextCosts') return { ok: true, value: getContextCosts(ledger, { get: () => undefined }, payload.args.query) }
         if (endpoint === 'costMeter/getContextIntegration') return { ok: true, value: await getContextIntegration({ get: () => undefined }) }
         if (endpoint === 'costMeter/loginCodingPlan') return { ok: true, value: { ok: false, message: 'synthetic login response', state } }
@@ -110,6 +116,9 @@ try {
     await assert.rejects(first.api.loadStatistics(), /Remote package "dsh-cost-meter" is already registered/)
     console.log('[ok] #210 baseline v1.8.1 reproduces duplicate Remote package on ' + req('@deepseek-ai/dsh-api-gateway/package.json').version)
   } else {
+    assert.equal((await first.api.releasePriceLock('openai/gpt-4o')).ok, true)
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/releasePriceLock', { id: 'openai/gpt-4o' }], 'shipped settings wrapper uses the positional string accepted by the gateway')
+    await assert.rejects(first.api.releasePriceLock('missing'), /missing/, 'business failures reach the price editor')
     // A transient asset failure must be retryable without damaging the main face.
     failLoad = true
     await assert.rejects(first.api.loadStatistics(), /synthetic chunk load failure/)
@@ -165,6 +174,16 @@ try {
     assert.equal(Prices, samePrices, 'concurrent catalog opens share one mounted contribution')
     assert.equal((await Prices({ state }).props.api.getOpenRouterCatalog()).stale, false)
     assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/getOpenRouterCatalog', {}])
+    const [History, sameHistory] = await Promise.all([first.api.loadPricing(), first.api.loadPricing()])
+    assert.equal(History, sameHistory, 'pricing settings mount only once')
+    const pricingRpc = History({ mode: 'history' }).props.rpc
+    const restoredCatalog = await pricingRpc('getPriceCatalog')
+    TYPERT.invocations.find(d => d.method === 'getPriceCatalog').result.create().parse(restoredCatalog)
+    assert.equal(JSON.stringify(restoredCatalog), JSON.stringify(buildPriceCatalog()), 'lazy catalog survives the shipped pricing gateway and host codec')
+    assert.equal((await pricingRpc('getRepricingHistory')).length, 0)
+    assert.equal((await pricingRpc('repriceHistory', true)).ok, true)
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/repriceHistory', { confirmed: true }])
+    await assert.rejects(pricingRpc('repriceHistory', 'true'), /Expected confirmation/)
     const expectedMethods = TYPERT.invocations.filter(d => d.namespace === 'costMeter').map(d => d.method).sort()
     const actualMethods = Array.from(client.typert.remotes.list().filter(d => d.namespace === 'costMeter'), d => d.method).sort()
     assert.deepEqual(actualMethods, expectedMethods, 'all main and statistics methods coexist exactly once')
@@ -175,6 +194,7 @@ try {
     assert.equal([...listeners.values()].reduce((sum, rows) => sum + rows.size, 0), 0, 'unload removes lazy activation listeners')
     const second = await activate()
     const Reopened = await second.api.loadStatistics()
+    assert.equal(typeof await second.api.loadPricing(), 'function', 'pricing contribution supports plugin reload')
     assert.equal(typeof Reopened, 'function', 'same client modules can be mounted again after plugin reload')
     assert.equal((await Reopened({ state }).props.api.getBillingStatistics(query)).totals.calls, 0)
     await second.fiber.dispose()

@@ -54,6 +54,10 @@
       for (const key of ['input', 'output', 'cacheRead', 'cacheWrite', 'calls', 'cost']) out[key] = needNum(v[key], path + '.' + key)
       return out
     }
+    function parseMetering(v) {
+      return v == null ? undefined : { source: needStr(v.source, 'source'), requestId: needStr(v.requestId, 'requestId'), attempt: needNum(v.attempt, 'attempt'),
+        complete: needBool(v.complete, 'complete'), status: needStr(v.status, 'status'), upstream: needStr(v.upstream, 'upstream') }
+    }
     function parseTurnRows(rows) {
       return (Array.isArray(rows) ? rows : fail('rows', 'array')).map(r => ({ provider: needStr(r.provider, 'provider'), model: needStr(r.model, 'model'), bucket: needStr(r.bucket, 'bucket'), tokens: needNum(r.tokens, 'tokens'), rate: needNum(r.rate, 'rate'), cost: needNum(r.cost, 'cost'), priced: needBool(r.priced, 'priced'), plan: needBool(r.plan, 'plan') }))
     }
@@ -193,6 +197,7 @@
                 apiKey: typeof e.apiKey === 'string' ? e.apiKey : '',
                 ...(id === 'minimax' ? { baseUrl: typeof e.baseUrl === 'string' ? e.baseUrl : '' } : {}),
                 ...(id === 'factory' ? { orgId: typeof e.orgId === 'string' ? e.orgId : '', factoryPool: ['core', 'both'].includes(e.factoryPool) ? e.factoryPool : 'standard' } : {}),
+                ...(id === 'opendesign' ? { workspaceId: typeof e.workspaceId === 'string' ? e.workspaceId : '' } : {}),
                 ...(id === 'qwen' ? { quotaSource: ['cli', 'bailian'].includes(e.quotaSource) ? e.quotaSource : 'local' } : {}),
                 // SCNet / 千问本地计量字段(issue #26/#78):其余厂商无此键,缺省剔除。
                 ...(typeof e.planCredits === 'number' && Number.isFinite(e.planCredits) && e.planCredits > 0 ? { planCredits: e.planCredits } : {}),
@@ -430,6 +435,11 @@
         // Token Plan 统计(issue #64):宽容解析,缺失/畸形回落 null(UI 隐藏面板)。
         planStats: parsePlanStats(v.planStats),
         history: Array.isArray(v.history) ? v.history.map((d, i) => parseDay(d, path + '.history[' + i + ']')) : [],
+        billionContext: v.billionContext?.protocol === 1 ? { protocol: 1, connected: v.billionContext.connected === true, failed: v.billionContext.failed === true,
+          requests: Number(v.billionContext.requests) || 0, unreported: Number(v.billionContext.unreported) || 0, partial: Number(v.billionContext.partial) || 0, uncovered: Number(v.billionContext.uncovered) || 0,
+          detected: v.billionContext.detected === true, version: typeof v.billionContext.version === 'string' ? v.billionContext.version.slice(0, 100) : '',
+          compatibility: ['needs_update', 'changed', 'bridge_missing', 'ready'].includes(v.billionContext.compatibility) ? v.billionContext.compatibility : 'unknown',
+          noticeId: typeof v.billionContext.noticeId === 'string' ? v.billionContext.noticeId.slice(0, 240) : '' } : undefined,
         externalUsage: v.externalUsage && Array.isArray(v.externalUsage.sources) ? {
           fetchedAt: Number(v.externalUsage.fetchedAt) || 0,
           stale: v.externalUsage.stale === true,
@@ -566,8 +576,8 @@
         {
           id: 'dsh-cost-meter#costMeter/getTurnCost', service: 'costMeter', namespace: 'costMeter', method: 'getTurnCost', invocation: { kind: 'direct' },
           parameters: [rpcParam('sessionId', 'SessionId', codecOf(v => needStr(v, 'sessionId'))), ...['startSeq', 'endSeq'].map(name => rpcParam(name, 'TurnSeq', codecOf(v => { if (!Number.isSafeInteger(v) || v < 0) fail(name, 'nonnegative integer'); return v })))],
-          result: strictCodec('TurnCost', codecOf(v => ({ found: needBool(v.found, 'found'), cost: needNum(v.cost, 'cost'), apiCost: needNum(v.apiCost, 'apiCost'), rows: parseTurnRows(v.rows),
-            calls: (Array.isArray(v.calls) ? v.calls : fail('calls', 'array')).map(c => ({ kind: needStr(c.kind, 'kind'), provider: needStr(c.provider, 'provider'), model: needStr(c.model, 'model'), atMs: needNum(c.atMs, 'atMs'), cost: needNum(c.cost, 'cost'), apiCost: needNum(c.apiCost, 'apiCost'), plan: needBool(c.plan, 'plan'), priced: needBool(c.priced, 'priced'), longContext: needBool(c.longContext, 'longContext'), rows: parseTurnRows(c.rows) })) }))),
+          result: strictCodec('TurnCost', codecOf(v => ({ found: needBool(v.found, 'found'), ...(v.inherited === undefined ? {} : { inherited: needBool(v.inherited, 'inherited') }), cost: needNum(v.cost, 'cost'), apiCost: needNum(v.apiCost, 'apiCost'), rows: parseTurnRows(v.rows),
+            calls: (Array.isArray(v.calls) ? v.calls : fail('calls', 'array')).map(c => ({ kind: needStr(c.kind, 'kind'), provider: needStr(c.provider, 'provider'), model: needStr(c.model, 'model'), atMs: needNum(c.atMs, 'atMs'), cost: needNum(c.cost, 'cost'), apiCost: needNum(c.apiCost, 'apiCost'), plan: needBool(c.plan, 'plan'), priced: needBool(c.priced, 'priced'), longContext: needBool(c.longContext, 'longContext'), rows: parseTurnRows(c.rows), ...(c.metering ? { metering: parseMetering(c.metering) } : {}) })) }))),
         },
         {
           method: 'getTopSessions',
@@ -817,7 +827,8 @@
       }
     }
 
-    const SCOPED_PRICE_PROVIDERS = new Set(['openrouter', 'opencode-zen', 'opencode-go', 'zen', 'opencode'])
+    const OPENDESIGN_PROVIDER_IDS = ['opendesign', 'open-design', 'open-design-api', 'amr-link.open-design.ai']
+    const SCOPED_PRICE_PROVIDERS = new Set(['openrouter', 'opencode-zen', 'opencode-go', 'opencode-go-plus', 'zen', 'opencode', ...OPENDESIGN_PROVIDER_IDS])
     const MODEL_VENDOR_PREFIXES = {
       openai: /^(?:gpt|o\d|codex)/i, anthropic: /^claude/i, google: /^gemini/i,
       deepseek: /^deepseek/i, moonshot: /^kimi/i, 'z-ai': /^glm/i, xai: /^grok/i,
@@ -906,11 +917,13 @@
           return { entry: prices.default ?? { cacheHit: 0, cacheMiss: 0, output: 0 }, priced: prices.default?.unpriced !== true, billingMode: 'deepseek-peak', matched: false }
         }
       }
-          if (['zen', 'opencode'].includes(targetProvider)) {
+          if (['zen', 'opencode', 'opencode-go-plus'].includes(targetProvider)) {
         const own = priceModelHit(targetModel, prices.providers?.[targetProvider]?.models ?? {}, 'opencode-go', mode, prices)
         if (own === null) targetProvider = 'opencode-go'
         else targetModel = own
       }
+      if (OPENDESIGN_PROVIDER_IDS.includes(targetProvider) && targetProvider !== 'opendesign'
+        && priceModelHit(targetModel, prices.providers?.[targetProvider]?.models ?? {}, targetProvider, mode, prices) === null) targetProvider = 'opendesign'
       // 本地推理来源零价守卫(与 pricing.js 同口径,置于覆盖之后、目录匹配之前)。
       if (isLocalOriginClient(targetProvider, targetModel)) {
         return { entry: null, priced: false, billingMode: 'flat', matched: false }
@@ -1037,14 +1050,24 @@
     // ── Plan/API 双轨分类(issue #64):与 lib/plan-billing.js 同逻辑的镜像实现
     //    (bundle 无法导入 Node 模块,修改时两处同步)。──
     const PLAN_PROVIDER_ALIASES_LOCAL = {
-      go: ['go', 'zen', 'opencode', 'opencode-go'],
+      opendesign: OPENDESIGN_PROVIDER_IDS,
+      go: ['go', 'zen', 'opencode', 'opencode-go', 'opencode-go-plus'],
+      codex: ['codex', 'openai-codex', 'dsh-openai-codex'],
+      'volcengine-agent': ['volcengine-agent', 'ark-agent-plan', 'volcengine-agent-plan'],
+      'tencent-coding': ['tencent-coding', 'tencent-coding-plan', 'tokenhub-coding-plan'],
+      'tencent-token': ['tencent-token', 'tencent-token-plan', 'tokenhub-token-plan'],
+      'baidu-coding': ['baidu-coding-plan', 'qianfan-coding-plan'],
+
       qwen: ['qwen', 'qwen-tokenplan', 'qianwen-tokenplan', 'qwen-token-plan', 'qianwen-token-plan'],
       scnet: ['scnet', 'scnet-tokenplan', 'scnet-token-plan'],
       mimo: ['mimo', 'xiaomimimo', 'mimo-token-plan', 'xiaomi-token-plan', 'xiaomi-token-plan-cn', 'xiaomi-token-plan-sgp', 'xiaomi-token-plan-ams'],
       factory: ['factory', 'droid', 'factory-a', 'factory-g', 'factory-o'],
     }
-    const PLAN_PROVIDER_IDS_LOCAL = ['anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'scnet', 'volcengine', 'qwen', 'mimo', 'factory', 'go']
+    const PLAN_PROVIDER_IDS_LOCAL = ['opendesign', 'anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'scnet', 'volcengine', 'qwen', 'mimo', 'factory', 'go', 'codex', 'volcengine-agent', 'tencent-coding', 'tencent-token', 'baidu-coding']
     const PLAN_NAME_HINTS_LOCAL = {
+      opendesign: 'opendesign|open[._-]?design',
+      codex: 'codex|chatgpt', 'baidu-coding': 'baidu|qianfan|百度|千帆',
+      'tencent-coding': 'tencent|tokenhub|腾讯',
       anthropic: 'anthropic|claude', zai: 'z[._-]?ai|zhipu|glm|智谱', minimax: 'minimax|海螺',
       kimi: 'kimi|moonshot|moonshotai|月之暗面', openrouter: 'openrouter', siliconflow: 'siliconflow|硅基',
       commandcode: 'commandcode', scnet: 'scnet|sugon|超算',
@@ -1054,10 +1077,19 @@
     const PLAN_NAME_MATCHERS_LOCAL = Object.entries(PLAN_NAME_HINTS_LOCAL).map(([id, hints]) => [id, new RegExp('(?:^|[^a-z0-9])(?:' + hints + ')(?=$|[^a-z0-9])')])
     function inferPlanProviderIdLocal(provider, modelId) {
       for (const raw of [provider, modelId]) {
-        const text = String(raw ?? '').normalize('NFKC').replace(/([a-zA-Z0-9\u3400-\u9fff])(?=(?:Coding|Token|Plan|Subscription))/g, '$1-').replace(/([a-z0-9])((?:coding|token)?plan|subscription)$/i, '$1-$2').toLowerCase()
-        if (!/(?:^|[^a-z0-9])(?:(?:coding|token)[-_\s]*)?plan(?:$|[^a-z0-9])|(?:^|[^a-z0-9])subscription(?:$|[^a-z0-9])|套餐|订阅/.test(text)) continue
+        const text = String(raw ?? '').normalize('NFKC').replace(/([a-zA-Z0-9\u3400-\u9fff])(?=(?:Coding|Token|Agent|Plan|Subscription))/g, '$1-').replace(/([a-z0-9])((?:coding|token|agent)?plan|subscription)$/i, '$1-$2').toLowerCase()
+        if (!/(?:^|[^a-z0-9])(?:(?:coding|token|agent)[-_\s]*)?plan(?:$|[^a-z0-9])|(?:^|[^a-z0-9])subscription(?:$|[^a-z0-9])|套餐|订阅/.test(text)) continue
         const matches = PLAN_NAME_MATCHERS_LOCAL.filter(([, pattern]) => pattern.test(text))
-        if (matches.length) return matches.length === 1 ? matches[0][0] : null
+        if (matches.length) {
+          if (matches.length !== 1) return null
+          const id = matches[0][0]
+          if (id === 'volcengine' && /agent[-_\s]*plan|智能体.*套餐/.test(text)) return 'volcengine-agent'
+          if (id === 'tencent-coding') {
+            const token = /token[-_\s]*plan|令牌.*套餐/.test(text), coding = /coding[-_\s]*plan|编程.*套餐/.test(text)
+            return token === coding ? null : token ? 'tencent-token' : id
+          }
+          return id
+        }
       }
       return null
     }
@@ -1080,6 +1112,7 @@
         }
       }
       if (config?.goQuota?.enabled === true) out.add('go')
+      if (config?.codexQuotaEnabled === true) out.add('codex')
       return out
     }
     // 路由调用判定(与 lib/plan-billing.js 同逻辑的镜像):provider 空/deepseek
@@ -1418,15 +1451,27 @@
           try {
             const value = await props.api.getSessionCost(props.sessionId)
             if (active) setSnapshot({ id: props.sessionId, include: config?.includeSubagentCost === true, value })
-          } catch { /* 旧服务无 RPC 时保留投影显示。 */ }
+          } catch {
+            // Older hosts may not provide this RPC. Finish the loading state,
+            // retaining an existing ledger snapshot or the projection fallback.
+            if (active) setSnapshot(previous => previous?.id === props.sessionId && previous.include === (config?.includeSubagentCost === true) ? previous : { id: props.sessionId, include: config?.includeSubagentCost === true, value: null })
+          }
           finally { pending = false }
         }
         void refresh()
         const timer = config?.includeSubagentCost === true ? setInterval(refresh, 10000) : null
         return () => { active = false; if (timer !== null) clearInterval(timer) }
       }, [props.sessionId, state?.meta?.now, projection, config?.includeSubagentCost])
-      const saved = snapshot && snapshot.id === props.sessionId && snapshot.include === (config?.includeSubagentCost === true) ? snapshot.value : null
-      return { usage: mergeSessionUsage(projection, saved, config?.includeSubagentCost === true, config), config }
+      const current = snapshot && snapshot.id === props.sessionId && snapshot.include === (config?.includeSubagentCost === true) ? snapshot : null
+      const saved = current?.value
+      return { usage: mergeSessionUsage(projection, saved, config?.includeSubagentCost === true, config), config,
+        pending: !!props.sessionId && !!props.api?.getSessionCost && !current,
+        unrecorded: saved?.found === false && (!config?.includeSubagentCost || !saved.subagentCount) }
+    }
+
+    function sessionCostStatus(state) {
+      const en = resolveLocale(state.config) === 'en'
+      return state.pending ? (en ? 'Loading session cost…' : '正在读取本会话费用…') : state.unrecorded ? (en ? 'Session cost: no ledger records' : '本会话暂无账本记录') : !state.usage ? (en ? 'Session cost unavailable' : '本会话费用暂不可用') : ''
     }
 
     function sessionCostParts(usage, config) {
@@ -1471,20 +1516,23 @@
         row.provider + ':' + row.model + ' · ' + names[row.bucket] + (row.plan ? ' (Plan)' : '') + ': ' + row.tokens.toLocaleString() + ' × ' + (row.priced ? money(row.rate) : '?') + ' / 1,000,000 ≈ ' + (row.priced ? money(row.cost) : '?'),
         !row.priced ? (en ? ' (price unavailable)' : '（未配置价格）') : row.bucket === 'reasoning' && row.rate === 0 ? (en ? ' (no separate charge)' : '（不单独收费）') : '')
       return el('details', { className: 'cm-note', style: { fontSize: 12, marginTop: 6 } },
-        el('summary', { style: { cursor: 'pointer' } }, en ? 'Turn cost' : '本轮费用', value?.found ? ' ≈ ' + money(config.showTotalWithPlan ? value.cost : value.apiCost) + (value.rows.some(r => !r.priced) ? (en ? ' + unpriced usage' : ' + 未定价用量') : '') : error ? ' ⚠' : ''),
-        error ? el('div', { role: 'alert' }, error) : !value ? (en ? 'Loading…' : '加载中…') : !value.found ? (en ? 'Complete usage records unavailable' : '没有完整用量记录') :
+        el('summary', { style: { cursor: 'pointer' }, title: en ? 'Log estimate at configured prices; session cost uses recorded ledger amounts.' : '本轮按日志和配置价格估算，本会话按账本已入账金额汇总。' }, en ? 'Turn cost' : '本轮费用', value?.found ? ' ≈ ' + money(config.showTotalWithPlan ? value.cost : value.apiCost) + (value.rows.some(r => !r.priced) ? (en ? ' + unpriced usage' : ' + 未定价用量') : '') : value?.inherited ? (en ? ' · inherited history' : ' · 继承历史') : error ? ' ⚠' : ''),
+        error ? el('div', { role: 'alert' }, error) : !value ? (en ? 'Loading…' : '加载中…') : !value.found ? value.inherited ? (en ? 'Inherited usage is not billed again in this conversation.' : '继承的历史用量不在本会话重复计费。') : (en ? 'Complete usage records unavailable' : '没有完整用量记录') :
           el(Fragment, null, el('p', null, en ? 'Estimated from recorded usage and configured prices; rates per 1M tokens.' : '按已记录用量和配置价格估算；单价单位为每百万 Token。'),
             el('p', null, 'API ≈ ' + money(value.apiCost) + ' · Plan ≈ ' + money(value.cost - value.apiCost) + (en ? ' (equivalent)' : '（等值）')),
             value.rows.map(rowView),
             el('details', null, el('summary', { style: { cursor: 'pointer' } }, (en ? 'Individual calls' : '逐次调用明细') + ' (' + value.calls.length + ')'),
               value.calls.map((call, i) => el('details', { key: i, style: { margin: '6px 0' } },
                 el('summary', { style: { cursor: 'pointer', overflowWrap: 'anywhere' } }, '#' + (i + 1) + ' ' + kinds[call.kind] + ' · ' + call.provider + ':' + call.model + ' · ' + new Date(call.atMs).toLocaleTimeString() + ' · ' + (call.plan ? 'Plan ' : 'API ') + (call.priced ? '≈ ' + money(call.cost) : (en ? 'price unavailable' : '未配置价格')) + (call.longContext ? (en ? ' · long context' : ' · 长上下文价格') : '')),
+                call.metering ? el('p', null, 'billion-context · ' + call.metering.upstream + (call.metering.attempt > 1 ? (en ? ' · Retry ' : ' · 重试 ') + call.metering.attempt : '') + (!call.metering.complete ? (en ? ' · partial usage' : ' · 用量回执不完整') : '')) : null,
                 call.rows.map(rowView))))))
     }
 
     function SessionCost(props) {
-      const { usage, config } = useSessionUsage(props)
-      if (!usage || !config || (billedInput(usage) + (usage?.output ?? 0)) === 0) return null
+      const state = useSessionUsage(props), { usage, config } = state
+      if (!config) return null
+      const status = sessionCostStatus(state)
+      if (status) return el('div', { className: 'cm-chip' }, status)
       const t = makeT(resolveLocale(config))
       const { cost, planPart } = sessionCostParts(usage, config)
       const detail = [
@@ -1509,12 +1557,13 @@
     }
 
     function DockLine(props) {
-      const { usage, config } = useSessionUsage(props)
-      if (!usage || !config) return null
+      const state = useSessionUsage(props), { usage, config } = state
+      if (!config) return null
+      const status = sessionCostStatus(state)
+      if (status) return el('div', { className: 'cm-root', role: 'status', title: status }, status)
       const input = usage.input ?? 0
       const cache = (usage.cacheRead ?? 0) + (usage.cacheWrite ?? 0)
       const output = usage.output ?? 0
-      if (input + cache + output === 0) return null
       const t = makeT(resolveLocale(config))
       const { cost, planPart } = sessionCostParts(usage, config)
       // 缓存写入属于输入分母，但不是缓存命中；无输入时显示未知。
@@ -1530,9 +1579,13 @@
       const fullLine = t(planPart > 0 ? 'sessionLineSplit' : 'sessionLine', values)
       const modelDetail = modelCostDetail(usage, config)
       const compact = config.sessionCostCompact === true
-      // 紧凑模式只留金额;悬停保留完整费用行和模型分项。
-      return el('div', { className: 'cm-root', title: compact ? [fullLine, modelDetail].filter(Boolean).join('; ') : modelDetail },
-        compact ? t(planPart > 0 ? 'sessionLineSplitCompact' : 'sessionLineCompact', values) : fullLine)
+      // Keep the amount visible when native or peer-plugin statistics grow.
+      // Token and Plan details may truncate; the full line remains on hover.
+      const amount = t('sessionLineCompact', values)
+      const line = compact ? t(planPart > 0 ? 'sessionLineSplitCompact' : 'sessionLineCompact', values) : fullLine
+      return el('div', { className: 'cm-root cm-session-cost', title: [fullLine, modelDetail].filter(Boolean).join('; ') },
+        el('span', { className: 'cm-session-amount' }, amount),
+        el('span', { className: 'cm-session-detail' }, line.slice(amount.length)))
     }
 
     // ── 侧边栏:余额行 + 预算图框/今日徽章(纵向堆叠,位于设置按钮上方) ──────
@@ -2789,7 +2842,7 @@
       volcengine: 'Ark',
       qwen: 'Qwen',
       mimo: 'MiMo',
-      factory: 'Factory',
+      factory: 'Factory', opendesign: 'OpenDesign',
     }
 
     function QuotaStrip(props) {

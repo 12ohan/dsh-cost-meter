@@ -62,6 +62,9 @@ const packedMessages = Object.entries(messages).map(([locale, dict]) => [locale,
 // restore them before exposing dictionaries. All translations round-trip below.
 const phraseCounts = new Map()
 for (const value of Object.values(messages).flatMap(Object.values)) {
+  for (const match of value.matchAll(/[A-Za-z][A-Za-z0-9'-]{6,}/g)) {
+    phraseCounts.set(match[0], (phraseCounts.get(match[0]) ?? 0) + 1)
+  }
   const words = [...value.matchAll(/[A-Za-z][A-Za-z0-9'-]*(?: [A-Za-z][A-Za-z0-9'-]*)+/g)]
   for (const match of words) {
     const parts = match[0].split(' ')
@@ -70,8 +73,8 @@ for (const value of Object.values(messages).flatMap(Object.values)) {
       if (phrase.length >= 8) phraseCounts.set(phrase, (phraseCounts.get(phrase) ?? 0) + 1)
     }
   }
-  for (const match of value.matchAll(/[\u3400-\u9fff]{4,}/g)) {
-    for (let i = 0; i < match[0].length; i++) for (let n = 4; n <= 16 && i + n <= match[0].length; n++) {
+  for (const match of value.matchAll(/[\u3400-\u9fff]{3,}/g)) {
+    for (let i = 0; i < match[0].length; i++) for (let n = 3; n <= 16 && i + n <= match[0].length; n++) {
       const phrase = match[0].slice(i, i + n)
       phraseCounts.set(phrase, (phraseCounts.get(phrase) ?? 0) + 1)
     }
@@ -116,10 +119,14 @@ if (cssResult.warnings.length) throw new Error('client CSS contains build warnin
 // Store repeated native-theme and component prefixes once; restore before injection.
 // This is lossless text packing: the actual stylesheet and cascade do not change.
 const compactCss = cssResult.code.trim()
-assert.ok(!/[\x01-\x05]/.test(compactCss), 'CSS packing markers must be unused')
-const packedCss = compactCss.replaceAll('font-size:', '\x05').replaceAll('color:var(--dsw-alias-', '\x04').replaceAll('var(--dsw-alias-', '\x01').replaceAll('.cm-', '\x02').replaceAll('background:', '\x03')
-assert.equal(packedCss.replaceAll('\x05', 'font-size:').replaceAll('\x04', 'color:var(--dsw-alias-').replaceAll('\x01', 'var(--dsw-alias-').replaceAll('\x02', '.cm-').replaceAll('\x03', 'background:'), compactCss)
-src = src.replace(cssMatch[0], () => `const css = ${javascriptLiteral(packedCss)}.replaceAll("\\x05","font-size:").replaceAll("\\x04","color:var(--dsw-alias-").replaceAll("\\x01","var(--dsw-alias-").replaceAll("\\x02",".cm-").replaceAll("\\x03","background:")`)
+const cssPhrases = ['color:var(--dsw-alias-', 'var(--dsw-alias-', '.cm-', 'background:', 'align-items:', 'border-radius:', 'font-size:',
+  'display:', 'padding:', 'justify-content:', 'margin:', 'gap:', 'font-weight:', 'line-height:', 'border:', 'min-width:', 'max-width:']
+const cssTokenBase = 0x0180, cssTokenRange = `[${String.fromCharCode(cssTokenBase)}-${String.fromCharCode(cssTokenBase + cssPhrases.length - 1)}]`
+assert.ok(!new RegExp(cssTokenRange).test(compactCss), 'CSS packing markers must be unused')
+let packedCss = compactCss
+for (const [i, phrase] of cssPhrases.entries()) packedCss = packedCss.replaceAll(phrase, String.fromCharCode(cssTokenBase + i))
+assert.equal(packedCss.replace(new RegExp(cssTokenRange, 'g'), token => cssPhrases[token.charCodeAt(0) - cssTokenBase]), compactCss)
+src = src.replace(cssMatch[0], () => `const cssPhrases=${javascriptLiteral(cssPhrases.join('~'))}.split("~");const css=${javascriptLiteral(packedCss)}.replace(/${cssTokenRange}/g,token=>cssPhrases[token.charCodeAt(0)-${cssTokenBase}])`)
 const result = await transform(src, {
   minify: true,
   keepNames: false,
@@ -144,7 +151,7 @@ console.log('✓ lib/client.js within DSH STORE per-file bound (262144)')
 
 // DSH 0.2.0-rc.2 package-local chunks use the host's require.async contract.
 // Each on-demand screen has readable source and a bounded runtime asset.
-for (const chunk of ['statistics', 'openrouter', 'community']) {
+for (const chunk of ['statistics', 'openrouter', 'community', 'pricing']) {
   const source = readFileSync(resolve(projectRoot, `src/${chunk}/index.js`), 'utf8')
   const result = await transform(source, { minify: true, target: 'es2022', charset: 'utf8', legalComments: 'none' })
   for (const [name, text] of [[`src/${chunk}/index.js`, source], [`lib/client.${chunk}.js`, result.code]]) {

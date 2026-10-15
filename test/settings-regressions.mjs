@@ -4,15 +4,17 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { sanitizeConfig, applyConfigPatch, zeroDay } from '../lib/store.js'
 import { parseAntigravityQuota } from '../lib/gateway-quota-adapters.js'
 import { qwenTokenPlanWindows } from '../lib/coding-plans.js'
+import { buildPriceCatalog } from '../lib/pricing.js'
 import { stateSchema } from '../lib/typert.host.js'
 
 // 执行真实组件和事件回调，再经过服务端清洗与客户端读取；不向发布产物暴露接口。
 const dir = new URL('../src/client/', import.meta.url)
 const source = readdirSync(dir).filter(name => name.endsWith('.js')).sort().map(name => readFileSync(new URL(name, dir), 'utf8')).join('')
 const code = source.replace('exports.apply = apply', 'exports.test = { PlanQuotaCard, CostSection, parseConfig, makeT, codingPlanWindowLabel }; exports.apply = apply')
-let active
+let active, pricing
 const react = {
-  createElement: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity) }),
+  createElement: (type, props, ...children) => type?.name === 'BillingStatistics' && props?.mode === 'matching'
+    ? pricing.Matching(props) : ({ type, props: props ?? {}, children: children.flat(Infinity) }),
   Fragment: 'fragment',
   useState: initial => {
     const runner = active, i = runner.cursor++
@@ -43,6 +45,10 @@ vm.runInNewContext(code, {
   setTimeout: fn => { timers.set(++timerId, fn); return timerId }, clearTimeout: id => timers.delete(id),
 })
 const ui = factory(name => name === 'react' ? react : {}).test
+vm.runInNewContext(readFileSync(new URL('../src/pricing/index.js', import.meta.url), 'utf8').replace('return { mount, CONTRIBUTION }', 'return { Matching, RestorePrices }'), {
+  window: { __ModuleLoader__: { load: value => { factory = value.factory } } },
+})
+pricing = factory(name => name === 'react' ? react : {})
 function renderer(component, props) {
   const runner = { slots: [], cursor: 0, effects: [], dirty: false }
   return () => {
@@ -292,3 +298,38 @@ const credits = qwenTokenPlanWindows({ '2026-09-08': { byProviderModel: { 'qwen:
 }, Date.parse('2026-09-08T00:00:00Z'))
 assert.equal(credits.used, 45.5, '带点号和连字符的模型名覆盖确实参与 Credits 折算(#103)')
 console.log('[ok] 设置交互：千问空费率/自动保存回读/模型移除与恢复/用量保留/侧栏样式/日标签通过')
+
+// #275: legacy hidden prices remain reachable after removal of the catalog panel.
+{
+  const config = roundTrip({ locale: 'zh', priceTableDisplay: { 'deepseek:deepseek-v4-flash': false, 'openai:gpt-6-astra': false } })
+  const current = { config, today: zeroDay('2026-10-15'), month: zeroDay('2026-10'), total: zeroDay(''), history: [] }
+  const section = renderer(ui.CostSection, () => ({ useCost: () => ({ state: current }), api: {} }))
+  let tree = section()
+  button(tree, '价格').props.onClick(); tree = section()
+  button(tree, '价格表(美元 / 1M tokens)').props.onClick(); tree = section()
+  for (const [vendor, id] of [['DeepSeek', 'deepseek-v4-flash'], ['OpenAI', 'gpt-6-astra']]) {
+    const group = nodes(tree).find(node => node.props.className === 'cm-catalog-vendor cm-vendor-toggle' && textOf(node).includes(vendor))
+    assert.ok(group, vendor + ' is reachable')
+    group.props.onClick(); tree = section()
+    assert.ok(nodes(tree).some(node => node.props.modelId === id), id + ' hidden editor is reachable')
+  }
+  timers.clear()
+  let draft = roundTrip(config)
+  const original = JSON.stringify(draft.prices.providers.openai.models['gpt-6-astra'])
+  delete draft.prices.providers.openai.models['gpt-6-astra']
+  let reads = 0
+  const rpc = async method => { assert.equal(method, 'getPriceCatalog'); reads++; return buildPriceCatalog() }
+  const restore = renderer(pricing.RestorePrices, () => ({ state: { config }, draft, setDraft: next => { draft = next }, locale: 'zh', rpc }))
+  tree = restore(); assert.equal(reads, 0, 'closed restore panel does not fetch the catalog')
+  button(tree, '恢复内置模型').props.onClick(); tree = restore()
+  await Promise.resolve(); tree = restore()
+  const select = nodes(tree).find(node => node.type?.name === 'SearchPriceSelect')
+  assert.ok(select.props.options.some(option => option.value === 'openai:gpt-6-astra'))
+  select.props.onChange('openai:gpt-6-astra'); tree = restore()
+  button(tree, '恢复').props.onClick(); tree = restore()
+  assert.equal(JSON.stringify(draft.prices.providers.openai.models['gpt-6-astra']), original)
+  assert.deepEqual(applyConfigPatch(config, { prices: draft.prices }).errors, [])
+  assert.equal(reads, 1, 'rerenders and restores do not fetch the catalog again')
+  button(tree, '收起恢复入口').props.onClick(); restore()
+}
+console.log('[ok] #275: hidden price editors, on-demand catalog and model restore')
