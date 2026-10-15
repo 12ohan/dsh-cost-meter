@@ -447,6 +447,9 @@
           combined: Object.fromEntries(['today', 'month', 'total', 'history'].map(k => [k, k === 'history' ? (v.externalUsage.combined.history ?? []).map(d => parseDay(d, path + '.external.history')) : parseDay(v.externalUsage.combined[k], path + '.external.' + k)])),
         } : null,
         config: parseConfig(v.config, path + '.config'),
+        // 价格表版本号:宿主在版本未变时会省略 config.prices(占载荷 56%),
+        // 客户端据此沿用上一份,并按同一版本号回传以避免重复下发。
+        pricesRev: typeof v.pricesRev === 'string' ? v.pricesRev : undefined,
         reconcile: v.reconcile === null || v.reconcile === undefined ? undefined : { ok: v.reconcile.ok === true, message: typeof v.reconcile.message === 'string' ? v.reconcile.message : '' },
         // 手改过价格的 OpenRouter 模型 id(缺失/畸形回落空表:不显示任何锁定标记)。
         priceLockIds: Array.isArray(v.priceLockIds) ? v.priceLockIds.filter(id => typeof id === 'string') : [],
@@ -511,6 +514,15 @@
     const CONTRIBUTION = {
       package: 'dsh-cost-meter',
       descriptors: [
+        {
+          method: 'getStateSince',
+          // Keep getState zero-argument: DSH checks the exact client argument count.
+          parameters: [rpcParam('pricesRev', 'PricesRev', codecOf(v => {
+            if (typeof v !== 'string') fail('pricesRev', 'price table revision')
+            return v
+          }))],
+          result: strictCodec('CostState', stateCodec),
+        },
         ...['getState', 'getLocalState'].map(method => ({ method, result: strictCodec('CostState', stateCodec) })),
         {
           method: 'updateConfig',

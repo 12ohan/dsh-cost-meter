@@ -28,7 +28,7 @@ const React = { createElement: (type, props) => ({ type, props }) }
 const registrations = new Map(), calls = [], timers = new Set()
 const listeners = new Map()
 const config = sanitizeConfig({ locale: 'en', hideOfficialBalance: true, goQuota: { enabled: false } })
-const state = { config, meta: { now: 1, dayKey: '2026-09-30', timezone: 'UTC' } }
+const state = { config, pricesRev: 'fixture:1', meta: { now: 1, dayKey: '2026-09-30', timezone: 'UTC' } }
 const work = mkdtempSync(join(tmpdir(), 'cm-statistics-client-'))
 const ledger = { config, days: {}, path: join(work, 'ledger.json') }
 function moduleFrom(source, require) {
@@ -69,6 +69,11 @@ class Connection extends Service {
       call: async (channel, endpoint, payload) => {
         assert.equal(channel, '/api'); calls.push([endpoint, payload.args])
         if (['costMeter/getState', 'costMeter/getLocalState'].includes(endpoint)) return { ok: true, value: state }
+        if (endpoint === 'costMeter/getStateSince') {
+          if (payload.args.pricesRev !== state.pricesRev) return { ok: true, value: state }
+          const { prices, ...rest } = state.config
+          return { ok: true, value: { ...state, config: rest } }
+        }
         if (endpoint === 'costMeter/updateConfig') { state.config = applyConfigPatch(state.config, payload.args.patch).config; return { ok: true, value: state } }
         if (endpoint === 'costMeter/getOpenRouterCatalog') return { ok: true, value: { fetchedAt: '2026-10-09T05:00:00Z', stale: false, error: '', models: [] } }
         if (endpoint === 'costMeter/getRepricingHistory') return { ok: true, value: [] }
@@ -108,7 +113,8 @@ try {
     const fiber = client.plugin(main); await fiber
     const entry = registrations.get('settings.section:cost-meter')
     assert.ok(entry, 'the real main apply installed its settings entry')
-    return { fiber, api: entry.options.inject().api }
+    await new Promise(resolve => setImmediate(resolve))
+    return { fiber, api: entry.options.inject().api, store: entry.options.inject().hooks.cost }
   }
   const first = await activate()
   assert.equal(loadCalls, 0, 'initial metering does not load the statistics chunk')
@@ -116,6 +122,16 @@ try {
     await assert.rejects(first.api.loadStatistics(), /Remote package "dsh-cost-meter" is already registered/)
     console.log('[ok] #210 baseline v1.8.1 reproduces duplicate Remote package on ' + req('@deepseek-ai/dsh-api-gateway/package.json').version)
   } else {
+    assert.equal(first.store.getSnapshot().status, 'ready', 'initial local read and background refresh both succeed')
+    assert.deepEqual(calls.slice(0, 2).map(([endpoint]) => endpoint), ['costMeter/getLocalState', 'costMeter/getState'])
+    assert.deepEqual(JSON.parse(JSON.stringify(calls[1][1])), {}, 'initial refresh preserves the zero-argument contract')
+    await first.api.reload()
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/getStateSince', { pricesRev: 'fixture:1' }])
+    assert.deepEqual(JSON.parse(JSON.stringify(first.store.getSnapshot().state.config.prices)), JSON.parse(JSON.stringify(config.prices)), 'omitted prices retain the actual table, not parser defaults')
+    delete state.pricesRev
+    await first.api.reload()
+    await first.api.reload()
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/getState', {}], 'a host without a revision uses the legacy zero-argument endpoint')
     assert.equal((await first.api.releasePriceLock('openai/gpt-4o')).ok, true)
     assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/releasePriceLock', { id: 'openai/gpt-4o' }], 'shipped settings wrapper uses the positional string accepted by the gateway')
     await assert.rejects(first.api.releasePriceLock('missing'), /missing/, 'business failures reach the price editor')
