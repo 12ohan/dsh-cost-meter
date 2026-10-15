@@ -2,6 +2,21 @@
 
 ## English
 
+### Conversation cost views
+
+The conversation **Cost details** view defaults to the treemap and offers four layouts over the same complete cost totals:
+
+- **Categories:** a donut and compact cost bars group file reading, local search, web search, file changes, commands, agent coordination, compaction, model responses and other tools across all agents. Classification uses recorded tool names only. A model step spanning different activities remains one mixed-tools item and is counted once.
+- **Treemap:** frames show activities and the smaller rectangles show named tools, with the five highest-cost tool combinations retained per activity. Switch to **By agent** to see each agent's own costs divided into activities. Areas follow costs; headings zoom in, and selecting a tile opens its calls in a detail dialog. No steps are hidden behind an undifferentiated step-count remainder.
+- **Ownership:** an expandable tree keeps the actual parent/subagent chain. The tree uses the full panel width. Each row shows cost, steps, calls, share of its parent and share of the conversation; clicking a name opens its calls. Agent totals include descendants; categories underneath contain only the agent's own calls.
+- **Step heatmap:** each fixed-size cell represents one billed step, including zero-cost and unpriced steps. Hue identifies activity; shade indicates relative cost. Scroll through large histories, filter by activity or agent, sort by time or cost, or jump to an index. Selecting a cell opens its token counts, unit prices, charges and recorded inputs, response and tools in a dialog. The viewport reads bounded metadata pages and renders only visible cells.
+
+Tool categories attribute the model-call cost of the associated step; they do not invent a separate execution price for a file read or command. Native search charges remain separate recorded billing events. Shares always use the whole conversation's selected cost basis.
+
+The host prepares recently viewed conversations in the background at startup and refreshes them after completed turns. Conversation entry buttons also prefetch usage totals and fee categories. Calculated fees and price-independent usage metadata survive restarts; saved results appear first while changed logs refresh silently. View switches, sorting and paging share one calculation, and categories can display before call totals finish loading. Changes to price rules, plan ownership or subagent inclusion recalculate from the metadata cache; changed logs are reread. Caches are bounded and contain no message bodies, tool arguments, results or credentials.
+
+The step-cost share distribution groups many small steps into four ranges: below 0.1%, 0.1–1%, 1–5% and at least 5% of conversation costs. Each range shows step count and cumulative cost. Zero-cost and unpriced usage stay separate. Step details default to a global highest-cost-first ranking, with a trajectory-order option. Twenty rows are shown initially and more expand in place. Clicking a step opens a detail dialog. Category and agent dialogs list their steps by cost and show the selected call beside the list. Only that call’s recorded content is loaded; the close button remains visible while scrolling, and Escape returns to the underlying view. The individual-call section uses a highest-cost ranking with bars scaled to its largest call, alongside each amount and share of the whole conversation; remaining calls are summarized as text.
+
 Open a conversation and click **Cost details** in the same row as turns, speed, tokens and cache-hit statistics below its input box. **Settings → Cost → Display** has separate switches to hide the header entry, composer entry and turn cost summaries; all remain visible by default. The header entry automatically hides at viewport widths of 640px or less. The composer entry follows its own switch. Both buttons use compact 12px text. Budget chips take only their content width and no longer create an extra row. Cost badge visibility remains independent. From 1.8.13, **Amount only below the composer (full split on hover)** in the same Display tab condenses the conversation cost line to its amounts. Hover retains cache hit rate, input/cache/output tokens and model amounts; header badges and Cost details stay available. The conversation entry opens its entire retained history, shows API and Plan equivalents separately, uses the sidebar cost basis by default, and puts component details before overview charts. Switching conversations closes the previous dialog. For all conversations, open **Settings → Cost → Cost statistics**; this entry starts with the last seven calendar days, including today.
 
 - **Periods:** Today, Last 7 days, Last 30 days, All retained, and custom inclusive dates. Dates follow the host timezone shown on the page.
@@ -34,6 +49,19 @@ The statistics screen uses DSH's package-local asynchronous module loader. Since
 
 ## 简体中文
 
+### 对话费用视图
+
+对话中的「费用明细」提供四种视图，使用同一份完整费用：
+
+- **归类占比**：圆环图配合费用条，把所有代理的读取文件、本地检索、网页搜索、文件修改、命令执行、代理协作、压缩、模型回复及其他工具分别汇总。只按已记录的工具名称分类；同一步涉及多种用途时归入「多类工具」，费用只计一次。
+- **矩形分布**（默认）：大框显示用途，小框显示具体工具；每类费用最高的五种工具组合单列，其余合并为其他工具。切到「按代理」后，每个代理的大框内展示它自身的用途分类。面积按金额分配，点击类别标题放大，点击小框弹出对应调用的详细信息，不再用「其余多少步」代替分类。
+- **父子归属**：占满面板宽度，按实际的子代理父子关系展开，显示费用、步数、调用次数、占父级和占对话的比例，点击名称弹出对应调用。代理合计包含后代；其下面的费用类别只统计自身调用。
+- **步骤热力图**：每格对应一个计费步骤，零费用和未定价步骤也保留。颜色区分类别，深浅表示相对费用；支持滚动、类别与代理筛选、金额或轨迹排序，以及按序号定位。点击格子弹出该步 Token、单价、金额及已记录的输入、回复与工具信息。只读取当前区域所需的精简元数据，避免同时渲染数千行表格。
+
+工具分类统计的是关联步骤的模型调用费用，不为读取文件、执行命令另造单价。原生搜索独立计费记录继续单独计算。占比始终以当前口径下的整段对话费用为分母。
+
+「单步费用占比分布」把小费用归到低于 0.1%、0.1%–1%、1%–5% 和不低于 5% 四个区间，显示步数及累计金额。零费用和未定价记录单列。逐步费用明细默认按整段对话的金额从高到低排列，也可切回轨迹顺序；先显示 20 行，更多原位展开。点击步骤打开详情弹窗；点击类别或代理时，弹窗按金额排列其步骤，并在旁边显示选中调用。只读取选中调用的正文，关闭按钮始终可见，按 Escape 返回原视图。逐次调用区域用高额调用排名代替圆环图，横条相对最高单笔金额缩放，同时显示金额和占整段对话的比例；其余调用仅作文字合计。
+
 从 1.8.13 起，可在**设置 → 费用 → 显示**开启“**输入区下方只显示金额（悬停可见完整分项）**”。费用行只显示金额，悬停保留命中率、输入／缓存／输出 Token 与模型金额。API 和 Plan 等值继续使用当前展示口径，标题栏徽章及“费用明细”入口保持原有行为；默认关闭。
 
 打开一个会话，点击**输入框下方与轮数、速度、Token 和缓存命中率同一行的「费用明细」**。在 **设置 → 费用 → 显示设置** 中，可分别隐藏标题栏入口、输入框下方入口和每轮回复后的费用行；默认均保留。视口不超过 640px 时，标题栏入口自动隐藏，输入框下方入口继续遵守自己的开关。两个明细按钮使用 12px 字号和紧凑间距；预算标签仅占内容所需宽度，不再独占整行。关闭费用徽章不影响明细入口。对话入口默认显示该对话保留的全部历史，API 与 Plan 等值分别列出，默认金额口径跟随侧栏的“含 Plan 总额”设置，费用构成放在趋势图之前。切换会话会关闭旧明细。全部会话统计的入口为 **设置 → 费用 → 计费统计**，默认显示包含今天的近 7 个自然日。
@@ -63,6 +91,8 @@ API 费用是按上报用量和配置单价计算的估算，不是厂商账单�
 缓存命中率为 `缓存读取 / (未缓存输入 + 缓存读取 + 缓存写入)`。Token 构成展示数量占比，不是费用占比。推理 Token 可能包含在输出中，因此单独列示，不再次加入总 Token；是否另收推理费取决于配置的单价。
 
 统计页使用 DSH 的异步模块加载器。从 **1.8.2** 起，主客户端与统计模块使用各自的 Remote 注册标识；两部分组合加载的流程已通过真实 **0.1.7-rc.2** 和 **0.2.0-rc.2** 客户端 registry/gateway 验证。没有该能力的旧宿主会显示升级提示，原有计费和设置继续可用。两个客户端文件分别遵守 256 KiB 大小限制。
+
+宿主启动后在后台准备最近查看的会话，回合结束后更新对应结果；会话入口也会预加载费用总览和分类图。计费结果和独立于价格的精简用量缓存都可跨重启保留，先显示已有数据，再后台更新。分类图不必等调用汇总读完，切换视图、排序和翻页共用计算结果。单价、套餐归属或子代理开关改变后可直接利用用量缓存重新计算，日志改变后才重新读取。缓存有容量限制，只保存计费字段，不保存对话正文、工具参数、返回内容或凭据。
 
 ## Design references
 

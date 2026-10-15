@@ -4,6 +4,8 @@
  */
 import assert from 'node:assert/strict'
 import './zai-candidates.mjs'
+import './statistics-cache.mjs'
+import './statistics-warmup.mjs'
 import './ledger-concurrency.mjs'
 import './ledger-lock-recovery.mjs'
 import './external-usage.mjs'

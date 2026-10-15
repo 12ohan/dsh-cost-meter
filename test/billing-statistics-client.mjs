@@ -22,7 +22,7 @@ const React = {
   useRef(value) { const i = current.cursor++; return current.hooks[i] ??= { current: value } },
 }
 vm.runInNewContext(readFileSync(new URL('../lib/client.statistics.js', import.meta.url), 'utf8'), {
-  window: { __ModuleLoader__: { load: m => { factory = m.factory } } }, navigator: { language: 'en' }, document: { getElementById: () => null },
+  setTimeout, clearTimeout, window: { __ModuleLoader__: { load: m => { factory = m.factory } } }, navigator: { language: 'en' }, document: { getElementById: () => null },
 })
 const ui = factory(() => React)
 const instances = []
