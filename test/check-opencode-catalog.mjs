@@ -23,7 +23,7 @@ const decode = text => text.replace(/&(?:amp|lt|gt|quot|apos|nbsp|le|ge);/g, ent
 })
 // Source data is compared only; stripped HTML is never executed or rendered.
 const cellsOf = row => [...row.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(match =>
-  decode(match[1].replace(/<(?:del|s)\b[^>]*>[\s\S]*?<\/(?:del|s)>/gi, '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim()) // codeql[js/incomplete-multi-character-sanitization]
+  decode(match[1].replace(/<(?:del|s)\b[^>]*>[\s\S]*?<\/(?:del|s)>/gi, ' ').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim()) // codeql[js/incomplete-multi-character-sanitization]
 const canon = text => String(text).toLowerCase().replace(/[^a-z0-9]+/g, '')
 const rate = text => {
   if (text === 'Free') return 0
