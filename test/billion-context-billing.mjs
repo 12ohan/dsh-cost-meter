@@ -38,17 +38,24 @@ const config = sanitizeConfig({ peakEnabled: false, includeSubagentCost: true, p
   fixture: { models: { main: price } }, '127.0.0.1': { models: { summary: price, main: price, google: price, responses: price } },
 } }, planBilling: { models: { '127.0.0.1:summary': 'plan' } } })
 const ledgerPath = join(root, 'storages/cost-meter/ledger.json')
-let ledger, bridge, realUpstream = false, retry = 0, producer, runtime
+let ledger, bridge, realUpstream = false, upstreamVersion = '', retry = 0, producer, runtime, nativeRuntime
+const originalFetch = globalThis.fetch
 try {
-  // The optional pinned npm build exercises its actual retry and summary helpers.
+  // Each supplied npm archive exercises its actual retry and summary helpers.
   if (process.env.DSH_TEST_BILLION_PACKAGE) {
     const { buildBillionCompatibility } = await import('../scripts/build-billion-context-compat.mjs')
     const built = await buildBillionCompatibility(process.env.DSH_TEST_BILLION_PACKAGE, root, { pack: false })
     const entry = join(built.directory, 'dist/index.js')
-    writeFileSync(entry, readFileSync(entry, 'utf8') + '\nexport { fetchWithTimeout, fetchWithRetry, requestSummaryBody, withFetchTransport };\n')
+    const source = readFileSync(entry, 'utf8'), hasTransport = /\bfunction withFetchTransport\(/.test(source)
+    writeFileSync(entry, source + '\nexport { fetchWithTimeout, fetchWithRetry, requestSummaryBody' + (hasTransport ? ', withFetchTransport' : '') + ' };\n')
     runtime = await import(pathToFileURL(entry).href)
+    if (!hasTransport) runtime = { ...runtime, withFetchTransport: (_, run) => run() }
+    const nativeEntry = join(built.directory, 'dist/agent/dsh-native.js')
+    writeFileSync(nativeEntry, readFileSync(nativeEntry, 'utf8') + '\nexport { installNativeFetchIntercept };\n')
+    nativeRuntime = await import(pathToFileURL(nativeEntry).href)
     producer = await import(pathToFileURL(join(built.directory, 'dist/cost-meter-proxy.js')).href)
     realUpstream = true
+    upstreamVersion = built.baseVersion
   } else {
     producer = await import('../lib/billion-context-proxy.js')
     const request = async (url, options) => {
@@ -93,9 +100,34 @@ try {
   }))
   const guarded = (url, options) => {
     assert.equal(new URL(url).hostname, '127.0.0.1', 'all requests remain in local synthetic fixtures')
-    return fetch(url, { ...options, dispatcher: undefined })
+    return originalFetch(url, { ...options, dispatcher: undefined })
   }
+  globalThis.fetch = guarded
   const options = (model = 'main') => ({ method: 'POST', headers: { authorization: 'Bearer ' + secrets[1], 'content-type': 'application/json' }, body: JSON.stringify({ messages: [{ role: 'user', content: secrets[0] }], model }) })
+  if (nativeRuntime) {
+    const key = Symbol.for('dsh-cost-meter.billion-context.v1'), previousBridge = globalThis[key], descriptor = Object.getOwnPropertyDescriptor(globalThis, 'fetch')
+    const group = '11111111-1111-4111-8111-111111111111', acknowledgements = []
+    let probeRequest
+    const address = await listen(createServer(async (req, res) => {
+      if (req.url === '/__bili/health') { res.setHeader('x-dsh-cost-meter-protocol', '1'); return sendJson(res, { ok: true }) }
+      const chunks = []; for await (const chunk of req) chunks.push(chunk)
+      probeRequest = { headers: req.headers, body: Buffer.concat(chunks).toString('utf8') }
+      res.setHeader('x-dsh-cost-meter-group', req.headers['x-dsh-cost-meter-group'] ?? '')
+      return sendJson(res, { native: true })
+    }))
+    try {
+      globalThis[key] = { begin: () => group, ack: (id, ok) => acknowledgements.push({ id, ok }) }
+      assert.equal(nativeRuntime.installNativeFetchIntercept({ origin: address, ready: Promise.resolve(address), headersFor: () => ({}) }), true)
+      const request = options(), response = await globalThis.fetch(address + '/bili/' + upstream + '/v1/chat/completions', request)
+      assert.deepEqual(await response.json(), { native: true })
+      assert.equal(probeRequest.headers['x-dsh-cost-meter-group'], group)
+      assert.equal(probeRequest.body, request.body)
+      assert.deepEqual(acknowledgements, [{ id: group, ok: true }], 'the actual upstream native interceptor carries and acknowledges metering')
+    } finally {
+      Object.defineProperty(globalThis, 'fetch', descriptor)
+      if (previousBridge === undefined) delete globalThis[key]; else globalThis[key] = previousBridge
+    }
+  }
   const reported = { inputTokens: 90, outputTokens: 8, cacheReadTokens: 5, cacheWriteTokens: 0, reasoningTokens: 0 }
   const proxy = await listen(createServer((req, res) => {
     producer.meterBillionRequest(req, res, () => runtime.withFetchTransport(guarded, async () => {
@@ -241,9 +273,10 @@ try {
   assert.equal(normalizeBillionUsage('openai', { prompt_tokens: 5, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 9 } }), null)
   assert.equal(normalizeBillionUsage('responses', { input_tokens: -1, output_tokens: 1 }), null)
   assert.ok((await billionRecordsFor(ledgerPath, 'root')).some(row => row.type.endsWith('replacement')))
-  console.log(JSON.stringify({ check: 'billion-context billing', actualPinnedUpstream: realUpstream, billedCalls: 8, totalUsd: before,
+  console.log(JSON.stringify({ check: 'billion-context billing', actualPinnedUpstream: realUpstream, upstreamVersion, billedCalls: 8, totalUsd: before,
     checks: 'four protocols, compression, retry attempts, actual cache buckets, API/Plan, parent/agents, replay equality, restart, atomic receipts, cancellation, unknown usage and privacy', externalRequests: 0 }))
 } finally {
+  globalThis.fetch = originalFetch
   for (const cleanup of effects.reverse()) cleanup()
   ledger?.close()
   await Promise.all(servers.map(server => new Promise(resolve => { server.closeAllConnections(); server.close(resolve) })))

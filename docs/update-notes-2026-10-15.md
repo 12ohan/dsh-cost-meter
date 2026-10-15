@@ -8,7 +8,7 @@ These changes are in the development branch for the next release. The npm releas
 - **Explicit recalculation:** Settings → Cost → Prices → Historical pricing offers **Recalculate history at current prices**. A warning and confirmation precede any change. Fully replayable session/day records can be recalculated; incomplete records keep their amounts. Every run retains before/after amounts, original price versions and a complete ledger backup. The settings show previous runs.
 - **Model search:** price-mapping selectors support provider/model keywords, multiple search words and clearing the filter while preserving the selected model.
 - **Conversation display:** a pending ledger read or missing record no longer makes the fee line disappear. Narrow composer statistics retain the session amount. Inherited fork history is excluded from duplicate turn charges.
-- **billion-context:** the paired `0.1.197-cost-meter.1` compatibility build records internal compression, retries and additional requests across four API protocols. Main/subagent totals, conversation/turn/step details and statistics share those calls and durable deduplication receipts. Old proxy builds retain normal DSH accounting. Missing usage, partial responses and missing prices remain explicit.
+- **billion-context:** a paired compatibility build for `0.1.181+` records internal compression, retries and additional requests across four API protocols. Main/subagent totals, conversation/turn/step details and statistics share those calls and durable deduplication receipts. Matching interfaces are accepted automatically without a version allowlist. Versions 0.1.180 and earlier prompt an upgrade; interface changes show a notice with community-group and issue links. Missing usage, partial responses and missing prices remain explicit.
 - **OpenDesign:** 35 provider-scoped model prices include published cache and long-context rates. Workspace quota and wallet queries require the exact workspace ID and a Control Key, not an inference key. Subscription usage defaults to Plan-equivalent cost; wallet-funded usage can be classified as API. Authenticated queries have synthetic coverage; no live account was used.
 - **Catalog and plans:** 19 other provider/model price entries were added or updated, cache-write price editing is available, and explicit plan assignment includes Codex/ChatGPT, Volcano Agent Plan, Tencent Coding/Token Plan and Baidu Qianfan Coding Plan.
 
@@ -45,11 +45,13 @@ See [billing statistics and historical pricing](billing-statistics.md), [billion
 
 ### 接入 billion-context 内部调用
 
-配套的 **billion-context 0.1.197-cost-meter.1** 兼容包记录内部压缩、重试和追加请求，支持 OpenAI Chat Completions、Responses、Anthropic Messages、Google GenerateContent 的 JSON 与流式用量。
+配套的 **billion-context 0.1.181 及更新版本**计费兼容包记录内部压缩、重试和追加请求，支持 OpenAI Chat Completions、Responses、Anthropic Messages、Google GenerateContent 的 JSON 与流式用量。
 
 主会话、子代理、日周统计及单轮／步骤明细共用逐次记录。调用序号随账本保存，防止重启和重复读取后再次计费；已经采集的代理用量替换对应 DSH 用量。旧版代理或写入失败时保留普通记账，未知费用、缺失价格和部分回执明确标出。
 
-该兼容包与费用插件配套使用，不能仅更新费用插件就宣称获得全部内部调用。代理与宿主需要共享本地计费文件；启用前缺失的内部记录无法补齐。详见[接入说明](billion-context-billing.md)。
+接入不再锁定 0.1.197。生成器按实际接口检查，后续版本接口一致时自动生成对应兼容包。检测到 0.1.180 及更早版本时提示升级到 0.1.181 或更新版本；接口变化或兼容桥未连接时显示相应弹窗，提供本项目的交流群与 issue 入口，关闭后同一问题不重复弹出。已用 0.1.181、0.1.185、0.1.190、0.1.196、0.1.197 的实际发布包验证。
+
+兼容包与费用插件配套使用，升级原插件后需要生成并安装对应兼容包。代理与宿主需要共享本地计费文件；启用前缺失的内部记录无法补齐。详见[接入说明](billion-context-billing.md)。
 
 ### 新增 OpenDesign 计费与查询
 

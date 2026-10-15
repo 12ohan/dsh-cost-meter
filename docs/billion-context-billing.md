@@ -2,70 +2,69 @@
 
 ## English
 
-This local integration pairs dsh-cost-meter with **billion-context 0.1.197-cost-meter.1**, a compatibility build of the published 0.1.197 package. It has not been published to npm. The build script checks both original runtime checksums, preserves the upstream license and authorship, and adds its base commit to the package metadata.
+The metering bridge supports **billion-context 0.1.181 or later** through a paired compatibility build. Release numbers are not an allowlist: the generator inspects the actual proxy and native transport contracts and automatically accepts unchanged interfaces, including later versions. Runtime hashes record provenance rather than block other releases. Original authorship and licenses are retained.
+
+**0.1.180 and earlier:** an enabled plugin is detected through DSH's plugin manager, and a popup asks the user to upgrade to **0.1.181 or later**. Incompatible metering interfaces also produce a popup with **Community group** and **Open an issue** links. The group link opens this project's existing WeChat group section. Acknowledging a notice suppresses repeats for the same version and reason; a new problem can prompt again. A temporary transport failure alone is not classified as an interface change.
 
 ### What it records
 
-- Each consumed upstream request, including internal compression, HTTP retries and additional model rounds.
-- Provider-reported uncached input, cache reads, cache writes, output and reasoning usage across OpenAI Chat Completions, Responses, Anthropic Messages and Google GenerateContent, including streaming responses.
-- Actual upstream origin and model, request identity, retry attempt, completion status, owning DSH conversation and active turn/step.
-- Successful zero usage, missing usage and partial responses remain distinct. Missing prices remain unpriced. No amount is inferred from savings percentages, balance changes or estimated context size.
+- Every consumed upstream request, including compression, HTTP retries and additional model rounds.
+- Uncached input, cache reads, cache writes, output and reasoning usage across OpenAI Chat Completions, Responses, Anthropic Messages and Google GenerateContent, including streams.
+- Actual upstream origin/model, request identity, attempt, completion status, owning DSH conversation and active turn/step.
+- Zero usage, missing usage, partial responses and missing prices remain distinct. Charges are not guessed from savings percentages, balance movement or estimated context size.
 
-The integration observes the existing response as billion-context consumes it. It does not change the upstream URL, API key, proxy, model, prompt, returned text or the usage used by DSH for context management. A short local health check confirms the metering protocol before attaching a correlation header. The proxy removes that header before forwarding a request.
+After durable proxy records are confirmed, those individual requests replace the corresponding ordinary DSH usage charge. Producer sequences and ledger receipts are committed together. Main/subagent totals, daily/week/all statistics, turn details and step views share these records and historical price versions. Inherited fork history is not charged again.
 
-### One charge per real request
+Main requests retain the configured DSH provider price. Internal models use their actual upstream/model. The bridge observes existing responses, preserves the request body and upstream credentials, and removes the private correlation header before forwarding to a model endpoint.
 
-The native adapter links the proxy request to the current DSH billing stream. After durable proxy records are confirmed, dsh-cost-meter accounts those individual requests and suppresses the ordinary host usage charge for that stream. Producer sequences and ledger receipts are committed together, preventing duplicate charges after restarts, concurrent hosts or repeated imports.
+### Generate and install the matching archive
 
-Ledger totals, the conversation badge, daily/week/all statistics, turn details and step views share these records. Subagent calls retain their own conversation identity and follow the existing inclusion setting. Replay excludes the linked original usage, and inherited fork history is not billed again.
-
-Main model requests retain the DSH provider's configured pricing. Internal models are resolved from their actual upstream and model; configure a price or Plan assignment when the catalog has no matching entry. Unknown charges are disclosed rather than treated as free.
-
-### Local installation
-
-Use the paired local preview archives. For a DSH profile that already uses billion-context, replace its package with `billion-context-0.1.197-cost-meter.1.tgz` and install the matching dsh-cost-meter preview, then fully restart the host. Keep the original npm package for rollback. This task does not install or enable billion-context on a profile that did not already use it.
-
-Developers can reproduce the third-party archive without installing or executing it:
+The generator automatically adapts supported interfaces without executing the original package. It does not rewrite the source archive. Build from the original package for the version being installed:
 
 ```powershell
-node scripts/build-billion-context-compat.mjs <original-billion-context-0.1.197.tgz> <local-output-directory>
+npm pack billion-context --ignore-scripts
+node scripts/build-billion-context-compat.mjs <original-billion-context.tgz> <local-output-directory>
 ```
 
-The original build is pinned to [commit 3aeddc1](https://github.com/ranxianglei/billion-context/tree/3aeddc160864ca774e54817559d6984310e2a9ab). Unknown versions fail the checksum gate instead of receiving an approximate patch. A later upstream update can remove this compatibility build; the UI reports a missing bridge and ordinary DSH billing continues.
+The output version is `<upstream-version>-cost-meter.1` (for example, `0.1.197-cost-meter.1`). Install it alongside the matching dsh-cost-meter development build in the DSH profile already using billion-context, then fully restart the host. After updating the original plugin, generate and install a matching compatibility archive. A stock package without the metering bridge does not expose all internal calls merely because its version is newer.
 
-### Storage and limits
+The generator supports both observed native fetch implementations and optional summary helpers. Changed required contracts stop generation with feedback links. Runtime protocol mismatches or an unconnected bridge are surfaced in the popup; ordinary DSH billing remains available.
 
-Only sanitized billing fields are retained under `<ledger>.billion-context`. No prompt, response content, tool payload, request header or credential is stored. Imports read bounded newline-delimited records incrementally. The ledger's persisted receipts are essential to deduplication; restore them together with a ledger backup.
+### Storage and verification
 
-The producer and host share local files, so a remote proxy is not covered by this build. Missing historical records cannot be reconstructed. A provider that omits usage, an interrupted response or a storage failure can leave unknown charges; the fee view identifies incomplete coverage. Unsupported proxies and failed durable writes retain ordinary host accounting, while available partial usage remains explicitly marked.
+Only billing metadata is saved under `<ledger>.billion-context`: no prompts, returned text, tool payloads, request headers or credentials. Restore persisted receipts together with a ledger backup. Producer and host must share local files; remote proxies and missing historical records are outside this bridge's coverage.
 
-Verification uses local synthetic HTTP services, including the exact pinned billion-context retry and summary functions. It covers four protocols, cache buckets, compression, retries, API/Plan separation, concurrent subagents, replay equality, restart receipts, cancellation, missing usage, downgrade and storage failure. No paid model request is made.
+Actual npm releases **0.1.181, 0.1.185, 0.1.190, 0.1.196 and 0.1.197** were verified with their native interceptor, retry and summary implementations. Checks cover four protocols, cache buckets, API/Plan, concurrent agents, replay, restart, cancellation, incomplete usage and storage failures. Future-version acceptance and changed-contract rejection use separate synthetic fixtures. Browser checks cover upgrade and compatibility notices, feedback links and dismissal. No paid model calls are made.
 
 ## 中文
 
-本地接入需要配套使用 dsh-cost-meter 预览包和 **billion-context 0.1.197-cost-meter.1**。后者基于官方 0.1.197 发布包生成，保留原作者与许可证，并记录原始提交和运行文件校验值；尚未发布 npm。
+### 支持范围与自动兼容
+
+完整内部计费从 **billion-context 0.1.181** 起接入，需要配套计费兼容包。生成器检查代理请求、摘要重试和原生请求拦截的实际接口，**不再锁定 0.1.197 或固定文件校验值**。后续版本保留相同接口时自动通过检查并生成兼容包，原作者、许可证、原始版本及文件校验值继续保留。
+
+检测到启用中的 **0.1.180 及更早版本**时，弹窗提示升级到 **0.1.181 或更新版本**。计费接口变化或兼容桥未连接时也会显示相应提醒，提供：
+
+- **加入交流群**：跳转到本项目现有的[微信交流群入口](../README.zh-CN.md#交流与反馈)。
+- **提交 issue**：打开本项目的问题反馈模板。
+
+关闭后，同一版本、同一问题不会反复弹窗；出现新的兼容问题时重新提醒。临时超时或请求取消不被直接判为接口变化。反馈时请附 billion-context、费用插件和 DSH 的版本。
 
 ### 统计内容
 
-- 逐次采集真实上游请求，包含内部压缩、HTTP 重试和追加模型轮次。
-- 支持 OpenAI Chat Completions、Responses、Anthropic Messages、Google GenerateContent 的 JSON 和流式用量。
-- 分开记录未缓存输入、缓存读取、缓存写入、输出和推理 Token，保留实际上游、模型、重试次数、完成状态、DSH 会话及当前轮次／步骤。
-- 主模型沿用 DSH 渠道的配置价格；内部模型按实际上游与模型匹配价格。缺少价格或套餐归属时需要配置，不按节省比例、余额差或上下文估算补算费用。
+逐次记录内部压缩、HTTP 重试和追加请求；支持 OpenAI Chat Completions、Responses、Anthropic Messages、Google GenerateContent 的 JSON 与流式回执。未缓存输入、缓存读写、输出和推理 Token 分开保存，保留实际上游、模型、重试次数、完成状态、会话和轮次／步骤。
 
-接入只观察原有响应，不改上游地址、代理、模型、提示词、密钥、返回文本和 DSH 用于管理上下文的用量。发送关联标识前只查询本地代理的健康接口；关联标识会在代理转发上游前删除。
+代理用量成功写入后，逐次记录替换对应的普通 DSH 用量，避免双计。调用序号和账本凭据原子保存，防止重启、重复读取和并发导入再次收费。会话金额、子代理、日／周／全部统计、单轮和步骤明细共用记录，分叉继承的历史不重复计费，并沿用保存的历史价格版本。
 
-### 去重与界面
+主请求沿用 DSH 渠道配置价格；内部模型按实际上游和模型匹配。零用量、缺失用量、部分回执和未定价明确区分，不按节省比例、余额差或估算上下文补算费用。关联标识在转发模型端点前删除，不改变请求正文和上游凭据。
 
-确认代理记录写入后，每次真实请求独立入账，原来那条 DSH 投影用量不再重复收费。调用序号和入账凭据在同一笔账本事务中保存，重启、重复读取和多进程导入均不会重复入账。
+### 使用方法
 
-会话金额、日／周／全部统计、单轮费用及步骤明细共用记录；子代理保留原会话归属，按既有开关汇总。回放会排除已经替换的原用量，分叉继承的历史不再次收费。调用明细标注 billion-context、实际上游、重试次数及不完整回执。
+先取得所用版本的原始 npm 包，再运行上面的生成命令。生成结果按原始版本命名为 `<原版本>-cost-meter.1`，与费用插件开发包一起安装到已使用 billion-context 的 DSH Profile，然后完全重启宿主。
 
-### 使用与边界
+**升级原插件后，需要为新版本生成并安装对应兼容包。**生成器会自动判断接口兼容性；仅升级原版包不能获得完整内部调用记录。必需接口变化时停止生成并给出反馈入口，运行期间的协议不匹配或未连接状态通过弹窗提示。
 
-已经使用 billion-context 的目标环境需要安装两个配套的本地包，然后完全退出并重启 DSH；原版包保留用于回退。本任务不会给原本未使用 billion-context 的本机环境新增或启用代理插件。
+计费数据保存在 `<ledger>.billion-context`，只含计费字段，不保存正文、工具内容、请求头或密钥。代理与宿主需要共享本地文件；远程代理及启用前缺失的内部记录无法通过此桥补齐。恢复账本时同时保留入账凭据。
 
-计费记录位于 `<ledger>.billion-context`，只保留计费字段，不保存对话正文、工具内容、请求头或凭据。账本中的入账凭据需要与账本一起备份和恢复。
+### 验证
 
-这个版本要求代理与 DSH 共享本地文件，暂不覆盖远程代理。启用前未保存的内部调用不能补齐；厂商未上报用量、流中断和存储失败会明确标出。旧代理或写入失败时保留普通 DSH 记账，不将未知费用当作免费。
-
-测试使用本地模拟接口及精确版本的 billion-context 重试、摘要实现，覆盖四种协议、缓存桶、压缩、重试、API／Plan、并发子代理、回放一致、重启去重、取消、缺失回执、降级和写入失败，没有调用付费模型。
+已用 **0.1.181、0.1.185、0.1.190、0.1.196、0.1.197** 的实际 npm 发布包验证原生拦截、摘要、重试、四种协议、API／Plan、并发子代理、历史回放、重启去重、取消、缺失回执和写入失败。未来版本自动接入与接口变化拒绝另用模拟代码验证；浏览器验证升级提醒、兼容提醒、群与 issue 链接及关闭去重。测试没有调用付费模型。

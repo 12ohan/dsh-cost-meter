@@ -7,6 +7,7 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { build } from 'esbuild'
 import { sanitizeConfig, zeroDay } from '../lib/store.js'
+import { PLAN_PROVIDER_IDS } from '../lib/plan-billing.js'
 import { javascriptLiteral as literal } from '../scripts/javascript-literal.mjs'
 
 const uiModules = resolve(process.env.DSH_TEST_UI_MODULES ?? process.env.DSH_TEST_NODE_MODULES ?? '.tmp-context-host/node_modules')
@@ -108,7 +109,8 @@ try {
     }
   }
   const select = page.locator('.cm-mstats-row select').first()
-  assert.equal(await select.locator('option[value^="plan:"]').count(), 18, 'each supported subscription family is selectable')
+  assert.deepEqual(await select.locator('option[value^="plan:"]').evaluateAll(options => options.map(option => option.value.slice(5)).sort()),
+    [...PLAN_PROVIDER_IDS].sort(), 'selectable subscription families match server billing classification')
   await select.selectOption('plan:volcengine')
   await page.waitForFunction(() => window.patches.length === 1)
   assert.deepEqual(await page.evaluate(() => window.patches[0]), { planBilling: { ...initialState.config.planBilling, models: { [longKey]: 'plan' }, modelPlans: { [longKey]: 'volcengine' } } })
@@ -122,7 +124,7 @@ try {
   await select.selectOption('auto')
   await page.waitForFunction(() => window.patches.length === 4)
   assert.deepEqual(await page.evaluate(() => window.patches[3]), { planBilling: { ...initialState.config.planBilling, models: {}, modelPlans: {} } })
-  for (const [i, id] of ['codex', 'volcengine-agent', 'tencent-coding', 'tencent-token', 'baidu-coding'].entries()) {
+  for (const [i, id] of ['codex', 'volcengine-agent', 'tencent-coding', 'tencent-token', 'baidu-coding', 'opendesign'].entries()) {
     await select.selectOption('plan:' + id)
     await page.waitForFunction(count => window.patches.length === count, 5 + i)
     assert.equal(await select.inputValue(), 'plan:' + id)

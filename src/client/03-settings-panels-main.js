@@ -10,6 +10,18 @@
 
     const loadedPages = new WeakMap()
     const warmPage = (load, props) => load?.().then(page => { loadedPages.set(load, page); return page.prefetch?.(props) }).catch(() => {})
+    function BillionCompatibilityGuide(props) {
+      const state = props.useCost?.(s => s)?.state, meter = state?.billionContext
+      const [Page, setPage] = useState(null)
+      const show = meter?.noticeId && ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility)
+      useEffect(() => {
+        if (!show) return
+        let active = true
+        props.api.loadStatistics().then(page => { if (active) setPage(() => page.BillionCompatibilityNotice) }).catch(() => {})
+        return () => { active = false }
+      }, [!!show, props.api])
+      return show && Page ? el(Page, { meter, locale: resolveLocale(state?.config ?? {}) }) : null
+    }
     function BillingStatistics(props) {
       const load = props.load ?? props.api.loadStatistics
       const [Page, setPage] = useState(() => loadedPages.get(load) ?? null), [error, setError] = useState(''), [retry, setRetry] = useState(0)
@@ -2821,6 +2833,8 @@
       })
       slots.inject('sidebar.footer.action', () => slots.register(
         { name: 'sidebar.footer.action', id: 'cost-meter-simple-guide', order: 1, inject: injected }, SidebarSimpleGuide))
+      slots.inject('sidebar.footer.action', () => slots.register(
+        { name: 'sidebar.footer.action', id: 'cost-meter-billion-compatibility', order: 2, inject: injected }, BillionCompatibilityGuide))
       // 首次更新引导:常驻 sidebar.footer.action 挂载,组件内部按 promptSeen 门控。
       slots.inject('sidebar.footer.action', () => {
         const dispose = slots.register(

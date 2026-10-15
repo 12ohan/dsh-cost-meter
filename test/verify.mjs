@@ -3470,6 +3470,8 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
     let calls = 0
     let sawBrowserUa = false
     globalThis.fetch = async (url, init = {}) => {
+      // Background price refreshes must not consume the Go quota retry script.
+      if (String(url) !== 'https://opencode.ai/zen/go/v1/usage') return prevFetch(url, init)
       const step = script[Math.min(calls, script.length - 1)]
       calls += 1
       if (init.headers?.['user-agent']?.includes('Mozilla/5.0')) sawBrowserUa = true
@@ -6803,5 +6805,6 @@ await import('./host-locale.mjs')
 await import('./host-locale-client.mjs')
 await import('./conversation-totals.mjs')
 await import('./billion-context-billing.mjs')
+await import('./billion-context-compatibility.mjs')
 await import('./opendesign.mjs')
 console.log('[ok] 全部验证通过')

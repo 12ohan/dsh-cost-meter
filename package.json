@@ -157,6 +157,7 @@
     "test": "node test/verify.mjs"
   },
   "devDependencies": {
+    "acorn": "8.15.0",
     "@deepseek-ai/dsh-credentials": "0.1.0-rc.8",
     "@deepseek-ai/dsh-home-paths": "0.1.0-rc.8",
     "esbuild": "^0.28.2"
