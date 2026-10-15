@@ -554,7 +554,7 @@ window.__ModuleLoader__.load({
           ? text('检测到 billion-context ', 'Detected billion-context ') + meter.version + text('。请更新到 0.1.181 或更新版本，再接入完整内部计费。', '. Update to 0.1.181 or later for complete internal billing.')
           : meter.compatibility === 'changed'
             ? text('检测到 billion-context 计费接口变化，内部费用尚未完整采集。请到交流群反馈，或提交 issue，以便更新接入。', 'The billion-context metering interface has changed. Internal cost coverage is incomplete. Report this in the community group or open an issue so the integration can be updated.')
-            : text('尚未连接 billion-context 内部计费接口。请安装对应版本的计费兼容包；仍有问题时，到交流群反馈或提交 issue。', 'The billion-context internal billing bridge is not connected. Install the matching compatibility build. If the problem persists, contact the community group or open an issue.')),
+            : text('原版 billion-context 的自动计费接入尚未完成。更新费用插件后请完全重启 DSH，让新启动的本地代理接入计费；仍有问题时，到交流群反馈或提交 issue。', 'Automatic billing for the original billion-context package is not connected. Fully restart DSH after updating cost-meter so its local proxy starts with metering. If the problem persists, contact the community group or open an issue.')),
         el('p', null, text('反馈时请附 billion-context、费用插件及 DSH 的版本。', 'Include the billion-context, cost-meter and DSH versions in your report.')),
         el('footer', null,
           el('a', { href: 'https://github.com/Han-1413141/dsh-cost-meter/blob/master/README.zh-CN.md#交流与反馈', target: '_blank', rel: 'noopener noreferrer', onClick: dismiss }, text('加入交流群', 'Community group')),
