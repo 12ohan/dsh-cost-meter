@@ -66,145 +66,89 @@ await page.exposeFunction('saveConfig', patch => {
   return saved
 })
 try {
-  await page.goto(url);await page.getByRole('tab',{name:'显示',exact:true}).click();await page.locator('.cm-display').waitFor()
-  await page.locator('.cm-display').screenshot({path:join(output,'initial.png')})
-  const item = key => page.locator('.cm-preview [data-display="' + key + '"]')
-  const chooseStyle = async label => {
-    await page.locator('.cm-preview-style-trigger').click()
-    await page.getByRole('button',{name:label,exact:true}).click()
-    await page.keyboard.press('Escape')
-  }
-  assert.equal(await page.locator('.cm-preview .cm-preview-style-trigger').count(),1,'style controls live inside the preview')
+  await page.goto(url)
+  await page.evaluate(()=>{
+    const host=document.createElement('div');host.id='host-fixture';host.style.cssText='position:absolute;top:5000px;height:1px;contain:strict;overflow:hidden'
+    const sidebar=document.createElement('aside');sidebar.className='_2H3hWW_root';sidebar.style.cssText='background:rgb(238,243,248);border-radius:19px'
+    const composer=document.createElement('div');composer.className='RlGAzG_card';composer.style.cssText='background:rgb(244,248,252);border-radius:31px'
+    const history=document.createElement('div');history.id='long-conversation'
+    const fragment=document.createDocumentFragment()
+    for(let i=0;i<20000;i++){const n=document.createElement('span');n.textContent='Long conversation '+i;fragment.appendChild(n)}
+    history.appendChild(fragment);host.append(sidebar,composer,history);document.body.appendChild(host)
+    window.outsideStyleReads=0;window.historyReads=0;window.historyClones=0;window.previewObservers=0
+    const read=window.getComputedStyle;window.getComputedStyle=(node,...args)=>{if(node.closest?.('#host-fixture'))window.outsideStyleReads++;if(node.closest?.('#long-conversation'))window.historyReads++;return read(node,...args)}
+    const clone=Node.prototype.cloneNode;Node.prototype.cloneNode=function(...args){if(this.closest?.('#host-fixture'))window.historyClones++;return clone.apply(this,args)}
+    const Observe=window.MutationObserver
+    window.MutationObserver=class extends Observe{active=false;observe(...args){if(args[1]?.attributeFilter?.includes('data-theme')&&!this.active){window.previewObservers++;this.active=true}return super.observe(...args)}disconnect(){if(this.active){window.previewObservers--;this.active=false}return super.disconnect()}}
+  })
+  await page.getByRole('tab',{name:'显示',exact:true}).click();await page.locator('.cm-display').waitFor()
+  const region=async name=>page.getByRole('tab',{name,exact:true}).click()
+  const item=key=>page.locator('.cm-preview [data-display="'+key+'"]')
+  const selectStyle=async label=>{await page.locator('.cm-preview-style-trigger').click();await page.getByRole('button',{name:label,exact:true}).click();await page.keyboard.press('Escape')}
+  assert.equal(await page.locator('.cm-display-model-options').evaluate(n=>n.open),false,'model options start collapsed below the preview')
   assert.equal(await page.locator('.cm-display-details').evaluate(n=>n.open),false)
-  assert.equal(await page.locator('.cm-display input[type=checkbox]:visible').count(),0,'primary UI is the preview')
-  assert.equal(await item('balance').getAttribute('aria-pressed'),'true')
+  assert.equal(await page.locator('iframe,.cm-native-desktop,.cm-preview-reference').count(),0,'no desktop copy or scaled reference')
+  await page.waitForFunction(()=>document.querySelector('.cm-preview-sidebar').style.backgroundColor==='rgb(238, 243, 248)')
+  assert.equal(await page.locator('.cm-preview-sidebar').evaluate(n=>getComputedStyle(n).borderRadius),'19px','current skin surface is reused')
+  assert.ok(await page.locator('.cm-preview').evaluate(n=>parseFloat(getComputedStyle(n).fontSize)>=14),'preview uses readable normal-size text')
   await item('balance').click();await page.waitForFunction(()=>window.current().hideOfficialBalance===true)
   assert.ok(await item('balance').locator('.cm-display-item-content').evaluate(n=>Number(getComputedStyle(n).opacity)<.6))
   await item('balance').focus();await page.keyboard.press('Space');await page.waitForFunction(()=>window.current().hideOfficialBalance===false)
-  await item('budget').click();await page.waitForFunction(()=>window.current().hideBudget===true)
-  assert.equal(saved.budget.enabled,true,'hiding a budget preserves budget accounting')
-  assert.equal(await page.locator('#actual-sidebar .cm-bbox-label').filter({hasText:'预算'}).count(),0,'actual sidebar hides the card')
+  await item('budget').click();await page.waitForFunction(()=>window.current().hideBudget===true);assert.equal(saved.budget.enabled,true)
   await item('budget').click();await page.waitForFunction(()=>window.current().hideBudget===false)
-  assert.equal(await page.locator('#actual-sidebar .cm-bbox-label').filter({hasText:'预算'}).count(),1)
-  await item('peak').click();await page.waitForFunction(()=>window.current().peakNotice===false)
-  assert.equal(saved.peakEnabled,true,'display changes preserve peak pricing')
-  await item('strip-go').click();await page.waitForFunction(()=>window.current().quotaStrip.go===true)
-  assert.equal(saved.goQuota.enabled,false,'showing quota does not enable an account query')
-  await page.evaluate(()=>window.setConfig({quotaStrip:{enabled:false,budget:true,go:true,plans:true}}))
-  await page.evaluate(()=>window.remount());await page.getByRole('tab',{name:'显示',exact:true}).click();await page.locator('.cm-display').waitFor()
-  await page.waitForFunction(()=>document.querySelector('[data-display="strip-budget"]').getAttribute('aria-pressed')==='false')
-  await item('strip-budget').click();await page.waitForFunction(()=>window.current().quotaStrip.enabled===true)
-  assert.equal(saved.quotaStrip.go,false);assert.equal(saved.quotaStrip.plans,false)
-  await item('session-header').click();await item('session-dock').click();await item('turn').click()
-  await page.waitForFunction(()=>window.current().hideSessionCostHeader&&window.current().hideSessionCostDock&&window.current().hideTurnCost)
-  assert.ok(saved.hideSessionCostHeader&&saved.hideSessionCostDock&&saved.hideTurnCost,'rapid changes survive autosave')
-  await item('badge').click();await page.waitForFunction(()=>window.current().position==='dock')
-  await chooseStyle('简洁');await page.waitForFunction(()=>window.current().sidebarSimple===true)
-  await page.evaluate(()=>window.remount());await page.getByRole('tab',{name:'显示',exact:true}).click();await page.locator('.cm-display').waitFor()
-  assert.equal(await item('session-header').getAttribute('aria-pressed'),'false','saved toggles survive reopening')
-  await chooseStyle('标准');await item('session-header').click();await item('session-dock').click();await item('turn').click()
-  await item('peak').click();await item('strip-plans').click()
-  await page.waitForFunction(()=>window.current().hideTurnCost===false&&window.current().peakNotice===true)
-  for (const theme of ['light','dark']) {
-    await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme)
-    for (const width of [1100,720,390]) {
-      await page.setViewportSize({width,height:1000});await page.locator('.cm-display').scrollIntoViewIfNeeded()
-      assert.equal(await page.locator('.cm-preview').evaluate(n=>n.scrollWidth>n.clientWidth+1),false,`preview fits ${theme}/${width}`)
-      await page.locator('.cm-display').screenshot({path:join(output,`${theme}-${width}.png`)})
-      await page.locator('.cm-preview-style-trigger').click()
-      const picker=await page.locator('.cm-preview-style-panel').boundingBox()
-      assert.ok(picker.x>=0&&picker.x+picker.width<=width,`style picker fits ${theme}/${width}`)
-      await page.locator('.cm-display').screenshot({path:join(output,`style-${theme}-${width}.png`)})
+  await item('peak').click();await page.waitForFunction(()=>window.current().peakNotice===false);assert.equal(saved.peakEnabled,true)
+  await selectStyle('简洁');await page.waitForFunction(()=>window.current().sidebarSimple===true)
+  await selectStyle('紧凑');await page.waitForFunction(()=>window.current().sidebarStyle==='compact'&&!window.current().sidebarSimple)
+  await selectStyle('分段');await page.waitForFunction(()=>window.current().peakStyle==='classic')
+  await region('输入区');await item('strip-go').click();await page.waitForFunction(()=>window.current().quotaStrip.go===true);assert.equal(saved.goQuota.enabled,false)
+  await page.waitForFunction(()=>document.querySelector('.cm-native-input-card').style.borderRadius==='31px')
+  await item('session-dock').click();await item('badge').click();await page.waitForFunction(()=>window.current().hideSessionCostDock&&window.current().position==='dock')
+  await region('会话内容');await item('turn').click();await item('session-header').click();await page.waitForFunction(()=>window.current().hideTurnCost&&window.current().hideSessionCostHeader)
+  for(const theme of ['light','dark']){
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.querySelector('._2H3hWW_root').style.backgroundColor=theme==='dark'?'rgb(37,39,43)':'rgb(238,243,248)'},theme)
+    for(const width of [1100,720,390]){
+      await page.setViewportSize({width,height:1000})
+      for(const name of ['侧栏','输入区','会话内容']){
+        await region(name)
+        assert.equal(await page.locator('.cm-preview').evaluate(n=>n.scrollWidth>n.clientWidth+2),false,'preview fits '+theme+'/'+width+'/'+name)
+        await page.locator('.cm-display').screenshot({path:join(output,theme+'-'+width+'-'+name+'.png')})
+      }
+      await region('侧栏');await page.locator('.cm-preview-style-trigger').click()
+      const r=await page.locator('.cm-preview-style-panel').boundingBox();assert.ok(r.x>=0&&r.x+r.width<=width,'style picker stays on screen')
       await page.keyboard.press('Escape')
     }
   }
-  await page.setViewportSize({width:1500,height:1050})
-  await page.evaluate(()=>document.documentElement.dataset.theme='light')
-  await chooseStyle('简洁')
-  await page.getByRole('button',{name:'放大预览',exact:true}).click()
-  await page.getByRole('dialog',{name:'桌面显示预览'}).waitFor()
-  assert.equal(await page.locator('.cm-native-desktop').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ')[0]),'280px')
-  const badgeBefore = await item('badge').getAttribute('aria-pressed')
-  await item('badge').click()
-  await page.waitForFunction(before=>document.querySelector('[data-display="badge"]').getAttribute('aria-pressed')!==before,badgeBefore)
-  await page.mouse.move(1400,20)
-  await page.locator('.cm-display-dialog').screenshot({path:join(output,'desktop-expanded.png')})
-  await page.locator('.cm-preview-style-trigger').click()
-  await page.getByRole('button',{name:'紧凑',exact:true}).click()
-  await page.getByRole('button',{name:'分段',exact:true}).click()
-  await page.waitForFunction(()=>window.current().sidebarStyle==='compact'&&!window.current().sidebarSimple&&window.current().peakStyle==='classic')
-  assert.equal(saved.peakEnabled,true,'changing peak appearance preserves peak pricing')
-  await page.keyboard.press('Escape')
-  assert.equal(await page.locator('.cm-display-dialog[open]').count(),1,'Escape closes the style picker before the expanded preview')
-  assert.equal(await page.locator('.cm-preview-style-trigger').evaluate(n=>n===document.activeElement),true)
-  await page.keyboard.press('Escape')
-  assert.equal(await page.locator('dialog[open]').count(),0)
+  await page.setViewportSize({width:1100,height:1000});await page.evaluate(()=>document.documentElement.dataset.theme='light')
+  await page.getByRole('button',{name:'放大预览',exact:true}).click();await page.locator('.cm-display-dialog[open]').waitFor()
+  await page.locator('.cm-preview-style-trigger').click();await page.keyboard.press('Escape')
+  assert.equal(await page.locator('.cm-display-dialog[open]').count(),1)
+  await page.keyboard.press('Escape');assert.equal(await page.locator('.cm-display-dialog[open]').count(),0)
   assert.equal(await page.getByRole('button',{name:'放大预览',exact:true}).evaluate(n=>n===document.activeElement),true)
-  await page.setViewportSize({width:1100,height:1000})
-  await page.locator('.cm-toolbar select').selectOption('en');await page.getByRole('region',{name:'Interactive display settings'}).waitFor()
-  await page.waitForFunction(()=>window.current().locale==='en')
-  await page.getByText('More options · layout, currency and refresh intervals',{exact:true}).click()
-  assert.equal(await page.locator('.cm-display-details').evaluate(n=>n.open),true)
-  await page.evaluate(()=>window.failSave=true);await item('balance').click()
-  await page.getByText(/synthetic save failure/).waitFor()
-  // A rendered DSH page takes precedence over the reference composition. Peer
-  // plugins and skin overrides must survive the copy without mounting again.
-  await page.evaluate(()=>{
-    window.failSave=false
-    const frame=document.querySelector('.cm-native-desktop').cloneNode(true)
-    frame.classList.add('BynINW_frame');frame.id='host-fixture'
-    Object.assign(frame.style,{position:'absolute',left:'0',top:'1200px',margin:'0',transform:'none',width:'1280px',height:'800px'})
-    const aliases={'.cm-native-side-root':'_2H3hWW_root','.cm-native-chat-titleRow':'Dc7zOa_titleRow','.cm-native-input-root':'RlGAzG_root','.cm-native-input-dock':'RlGAzG_dock'}
-    for(const[selector,name]of Object.entries(aliases))frame.querySelector(selector).classList.add(name)
-    for(const key of ['session-header','session-dock'])frame.querySelector('[data-display="'+key+'"]').querySelector('.cm-stat-entry').classList.add('cm-stat-'+key.split('-')[1])
-    frame.querySelector('[data-display="turn"]').firstElementChild.setAttribute('data-cm-turn','')
-    frame.querySelector('[data-display="corner"]').firstElementChild.classList.add('cm-corner')
-    for(const wrapper of frame.querySelectorAll('[data-display]'))wrapper.replaceWith(wrapper.firstElementChild)
-    for(const node of frame.querySelectorAll('[inert]'))node.removeAttribute('inert')
-    const peer=document.createElement('span');peer.className='peer-extension';peer.textContent='Peer plugin badge';peer.style.cssText='background:rgb(224,241,234);color:rgb(22,92,68);border-radius:17px;padding:2px 7px;font-size:11px'
-    frame.querySelector('.cm-native-chat-titleRow').appendChild(peer)
-    const overlay=document.createElement('div');overlay.dataset.shellOverlay='';frame.appendChild(overlay)
-    document.body.appendChild(frame)
-    window.remount()
-  })
-  await page.getByRole('tab',{name:'Display',exact:true}).click()
-  await page.getByText('Current page · includes skins and plugins',{exact:true}).waitFor()
-  await page.locator('.cm-live-hit[data-display="balance"]').waitFor()
-  const live=page.frameLocator('.cm-live-frame')
-  assert.equal(await live.locator('.peer-extension').textContent(),'Peer plugin badge')
-  assert.equal(await live.locator('.peer-extension').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(224, 241, 234)')
-  assert.equal(await live.locator('.peer-extension').evaluate(n=>getComputedStyle(n).borderRadius),'17px')
-  const alignment=await page.evaluate(()=>{
-    const source=document.querySelector('#host-fixture'),copy=document.querySelector('.cm-live-frame').contentDocument
-    const root=source.getBoundingClientRect(),a=source.querySelector('.cm-native-input-card').getBoundingClientRect(),b=copy.querySelector('.cm-native-input-card').getBoundingClientRect()
-    return{width:Math.abs(a.width-b.width),height:Math.abs(a.height-b.height),left:Math.abs(a.left-root.left-b.left)}
-  })
-  for(const value of Object.values(alignment))assert.ok(value<1,JSON.stringify(alignment))
-  const balanceBefore=await page.evaluate(()=>window.current().hideOfficialBalance)
-  await item('balance').click();await page.waitForFunction(before=>window.current().hideOfficialBalance!==before,balanceBefore)
-  assert.equal(await live.locator('[data-cm-live-key="balance"]').evaluate(n=>n.style.opacity),balanceBefore?'1':'0.26')
-  await page.evaluate(()=>{const style=document.createElement('style');style.textContent='#host-fixture .peer-extension{background:rgb(39,48,65)!important;border-radius:4px!important}';document.head.appendChild(style)})
-  await page.waitForFunction(()=>document.querySelector('.cm-live-frame')?.contentDocument.querySelector('.peer-extension')?.style.backgroundColor==='rgb(39, 48, 65)')
-  await page.evaluate(()=>{
-    const slot=document.querySelector('#host-fixture .cm-native-sidebar-footer');slot.replaceChildren();window.attachFixtureSidebar(slot)
-  })
-  await chooseStyle('Simple')
-  await page.waitForFunction(()=>document.querySelector('.cm-live-frame')?.contentDocument.querySelector('.cm-footer-stack.simple'))
-  await chooseStyle('Standard')
-  await page.waitForFunction(()=>{const node=document.querySelector('.cm-live-frame')?.contentDocument.querySelector('.cm-footer-stack');return node&&!node.classList.contains('simple')&&!node.classList.contains('compact')})
-  assert.equal(await live.locator('.peer-extension').evaluate(n=>n.style.backgroundColor),'rgb(39, 48, 65)','switching layout preserves skin and peer plugin output')
-  await page.getByRole('button',{name:'Expand preview',exact:true}).click()
-  await page.locator('.cm-live-hit[data-display="balance"]').waitFor()
-  await page.locator('.cm-display-dialog').screenshot({path:join(output,'live-skin-and-plugin.png')})
-  await page.locator('.cm-preview-style-trigger').click()
-  await page.locator('.cm-display-dialog').screenshot({path:join(output,'live-style-picker.png')})
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
+  // Reopening with a long real page must not scan its contents or accumulate observers.
+  const timings=[],styleStart=await page.evaluate(()=>window.outsideStyleReads)
+  const session=await page.context().newCDPSession(page)
+  await session.send('Emulation.setCPUThrottlingRate',{rate:4})
+  for(let i=0;i<25;i++){
+    await page.getByRole('tab',{name:'概览',exact:true}).click()
+    await page.locator('.cm-display').waitFor({state:'detached'})
+    await page.waitForFunction(()=>window.previewObservers===0)
+    assert.equal(await page.evaluate(()=>window.previewObservers),0,'preview observer is cleaned on close')
+    const duration=await page.evaluate(async()=>{const start=performance.now();[...document.querySelectorAll('[role=tab]')].find(n=>n.textContent==='显示').click();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return performance.now()-start})
+    await page.locator('.cm-preview').waitFor();timings.push(duration)
+    assert.equal(await page.evaluate(()=>window.previewObservers),1,'only one small theme observer exists')
+  }
+  await session.send('Emulation.setCPUThrottlingRate',{rate:1})
+  const metrics=await page.evaluate(()=>({styleReads:window.outsideStyleReads,historyReads:window.historyReads,historyClones:window.historyClones,previewNodes:document.querySelector('.cm-display').querySelectorAll('*').length}))
+  assert.equal(metrics.historyReads,0);assert.equal(metrics.historyClones,0)
+  assert.ok(metrics.styleReads-styleStart<=25*3,'at most three skin surfaces per mount')
+  assert.ok(metrics.previewNodes<1000,'bounded preview subtree')
+  const sorted=[...timings].sort((a,b)=>a-b),p95=sorted[Math.ceil(sorted.length*.95)-1]
+  assert.ok(p95<1000,'opening stays responsive under 4x CPU throttle: '+p95)
+  await region('会话内容');assert.equal(await item('turn').getAttribute('aria-pressed'),'false','saved toggles survive repeated reopening')
+  await page.locator('.cm-toolbar select').selectOption('en');await page.waitForFunction(()=>window.current().locale==='en')
+  await region('Sidebar');await page.evaluate(()=>window.failSave=true);await item('balance').click();await page.getByText(/synthetic save failure/).waitFor()
   assert.deepEqual(errors,[]);assert.deepEqual(external,[])
-  writeFileSync(join(output,'result.json'),JSON.stringify({themes:2,widths:[1100,720,390],autosave:true,keyboard:true,inlineStylePicker:true,liveStyleSwitch:true,liveDOM:true,skinAndPeerPlugin:true,alignment,externalRequests:external.length,browserErrors:errors.length},null,2))
-  console.log('[ok] visual display settings: native settings autosave, visibility gates, reopen, keyboard, save error, 2 themes / 3 widths, zero external requests')
-} catch(error) {
-  await page.screenshot({path:join(output,'failure.png'),fullPage:true})
-  console.error(errors)
-  throw error
-} finally {await browser.close();await new Promise(resolve=>server.close(resolve))}
+  const result={themes:2,widths:[1100,720,390],regions:3,normalFontSize:true,skinSurfaces:true,autosave:true,keyboard:true,reopenCount:25,hostConversationNodes:20000,cpuThrottle:4,openMedianMs:Math.round(sorted[Math.floor(sorted.length/2)]),openP95Ms:Math.round(p95),...metrics,externalRequests:external.length,browserErrors:errors.length}
+  writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log('[ok] '+JSON.stringify(result))
+} catch(error){await page.screenshot({path:join(output,'failure.png'),fullPage:true});console.error(errors);throw error}
+finally{await browser.close();await new Promise(resolve=>server.close(resolve))}

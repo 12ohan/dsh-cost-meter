@@ -2,7 +2,7 @@
 
 The display settings preview reuses selected SVG artwork and presentation CSS from @deepseek-ai/dsh-client-ui-primitives, @deepseek-ai/dsh-client-ui-sidebar and @deepseek-ai/dsh-client-ui-conversation, version 0.2.0-rc.2. Source: the corresponding packages shipped with DeepSeek Harness Desktop.
 
-Artwork is reused without geometry changes. CSS selectors are scoped and renamed, and the static preview layout is adapted for scaling. The preview uses the host's exported primitives when available.
+Artwork is reused without geometry changes. Presentation styles are scoped and adapted into separate regions at normal text size. The preview uses the host's exported primitives when available.
 
 MIT License
 

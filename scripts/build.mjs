@@ -155,7 +155,7 @@ for (const chunk of ['statistics', 'openrouter', 'community', 'pricing', 'displa
   let source = readFileSync(resolve(projectRoot, `src/${chunk}/index.js`), 'utf8')
   if (chunk === 'display') {
     source = source.replace('/* DISPLAY_NATIVE_SOURCE */', readFileSync(resolve(projectRoot, 'src/display/native.js'), 'utf8'))
-    source = source.replace('/* DISPLAY_LIVE_SOURCE */', readFileSync(resolve(projectRoot, 'src/display/live.js'), 'utf8'))
+    source = source.replace('/* DISPLAY_APPEARANCE_SOURCE */', readFileSync(resolve(projectRoot, 'src/display/appearance.js'), 'utf8'))
     const styles = await transform(readFileSync(resolve(projectRoot, 'src/display/preview.css'), 'utf8'), { loader: 'css', minify: true })
     source = source.replace("'DISPLAY_STYLE_SOURCE'", () => javascriptLiteral(styles.code))
   }

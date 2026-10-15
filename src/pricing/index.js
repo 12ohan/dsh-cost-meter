@@ -13,8 +13,13 @@ window.__ModuleLoader__.load({
       return value
     } }
     const boolSchema = { parse: value => { if (typeof value !== 'boolean') throw new Error('Expected confirmation'); return value } }
+    const catalogSchema = { parse: value => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid price catalog')
+      return value
+    } }
     const codec = (name, schema) => ({ mode: 'strict', typeSymbol: 'dsh-cost-meter#' + name, schema, create: () => schema })
     const CONTRIBUTION = { package: 'dsh-cost-meter-pricing', face: 'host', descriptors: [
+      { id: 'dsh-cost-meter#costMeter/getPriceCatalog', service: 'costMeter', namespace: 'costMeter', method: 'getPriceCatalog', invocation: { kind: 'direct' }, parameters: [], result: codec('PriceCatalog', catalogSchema) },
       { id: 'dsh-cost-meter#costMeter/getRepricingHistory', service: 'costMeter', namespace: 'costMeter', method: 'getRepricingHistory', invocation: { kind: 'direct' }, parameters: [], result: codec('RepricingHistory', historySchema) },
       { id: 'dsh-cost-meter#costMeter/repriceHistory', service: 'costMeter', namespace: 'costMeter', method: 'repriceHistory', invocation: { kind: 'direct' }, parameters: [{ name: 'confirmed', wire: 'confirmed', source: 'json', codec: codec('RepricingConfirmation', boolSchema) }], result: codec('FetchPricesResult', resultSchema) },
     ] }
@@ -31,6 +36,41 @@ window.__ModuleLoader__.load({
         el('select', { className: 'cm-input', value, 'aria-label': label + (en ? ' · Price model' : ' · 价格模型'), onChange: event => onChange(event.target.value) },
           el('option', { value: '' }, placeholder), ...shown.map(option => el('option', { key: option.value, value: option.value }, option.label))),
         query ? el('small', { role: 'status' }, matches.length ? (en ? `${matches.length} matches` : `${matches.length} 个结果`) : (en ? 'No matches' : '没有匹配的模型')) : null)
+    }
+
+    function RestorePrices({ state, draft, setDraft, locale, rpc }) {
+      const [open, setOpen] = useState(false), [catalog, setCatalog] = useState(null), [selected, setSelected] = useState(''), [error, setError] = useState(''), [retry, setRetry] = useState(0)
+      const currency = state.config.prices.currency ?? 'USD', en = locale === 'en'
+      useEffect(() => {
+        if (!open) return
+        let active = true
+        setCatalog(null); setError(''); setSelected('')
+        rpc('getPriceCatalog').then(value => { if (active) setCatalog(value) }, e => { if (active) setError(String(e.message ?? e)) })
+        return () => { active = false }
+      }, [open, currency, retry, rpc])
+      const options = []
+      for (const [provider, families] of Object.entries(catalog ?? {})) for (const models of Object.values(families)) for (const [id, entry] of Object.entries(models)) {
+        const mounted = provider === 'deepseek' ? draft?.prices.models[id] : draft?.prices.providers?.[provider]?.models?.[id]
+        if (!mounted && !entry.unpriced) options.push({ value: provider + ':' + id, label: provider + ' · ' + id, provider, id, entry })
+      }
+      const choice = options.find(option => option.value === selected)
+      const restore = () => {
+        if (!choice || !draft) return
+        const { provider, id, entry } = choice, copy = JSON.parse(JSON.stringify(entry)), prices = draft.prices
+        setDraft({ ...draft, prices: provider === 'deepseek'
+          ? { ...prices, models: { ...prices.models, [id]: copy } }
+          : { ...prices, providers: { ...prices.providers, [provider]: { ...prices.providers?.[provider], models: { ...prices.providers?.[provider]?.models, [id]: copy } } } } })
+        setSelected('')
+      }
+      return el('div', { className: 'cm-restore-prices' },
+        el('button', { type: 'button', className: 'cm-btn small', 'aria-expanded': open, onClick: () => setOpen(value => !value) }, open ? (en ? 'Close restore' : '收起恢复入口') : (en ? 'Restore bundled model' : '恢复内置模型')),
+        open ? el('div', { className: 'cm-collapse-body' },
+          error ? el('div', { role: 'alert', className: 'cm-err' }, error, el('button', { type: 'button', className: 'cm-btn small', onClick: () => setRetry(n => n + 1) }, en ? 'Retry' : '重试'))
+            : catalog === null ? el('p', { role: 'status', className: 'cm-hint' }, en ? 'Loading prices…' : '读取价格…')
+            : options.length ? el(Fragment, null,
+              el(SearchPriceSelect, { options, value: choice ? selected : '', placeholder: en ? 'Select a model' : '选择模型', label: en ? 'Restore model' : '恢复模型', locale, onChange: setSelected }),
+              el('button', { type: 'button', className: 'cm-btn small', disabled: !choice, onClick: restore }, en ? 'Restore' : '恢复'))
+            : el('p', { className: 'cm-hint' }, en ? 'All bundled models are mounted.' : '内置模型均已挂载。')) : null)
     }
 
     function Matching({ state, draft, setDraft, t, locale, resolveClientPrice, prettyProviderKey, setField }) {
@@ -165,13 +205,13 @@ window.__ModuleLoader__.load({
         if (method === 'repriceHistory') boolSchema.parse(args[0])
         const result = await service[method](...args)
         if (result?.ok !== true) throw new Error(result?.error?.message ?? 'Pricing request failed')
-        return (method === 'getRepricingHistory' ? historySchema : resultSchema).parse(result.value)
+        return (method === 'getPriceCatalog' ? catalogSchema : method === 'getRepricingHistory' ? historySchema : resultSchema).parse(result.value)
       }
       const style = document.createElement('style')
       style.textContent = '.cm-price-search{display:grid;gap:6px;min-width:0}.cm-price-search small{color:var(--dsw-alias-label-tertiary)}.cm-price-search select,.cm-price-search input{width:100%;min-width:0}.cm-repricing-warning{padding:12px;border:1px solid var(--dsw-alias-state-warning-primary,#c58a25);border-radius:10px;background:var(--dsw-alias-bg-layer-1)}.cm-repricing-warning p{margin:8px 0 12px;line-height:1.6}.cm-repricing-history{margin-top:12px}.cm-repricing-history table{width:100%;text-align:left;font-variant-numeric:tabular-nums}.cm-repricing-history td,.cm-repricing-history th{padding:8px;border-bottom:1px solid var(--dsw-alias-border-l1)}'
       document.head.appendChild(style)
       ctx.effect(() => () => style.remove(), 'cost-meter: pricing settings styles')
-      return props => props.mode === 'matching' ? el(Matching, props) : el(History, { ...props, rpc })
+      return props => props.mode === 'matching' ? el(Matching, props) : el(props.mode === 'restore' ? RestorePrices : History, { ...props, rpc })
     }
     return { mount, CONTRIBUTION }
   },

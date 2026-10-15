@@ -1,47 +1,17 @@
-/** Interactive display settings. Preview values are local examples; no account reads. */
+/** Interactive display settings. Only local presentation components are mounted. */
 window.__ModuleLoader__.load({
   id: 'dsh-cost-meter', chunk: 'client.display.js',
   factory: require => {
     const React = require('react')
     const { createElement: el, useState } = React
     const Fragment = React.Fragment
-
     /* DISPLAY_NATIVE_SOURCE */
     const fallbackNative = displayNativeFallback(React)
     let hostNative = {}
     try { hostNative = require('@deepseek-ai/dsh-client-ui-primitives') } catch {}
     const Native = Object.fromEntries(Object.entries(fallbackNative).map(([name, component]) => [name, hostNative[name] ?? component]))
     const css = 'DISPLAY_STYLE_SOURCE'
-    /* DISPLAY_LIVE_SOURCE */
-
-    // Preserve the desktop layout at every settings-pane width.
-    function PreviewCanvas({ children, controls, controlAnchor, expanded, width = 1280, height = 800, live = false }) {
-      const ref = React.useRef(null), desktop = React.useRef(null), control = React.useRef(null)
-      const [scale, setScale] = useState(.6)
-      React.useLayoutEffect(() => {
-        const update = () => {
-          const canvas = ref.current, next = Math.max(.05, Math.min(canvas.clientWidth / width, expanded ? (window.innerHeight - 150) / height : Infinity))
-          setScale(next)
-          if (!control.current) return
-          const box = canvas.getBoundingClientRect(), footer = desktop.current.querySelector('.cm-native-sidebar-footer')?.getBoundingClientRect()
-          const right = live && controlAnchor ? canvas.clientWidth / 2 + (controlAnchor.left + controlAnchor.width - width / 2) * next : footer ? footer.right - box.left : 272 * next
-          const top = live && controlAnchor ? controlAnchor.top * next : footer ? footer.top - box.top : 480 * next
-          const left = Math.max(8, Math.min(canvas.clientWidth - 68, right - 62))
-          control.current.style.left = left + 'px'
-          control.current.style.top = Math.max(8, Math.min(height * next - 38, top - 34)) + 'px'
-          control.current.style.setProperty('--cm-picker-left', (Math.max(8, Math.min(left, canvas.clientWidth - 284)) - left) + 'px')
-          control.current.style.setProperty('--cm-picker-width', Math.min(276, canvas.clientWidth - 16) + 'px')
-        }
-        const observer = new ResizeObserver(update)
-        observer.observe(ref.current); window.addEventListener('resize', update); update()
-        return () => { observer.disconnect(); window.removeEventListener('resize', update) }
-      }, [expanded, width, height, live, controlAnchor, children, scale])
-      return el('div', { ref, className: 'cm-preview', style: { height: height * scale } },
-        el('div', { className: 'cm-preview-screen' },
-          el('div', { ref: desktop, className: live ? 'cm-live-desktop' : 'cm-native-desktop', style: { width, height, marginLeft: -width / 2, transform: 'scale(' + scale + ')' } }, children)),
-        el('div', { ref: control, className: 'cm-preview-style-control' }, controls))
-    }
-
+    /* DISPLAY_APPEARANCE_SOURCE */
     function PreviewStylePicker({ mode, peakStyle, onMode, onPeak, text }) {
       const [open, setOpen] = useState(false)
       const root = React.useRef(null), trigger = React.useRef(null), panel = React.useRef(null)
@@ -84,10 +54,9 @@ window.__ModuleLoader__.load({
       const { draft, setDraft, t, locale, formatMoneyUsd, renderBudget, renderBalance, renderGo, renderPeak, onNavigate } = props
       const config = draft ?? props.state.config
       const en = locale === 'en', text = (zh, english) => en ? english : zh
-      const [feedback, setFeedback] = useState('')
-      const [expanded, setExpanded] = useState(false)
-      const [liveSource, setLiveSource] = useState(false)
-      const dialogRef = React.useRef(null), expandButton = React.useRef(null)
+      const [feedback, setFeedback] = useState(''), [region, setRegion] = useState('sidebar'), [expanded, setExpanded] = useState(false)
+      const appearance = useDisplayAppearance()
+      const id = React.useId(), dialogRef = React.useRef(null), expandButton = React.useRef(null)
       React.useEffect(() => {
         if (!expanded) return
         const dialog = dialogRef.current
@@ -100,7 +69,6 @@ window.__ModuleLoader__.load({
         set(patch)
         setFeedback(label + text(on ? '已隐藏' : '已显示', on ? ' hidden' : ' shown'))
       }
-      const items = []
       const item = (key, label, on, patch, content, extra = '') => {
         const node = el('div', {
         key, role: 'button', tabIndex: 0, className: 'cm-display-item ' + extra, 'data-display': key,
@@ -110,7 +78,6 @@ window.__ModuleLoader__.load({
         onKeyDown: event => { if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); toggle(label, on, patch) } },
       }, el('span', { className: 'cm-display-item-content', inert: '' }, content),
       el('span', { className: 'cm-display-item-tag', 'aria-hidden': true }, text(on ? '点击隐藏' : '点击显示', on ? 'Hide' : 'Show')))
-        items.push(node)
         return node
       }
       const line = (label, value) => el('span', { className: 'cm-preview-line' }, el('span', null, label), el('span', { className: 'cm-preview-value' }, value))
@@ -162,79 +129,73 @@ window.__ModuleLoader__.load({
         { goQuota: { ...config.goQuota, display: ['both', 'sidebar'].includes(config.goQuota?.display ?? 'both') ? 'settings' : 'both' } }, renderGo(config))
       const corner = item('corner', text('右下角额度', 'Corner quota'), cornerOn, { corner: { ...config.corner, enabled: !cornerOn } },
         el('span', { className: 'cm-corner-chip' }, t('budget') + ' 32%'))
-      const scene = el(Fragment, null,
-        el('div', { className: 'cm-native-titlebar', 'aria-hidden': true }, icon('IconPanelLeftOutlineRegular'), text('应用', 'App'), text('编辑', 'Edit'),
-          native('window-actions', '−', el('span', { className: 'cm-native-window-square' }), icon('IconCloseOutlineRegular', 14))),
-        el('aside', { className: 'cm-native-side-root', 'aria-label': text('侧栏预览', 'Sidebar preview') },
-          el('div', { className: 'cm-native-side-logoRow', 'aria-hidden': true }, el('div', { className: 'cm-native-side-brand' }, el(Native.BrandWordmark, { size: 24 }))),
-          el('div', { className: 'cm-native-side-newSession', 'aria-hidden': true }, native('side-newSessionContent', icon('IconNewChatOutlineRegular'), text('新会话', 'New conversation'))),
-          el('div', { className: 'cm-native-side-panelList', 'aria-hidden': true }, nav('IconPluginPinwheelOutlineRegular', text('插件', 'Plugins')), nav('IconClockOutlineRegular', text('自动化任务', 'Automations')), nav('IconInspectOutlineRegular', text('上下文洞察', 'Context insights'))),
-          el('div', { className: 'cm-native-workspaces', 'aria-hidden': true },
-            native('workspaces-title', text('工作区', 'Workspaces'), native('workspace-tools', icon('IconSearchOutlineRegular', 14), icon('IconSlidersTwoOutlineRegular', 14), icon('IconProjectAddOutlineRegular', 14))),
-            folder(text('日常工作', 'Daily work')), folder(text('项目资料', 'Project files')),
-            el('div', { className: 'cm-native-history active' }, text('整理项目计划', 'Organize the project plan'), el('small', null, text('刚刚', 'now'))),
-            native('history', text('查看文档与任务', 'Review documents and tasks')),
-            native('history', text('讨论界面布局', 'Discuss the interface layout')),
-            native('history', text('展开其余 5 个会话', 'Show 5 more conversations'))),
-          native('sidebar-footer', el('div', { className: 'cm-footer-stack' + (simple ? ' simple' : mode === 'compact' ? ' compact' : '') },
-            ...(simple ? [budget, balance, go, peak, today] : [balance, go, budget, peak, today]))),
-          el('div', { className: 'cm-native-account', 'aria-hidden': true }, native('avatar', icon('IconUserOutlineRegular', 18)), text('已登录 DeepSeek', 'Signed in to DeepSeek'))),
-        native('chat-root',
-          native('chat-header', native('chat-titleRow', native('chat-title', text('整理项目计划', 'Organize the project plan')),
-            meta('IconChevronDownOutlineRegular', text('7 个子智能体', '7 subagents')), meta('IconUsersOutlineRegular', text('智能体团队', 'Agent team')), meta('IconBranchOutlineRegular', text('标准模式', 'Standard mode')),
-            session('header'), badge('header'), native('header-tools', icon('IconEllipsisOutlineRegular'), icon('IconPanelLeftOutlineRegular'))),
-            el('div', { className: 'cm-native-chat-tabs', 'aria-hidden': true }, ...[text('对话', 'Chat'), text('轨迹', 'Trace'), text('上下文', 'Context'), text('编队', 'Team')].map((label, i) => el('span', { key: label, className: 'cm-native-chat-tab' + (i === 0 ? ' cm-native-chat-tabActive' : '') }, label)))),
-          native('thread',
-            el('div', { className: 'cm-native-user', 'aria-hidden': true }, text('帮我整理一下项目计划，列出接下来的工作。', 'Organize the project plan and outline the next steps.')),
-            native('response',
-              el('p', { 'aria-hidden': true }, text('已经整理好项目资料，接下来可以按这个顺序推进。', 'The project materials are ready. Here are the next steps.')),
-              el('table', { className: 'cm-native-response-table', 'aria-hidden': true }, el('tbody', null,
-                ...[[text('整理需求与资料', 'Organize requirements'), text('已完成', 'Done')], [text('确认界面布局', 'Review the layout'), text('已完成', 'Done')], [text('检查显示效果', 'Check the display'), text('进行中', 'In progress')]].map(([a,b]) => el('tr', { key: a }, el('td', null, a), el('td', null, el('span', { className: 'cm-native-check' }, '✓'), b))))),
-              el('p', { 'aria-hidden': true }, text('预算、余额和费用明细保留在常用位置，便于随时查看。', 'Budget, balance and cost details stay within easy reach.')),
-              el('div', { className: 'cm-native-file', 'aria-hidden': true }, native('file-icon', 'MD'), el('div', null, 'project-plan.md', el('small', null, text('项目计划与待办事项', 'Project plan and next steps')))),
-              item('turn', text('每轮费用', 'Per-turn cost'), config.hideTurnCost !== true, { hideTurnCost: config.hideTurnCost !== true },
-                el('span', { className: 'cm-native-turn' }, text('▸ 本轮费用 ≈ ', '▸ Turn cost ≈ ') + money(.08))),
-              el('div', { className: 'cm-native-response-actions', 'aria-hidden': true }, icon('IconCopyOutlineRegular'), icon('IconLikeOutlineRegular'), icon('IconDislikeOutlineRegular'), icon('IconShareOutlineRegular'),
-                el('span', null, icon('IconDatabaseOutlineRegular'), text('用量 128K tok', 'Usage 128K tok')), el('span', null, '14:32')))),
-          native('input-root',
-            el('div', { className: 'cm-preview-strip' }, stripItem('budget', t('budget'), 32, 'budget'), stripItem('go', 'Go', 24, 'go'), stripItem('plans', 'Plan', 18, 'plan')),
-            el('div', { className: 'cm-native-input-card', 'aria-hidden': true },
-              native('input-grow', native('input-input'), native('input-placeholder', text('发消息或创建任务，/ 调用指令，@ 文件或对话', 'Send a message, / commands, @ files or conversations'))),
-              native('input-row', native('input-tools', native('input-add', icon('IconPlusOutlineRegular', 20)), native('permission', icon('PermissionIconFullAccessRegular'), text('完全权限', 'Full access'), icon('IconChevronDownOutlineRegular', 12))),
-                native('input-trailing', native('model', 'DeepSeek-V41-Flash', el('em', null, 'Max'), icon('IconChevronDownOutlineRegular', 12)), icon('IconMicrophoneOutlineRegular', 20), native('input-primary', icon('IconSendOutlineRegular', 24))))),
-            native('input-dock', el('span', { className: 'cm-native-dock-stat', 'aria-hidden': true }, icon('IconGaugeOutlineRegular', 14), text('2 轮 6 步 · 273 tok/s', '2 turns · 6 steps · 273 tok/s')),
-              el('span', { className: 'cm-native-dock-stat', 'aria-hidden': true }, icon('IconDatabaseOutlineRegular', 14), text('128K tok · 缓存命中 98%', '128K tok · 98% cache')),
-              session('dock'), badge('dock'), corner,
-              el('span', { className: 'cm-native-dock-context', 'aria-hidden': true }, el('i', { className: 'cm-native-context-ring' }), '29%')))))
-      const savedConfig = props.state.config
-      const savedAppearance = JSON.stringify([savedConfig.sidebarSimple, savedConfig.sidebarStyle, savedConfig.peakStyle])
-      const preview = el(LiveDesktopPreview, { scene, items, expanded, controls: stylePicker, savedAppearance, onSource: setLiveSource })
+      const regions = [['sidebar', text('侧栏', 'Sidebar')], ['composer', text('输入区', 'Composer')], ['conversation', text('会话内容', 'Conversation')]]
+      const scene = region === 'sidebar' ?
+        el('div', { className: 'cm-preview-sidebar', style: appearance.sidebar },
+          el('div', { className: 'cm-preview-region-head' }, el('span', null, icon('IconPanelLeftOutlineRegular'), text('侧栏底部', 'Sidebar footer')), stylePicker),
+          el('div', { className: 'cm-preview-history', 'aria-hidden': true }, icon('IconFolderCloseRegular'), text('工作区', 'Workspace'), el('span', null, '···')),
+          el('div', { className: 'cm-footer-stack' + (simple ? ' simple' : mode === 'compact' ? ' compact' : '') },
+            ...(simple ? [budget, balance, go, peak, today] : [balance, go, budget, peak, today])),
+          el('div', { className: 'cm-preview-account', 'aria-hidden': true }, icon('IconUserOutlineRegular', 18), text('已登录 DeepSeek', 'Signed in to DeepSeek'))) : region === 'composer' ?
+        el('div', { className: 'cm-preview-composer' },
+          el('div', { className: 'cm-preview-region-head' }, el('span', null, icon('IconPlusOutlineRegular'), text('输入区域', 'Composer area'))),
+          el('div', { className: 'cm-preview-strip' }, stripItem('budget', t('budget'), 32, 'budget'), stripItem('go', 'Go', 24, 'go'), stripItem('plans', 'Plan', 18, 'plan')),
+          el('div', { className: 'cm-native-input-card', style: appearance.composer, 'aria-hidden': true },
+            native('input-placeholder', text('发消息或创建任务，/ 调用指令，@ 文件或对话', 'Send a message, / commands, @ files or conversations')),
+            native('input-row', native('input-tools', native('input-add', icon('IconPlusOutlineRegular', 20)), native('permission', icon('PermissionIconFullAccessRegular'), text('完全权限', 'Full access'))),
+              native('input-trailing', native('model', 'DeepSeek-V41-Flash', icon('IconChevronDownOutlineRegular', 12)), icon('IconMicrophoneOutlineRegular', 20), native('input-primary', icon('IconSendOutlineRegular', 24))))),
+          native('input-dock', el('span', { className: 'cm-native-dock-stat', 'aria-hidden': true }, icon('IconGaugeOutlineRegular', 14), text('2 轮 6 步 · 273 tok/s', '2 turns · 6 steps · 273 tok/s')),
+            el('span', { className: 'cm-native-dock-stat', 'aria-hidden': true }, icon('IconDatabaseOutlineRegular', 14), text('128K tok · 缓存命中 98%', '128K tok · 98% cache')),
+            session('dock'), badge('dock'), corner,
+            el('span', { className: 'cm-native-dock-context', 'aria-hidden': true }, el('i', { className: 'cm-native-context-ring' }), '29%'))) :
+        el('div', { className: 'cm-preview-conversation' },
+          el('div', { className: 'cm-native-chat-header', style: appearance.header },
+            el('div', { className: 'cm-native-chat-titleRow' }, el('span', null, text('整理项目计划', 'Organize the project plan')), session('header'), badge('header')),
+            el('div', { className: 'cm-native-chat-tabs', 'aria-hidden': true }, ...[text('对话', 'Chat'), text('轨迹', 'Trace'), text('上下文', 'Context')].map((label, i) => el('span', { key: label, className: i === 0 ? 'active' : '' }, label)))),
+          el('div', { className: 'cm-preview-response' },
+            el('p', { 'aria-hidden': true }, text('已整理好项目资料，接下来可以确认计划与时间安排。', 'The project materials are ready. Next, review the plan and schedule.')),
+            item('turn', text('每轮费用', 'Per-turn cost'), config.hideTurnCost !== true, { hideTurnCost: config.hideTurnCost !== true },
+              el('span', { className: 'cm-native-turn' }, text('▸ 本轮费用 ≈ ', '▸ Turn cost ≈ ') + money(.08))),
+            el('div', { className: 'cm-native-response-actions', 'aria-hidden': true }, icon('IconCopyOutlineRegular'), icon('IconLikeOutlineRegular'), icon('IconDislikeOutlineRegular'), icon('IconShareOutlineRegular'), el('span', null, '14:32'))))
+      const preview = el(Fragment, null,
+        el('div', { className: 'cm-display-region-tabs', role: 'tablist', 'aria-label': text('预览区域', 'Preview area') }, ...regions.map(([key, label], index) =>
+          el('button', { key, type: 'button', role: 'tab', id: id + key, 'aria-selected': region === key, 'aria-controls': id + '-panel', tabIndex: region === key ? 0 : -1,
+            onClick: () => setRegion(key), onKeyDown: event => {
+              if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return
+              event.preventDefault()
+              const next = event.key === 'Home' ? 0 : event.key === 'End' ? regions.length - 1 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + regions.length) % regions.length
+              setRegion(regions[next][0]); event.currentTarget.parentElement.children[next].focus()
+            } }, label))),
+        el('div', { className: 'cm-preview cm-region-preview', role: 'tabpanel', id: id + '-panel', 'aria-labelledby': id + region, 'data-region': region }, scene))
       return el('section', { className: 'cm-display', 'aria-label': text('交互式显示设置', 'Interactive display settings') },
-        el('div', { className: 'cm-display-heading' },
-          el('div', null, el('h3', null, text('点击界面，选择显示内容', 'Choose what appears on your screen')),
-            el('p', null, text('点击预算、余额或费用等项目即可切换。隐藏后会淡化，点击可重新显示。', 'Click a budget, balance or cost item to toggle it. Faded items can be turned back on.'))),
-          el('div', { className: 'cm-display-legend', 'aria-hidden': true }, el('span', null, el('i', { className: 'cm-display-dot' }), text('显示', 'Shown')), el('span', null, el('i', { className: 'cm-display-dot hidden' }), text('隐藏', 'Hidden')))),
-        el('div', { className: 'cm-display-preview-actions' }, el('span', null, liveSource ? text('当前界面 · 已包含皮肤和插件效果', 'Current page · includes skins and plugins') : text('原生布局示例', 'Native layout example')),
+        el('div', { className: 'cm-display-heading' }, el('div', null,
+          el('h3', null, text('设置你看到的界面', 'Make the screen yours')),
+          el('p', null, text('点击项目切换显示，淡化的项目已隐藏。', 'Click an item to toggle it. Faded items are hidden.'))),
           el('button', { ref: expandButton, type: 'button', className: 'cm-btn small cm-display-expand', onClick: () => setExpanded(true) }, icon('IconFullscreenOutlineRegular', 14), text('放大预览', 'Expand preview'))),
         expanded ? el('dialog', { ref: dialogRef, className: 'cm-display-dialog', 'aria-label': text('桌面显示预览', 'Desktop display preview'),
-          onCancel: event => { event.preventDefault(); event.stopPropagation(); setExpanded(false) },
-          onKeyDown: event => { if (event.key === 'Escape') event.stopPropagation() },
-          onClick: event => { if(event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if(event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setExpanded(false) } } },
-          el('div', { className: 'cm-display-dialog-head' }, text('点击项目，调整显示', 'Click items to adjust the display'),
-            el('button', { type: 'button', className: 'cm-display-dialog-close', 'aria-label': text('关闭预览', 'Close preview'), autoFocus: true, onClick: () => setExpanded(false) }, icon('IconCloseOutlineRegular'))),
-          preview, el('div', { className: 'cm-display-feedback', role: 'status', 'aria-live': 'polite' }, feedback || text('更改会自动保存', 'Changes save automatically'))) : preview,
-        el('div', { className: 'cm-display-toolbar' }, el('span', { className: 'cm-display-feedback', role: 'status', 'aria-live': 'polite' }, feedback || text('更改会自动保存', 'Changes save automatically'))),
-        el('div', { className: 'cm-display-footnote' },
-          el('p', null, liveSource ? text('已显示的项目直接取自当前界面；隐藏或未配置的项目用淡化示例占位。', 'Visible items come from your current page. Hidden or unconfigured items use faded examples.') : text('预算、余额和额度使用示例数据；这里仅调整显示。', 'Budget, balance and quota values are examples; these controls change visibility.')),
-          el('button', { type: 'button', className: 'cm-btn small', onClick: () => onNavigate('quotas') }, text('配置额度 →', 'Set up quotas →'))),
+          onCancel: event => { event.preventDefault(); event.stopPropagation(); setExpanded(false) }, onKeyDown: event => { if(event.key==='Escape')event.stopPropagation() } },
+          el('div', { className: 'cm-display-dialog-head' }, text('显示设置', 'Display settings'),
+            el('button', { type: 'button', className: 'cm-display-dialog-close', 'aria-label': text('关闭预览', 'Close preview'), autoFocus: true, onClick: () => setExpanded(false) }, icon('IconCloseOutlineRegular'))), preview) : preview,
+        el('div', { className: 'cm-display-toolbar' }, el('span', { className: 'cm-display-feedback', role: 'status', 'aria-live': 'polite' }, feedback || text('更改自动保存 · 预览使用示例数值', 'Changes save automatically · example values'))),
         el(DetailedSettings, props))
     }
 
-
-    function DetailedSettings({ state, draft, setDraft, t, locale, numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE }) {
+    class DisplayBoundary extends React.Component {
+      constructor(props) { super(props); this.state = { failed: false } }
+      static getDerivedStateFromError() { return { failed: true } }
+      render() {
+        if (!this.state.failed) return el(DisplaySettings, this.props)
+        const en = this.props.locale === 'en'
+        return el('section', { className: 'cm-display' },
+          el('p', { role: 'alert' }, en ? 'Preview unavailable. Display options are still available below.' : '预览暂不可用，可在下方继续调整显示选项。'),
+          el('button', { type: 'button', className: 'cm-btn small', onClick: () => this.setState({ failed: false }) }, en ? 'Retry preview' : '重试预览'),
+          el(DetailedSettings, { ...this.props, open: true }))
+      }
+    }
+    function DetailedSettings({ state, draft, setDraft, t, locale, numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, open = false }) {
       const config=state.config
       const setField=(key,value)=>setDraft(previous=>({...previous,[key]:value}))
-      return el('details', { className: 'cm-display-details' },
+      return el('details', { className: 'cm-display-details', open: open || undefined },
         el('summary', null, locale === 'en' ? 'More options · layout, currency and refresh intervals' : '详细设置 · 布局、金额格式与刷新频率'),
         el('div', { className: 'cm-grid' },
             el('div', { className: 'cm-grid-group' }, t('groupGeneral')),
@@ -486,10 +447,10 @@ window.__ModuleLoader__.load({
 
     function mount(ctx) {
       const style = document.createElement('style')
-      style.textContent = displayNativeCss + '\n' + css
+      style.textContent = css
       document.head.appendChild(style)
       ctx.effect(() => () => style.remove(), 'cost-meter: display settings styles')
-      return DisplaySettings
+      return DisplayBoundary
     }
     return { mount, DisplaySettings }
   },
