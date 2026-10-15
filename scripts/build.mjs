@@ -156,6 +156,7 @@ for (const chunk of ['statistics', 'openrouter', 'community', 'pricing', 'displa
   if (chunk === 'display') {
     source = source.replace('/* DISPLAY_NATIVE_SOURCE */', readFileSync(resolve(projectRoot, 'src/display/native.js'), 'utf8'))
     source = source.replace('/* DISPLAY_APPEARANCE_SOURCE */', readFileSync(resolve(projectRoot, 'src/display/appearance.js'), 'utf8'))
+    for (const part of ['sidebar', 'controls']) source = source.replace(`/* DISPLAY_${part.toUpperCase()}_SOURCE */`, readFileSync(resolve(projectRoot, `src/display/${part}.js`), 'utf8'))
     const styles = await transform(readFileSync(resolve(projectRoot, 'src/display/preview.css'), 'utf8'), { loader: 'css', minify: true })
     source = source.replace("'DISPLAY_STYLE_SOURCE'", () => javascriptLiteral(styles.code))
   }

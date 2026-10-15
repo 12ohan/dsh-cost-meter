@@ -1,5 +1,5 @@
 // Only three native surfaces are sampled. Work is independent of conversation
-// length: no DOM cloning, media decoding, iframe, resize observer or page scan.
+// length: no DOM cloning, media decoding, iframe or page scan.
 function readDisplayAppearance() {
   const surfaces = { sidebar: '._2H3hWW_root', composer: '.RlGAzG_card', header: '.Dc7zOa_header' }
   const properties = ['backgroundColor', 'color', 'borderColor', 'borderRadius', 'boxShadow', 'fontFamily']
@@ -13,6 +13,10 @@ function readDisplayAppearance() {
       if (style[property] && !/url\(/i.test(style[property])) value[property] = style[property]
     }
     result[key] = value
+    if (key === 'sidebar') {
+      const width = source.querySelector('.cm-footer-stack')?.getBoundingClientRect().width
+      if (width >= 180 && width <= 420) result.sidebarFooterWidth = width
+    }
   }
   return result
 }

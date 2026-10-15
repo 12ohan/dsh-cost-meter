@@ -1774,7 +1774,7 @@
       if (!balance || balance.status === 'off') return null
       if (balance.status === 'error') {
         return el(Tooltip, { label: [t('balanceQueryFailed', { message: balance.message || t('unknownError') }), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
-          el('div', { className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
+          el('div', { 'data-cm-display': 'balance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
             wide ? el(Fragment, null, t('balance'), ' ', el('span', { className: 'cm-num' }, t('queryFailed'))) : '⚠'))
       }
       const detail = [
@@ -1789,7 +1789,7 @@
         ...clickRefreshTipLines(t, refresh),
       ].join('; ')
       return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
-        el('div', { className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
+        el('div', { 'data-cm-display': 'balance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? el(Fragment, null, el('span', { className: 'cm-balance-name' }, t('balance'), rechargeLinkEl(t)), el('span', { className: 'cm-num cm-bal-amt' }, formatBalanceMoney(balance.totalBalance, state.config, balance.currency)), state.reconcile?.ok === false ? ' ⚠' : '') : el(WalletIcon, { size: 16 })))
     }
 
@@ -1820,7 +1820,7 @@
           el('span', { className: 'cm-bbox-pct cm-num cm-bal-amt' }, remaining)),
         el(BalanceBar, { segments, direction: barDirectionOf(config, 'balance') }))
       return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
-        el('div', { className: 'cm-bbox clickable' + (wide ? '' : ' rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
+        el('div', { 'data-cm-display': 'balance', className: 'cm-bbox clickable' + (wide ? '' : ' rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? body : el('div', { className: 'cm-bbox-rail cm-num' }, Math.round(segments.remainingPct) + '%')))
     }
 
@@ -2248,7 +2248,7 @@
         ? t('nextPeakIn', { time: countdownText(view, now, t) })
         : t('nextOffPeakIn', { time: countdownText(view, now, t) })
       return el(Tooltip, { label: t(keys.notice), side: 'right', delayMs: 300 },
-        el('div', { className: 'cm-peak-strip ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off') },
+        el('div', { 'data-cm-display': 'peak', className: 'cm-peak-strip ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off') },
           el('div', { className: 'cm-peak-track' },
             el('div', { className: 'cm-peak-segment cm-peak-high' }),
             el('div', { className: 'cm-peak-segment cm-peak-low' }),
@@ -2271,7 +2271,7 @@
         ? t('nextPeakIn', { time: countdownText(view, now, t) })
         : t('nextOffPeakIn', { time: countdownText(view, now, t) })
       return el(Tooltip, { label: t(keys.notice), side: 'right', delayMs: 300 },
-        el('div', { className: 'cm-peak-classic ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off') },
+        el('div', { 'data-cm-display': 'peak', className: 'cm-peak-classic ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off') },
           el('div', { className: 'cm-peak-classic-marker', style: { left: view.weekend || view.holiday ? '50%' : view.inPeak ? '25%' : '75%' } }),
           el('div', { className: 'cm-peak-track' },
             el('div', { className: 'cm-peak-segment cm-peak-high' }),
@@ -2362,7 +2362,7 @@
           detail
             ? el(Fragment, null,
               // 今日金额行受 hideTodayCost 门控(issue #46);金额为真金白银口径(issue #64)。
-              config.hideTodayCost === true ? null : el('div', { className: 'cm-bbox-line cm-num' },
+              config.hideTodayCost === true ? null : el('div', { 'data-cm-display': 'today', className: 'cm-bbox-line cm-num' },
                 config.sidebarTodayMetric === 'tokens'
                   ? t('today') + ' ' + sidebarTodayValue(today, config, t)
                   : t('todayShare', {
@@ -2428,7 +2428,7 @@
         t('goQuotaFetchedAt', { time: goQuota.fetchedAt > 0 ? new Date(goQuota.fetchedAt).toLocaleTimeString() : '—' }),
       ].join('; ')
       return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
-        el('div', { className: 'cm-bbox' + (view.level === 'ok' ? '' : ' ' + view.level) + (wide ? '' : ' rail') },
+        el('div', { 'data-cm-display': 'go', className: 'cm-bbox' + (view.level === 'ok' ? '' : ' ' + view.level) + (wide ? '' : ' rail') },
           wide ? view.body : el('div', { className: 'cm-bbox-rail cm-num' }, view.rail)))
     }
 
@@ -2640,8 +2640,8 @@
       const { state, wide } = props
       const t = makeT(resolveLocale(state.config))
       const enabled = state.config?.codexQuotaEnabled === true && state.config?.codexQuotaSidebar !== false
-      const snap = useCodexQuota(enabled)
-      const refresh = useClickRefresh(() => fetchCodexQuota(true, enabled))
+      const snap = useCodexQuota(enabled && !props.preview)
+      const refresh = useClickRefresh(props.preview ? null : () => fetchCodexQuota(true, enabled))
       if (!enabled || snap.status !== 'ok') return null
       const win = snap.windows.weekly ?? null
       if (win === null) return null
@@ -3190,12 +3190,12 @@
           }),
         ].join('; ')
         if (props.summary === true) return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
-          el('div', { className: 'cm-simple-summary' + (level === 'ok' ? '' : ' ' + level), tabIndex: 0 },
+          el('div', { 'data-cm-display': 'budget', className: 'cm-simple-summary' + (level === 'ok' ? '' : ' ' + level), tabIndex: 0 },
             el('span', null, t('todayBudget', { period: t(PERIOD_KEYS[budget.period] ?? 'periodMonth') })),
             el('span', { className: 'cm-num' }, todayValue + ' / ' + formatMoneyValue(amount, config))))
         const view = budgetBoxBody(state, config, t)
         return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
-          el('div', { className: 'cm-bbox' + (level === 'ok' ? '' : ' ' + level) + (wide ? '' : ' rail') },
+          el('div', { 'data-cm-display': 'budget', className: 'cm-bbox' + (level === 'ok' ? '' : ' ' + level) + (wide ? '' : ' rail') },
             wide ? view.body : el('div', { className: 'cm-bbox-rail cm-num' }, view.rail)))
       }
 
@@ -3212,7 +3212,7 @@
       ].join('; ')
       return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
         el(Fragment, null,
-          el('div', { className: 'cm-foot' + (wide ? '' : ' cm-foot-rail') },
+          el('div', { 'data-cm-display': 'today', className: 'cm-foot' + (wide ? '' : ' cm-foot-rail') },
             wide ? el(Fragment, null, t('today'), ' ', el('span', { className: 'cm-num' }, todayValue)) : el(WalletIcon, { size: 16 })),
           wide ? peakNoticeEl(state, config, t) : null))
     }
@@ -3228,8 +3228,11 @@
       }
       useProjectionRefresh(props, projectionUsage)
       const state = costStore?.state
-      const wide = !!props.wide
-      if (!state) return null
+      return state ? renderSidebarFooter(state, !!props.wide, props.api) : null
+    }
+
+    // Shared presentation only: no store, projection or quota subscription.
+    function renderSidebarFooter(state, wide, api, preview = false) {
       const config = state.config
       const t = makeT(resolveLocale(config))
       const showBalance = (config.balance?.display === 'sidebar' || config.balance?.display === 'both')
@@ -3259,7 +3262,7 @@
         })
       const plansOn = sidebarPlanIds.length > 0
       // 网关额度侧边栏卡片(issue #96):按来源 display 门控,卡片本体见 GatewayQuotaBox。
-      const gatewayNodes = gatewaySidebarCards(state, config, wide, props.api)
+      const gatewayNodes = gatewaySidebarCards(state, config, wide, api)
       // Codex 周额度(issue #59):客户端探测 dsh-codex-connect,ok 时并入侧边栏;
       // 其余显示全关时也要为它保留渲染入口(模块装载即有被动探测,快照同步读)。
       const codexOn = config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false && codexQuotaCache.status === 'ok'
@@ -3275,18 +3278,18 @@
       const mergedBudget = simple && wide && showToday && budgetOn
       const nodes = []
       if (mergedBudget) nodes.push(el(BudgetBoxContent, { state, wide, summary: true }))
-      else if (simple && wide && showToday) nodes.push(el('div', { className: 'cm-simple-summary' },
+      else if (simple && wide && showToday) nodes.push(el('div', { 'data-cm-display': 'today', className: 'cm-simple-summary' },
         el('span', null, t('today')), el('span', { className: 'cm-num' }, sidebarTodayValue(state.today, config, t))))
-      if (showBalanceBar) nodes.push(el(BalanceBox, { state, wide, api: props.api }))
-      else if (showBalance) nodes.push(el(BalanceRowContent, { state, wide, api: props.api }))
-      if (showCustomBalanceBar) nodes.push(el(CustomBalanceBox, { state, wide, api: props.api }))
-      else if (showCustomBalance) nodes.push(el(CustomBalanceRowContent, { state, wide, api: props.api }))
+      if (showBalanceBar) nodes.push(el(BalanceBox, { state, wide, api: api }))
+      else if (showBalance) nodes.push(el(BalanceRowContent, { state, wide, api: api }))
+      if (showCustomBalanceBar) nodes.push(el(CustomBalanceBox, { state, wide, api: api }))
+      else if (showCustomBalance) nodes.push(el(CustomBalanceRowContent, { state, wide, api: api }))
       const afterBalance = nodes.length
       if (plansOn) nodes.push(...sidebarPlanIds.map(id => id === 'minimax'
-        ? el(MiniMaxPlanBox, { state, wide, api: props.api })
-        : el(CodingPlanBox, { id, state, wide, api: props.api })))
+        ? el(MiniMaxPlanBox, { state, wide, api: api })
+        : el(CodingPlanBox, { id, state, wide, api: api })))
       nodes.push(...gatewayNodes)
-      if (codexOn) nodes.push(el(CodexPlanBox, { state, wide, api: props.api }))
+      if (codexOn) nodes.push(el(CodexPlanBox, { state, wide, api, preview }))
       if (goOk && budgetOn && wide && !simple) {
         // 同时出现:合并为一张卡片(Go 在上、预算在下,细分隔线),各自保留预警色与自己的详细信息开关。
         const goView = goBoxBody(state, config, t)
@@ -3294,9 +3297,9 @@
         const level = goView.level === 'over' || budgetView.level === 'over' ? 'over'
           : goView.level === 'warn' || budgetView.level === 'warn' ? 'warn' : 'ok'
         nodes.push(el('div', { className: 'cm-bbox cm-bbox-pair' + (level === 'ok' ? '' : ' ' + level) },
-          el('div', { className: 'cm-bbox-section' + (goView.level === 'ok' ? '' : ' ' + goView.level) }, goView.body),
+          el('div', { 'data-cm-display': 'go', className: 'cm-bbox-section' + (goView.level === 'ok' ? '' : ' ' + goView.level) }, goView.body),
           el('div', { className: 'cm-bbox-divider' }),
-          el('div', { className: 'cm-bbox-section' + (budgetView.level === 'ok' ? '' : ' ' + budgetView.level) }, budgetView.body)))
+          el('div', { 'data-cm-display': 'budget', className: 'cm-bbox-section' + (budgetView.level === 'ok' ? '' : ' ' + budgetView.level) }, budgetView.body)))
       } else {
         if (goOk) nodes.push(el(GoQuotaBox, { state, wide }))
         if (budgetOn && !mergedBudget) nodes.push(el(BudgetBoxContent, { state, wide }))
@@ -3307,6 +3310,6 @@
       // 收起(rail)态:无论预算/Go 额度开关状态,统一在图框下方追加竖向峰谷进度条(受 peakNotice 等门控,内部自行返回 null)。
       if (!wide) nodes.push(peakNoticeRailEl(state, config, t))
       if (modelsOn) nodes.splice(config.sidebarModels.position === 'first' ? 0 : config.sidebarModels.position === 'afterBalance' ? afterBalance : nodes.length, 0,
-        el(SidebarModelCosts, { key: 'models', state, wide }))
+        el(SidebarModelCosts, { key: 'models', state, wide, preview }))
       return el('div', { ...(simple ? { tabIndex: 0, role: 'region', 'aria-label': t('sidebarSimple') } : {}), className: 'cm-footer-stack' + (wide ? '' : ' rail') + (compactWide ? ' compact' : '') + (simple ? ' simple' : '') }, ...nodes)
     }

@@ -2155,25 +2155,19 @@
           : null,
         // 显示设置：独立加载的交互预览，共用草稿与自动保存。
         el(BillingStatistics, { state, api, load: api.loadDisplay, draft, setDraft, t, locale,
-          numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, onNavigate: setTab,
-          renderBudget: preview => budgetBoxBody({ today: { cost: 1.28 }, month: { cost: 32 }, total: { cost: 32 }, budgetUsed: 32 }, preview, t).body,
-          renderBalance: preview => el(preview.balance?.showProgressBar ? BalanceBox : BalanceRowContent, {
-            state: { config: preview, balance: { status: 'ok', currency: 'CNY', totalBalance: 68, grantedBalance: 0, toppedUpBalance: 68, fetchedAt: 0 } }, wide: true }),
-          renderGo: preview => el(GoQuotaBox, { state: { config: preview, goQuota: { status: 'ok', rolling: { percent: 24 }, weekly: { percent: 18 }, monthly: { percent: 12 } } }, wide: true }),
-          renderPeak: preview => peakNoticeEl({}, preview, t) }),
-          el('details', { className: 'cm-display-model-options' }, el('summary', null, t('modelsTitle')), el(ModelSidebarSettings, { draft, setDraft, t })),
-        // 顶栏:界面语言
-        el('div', { className: 'cm-toolbar' },
-          el('div', { className: 'cm-field' },
-            el('label', null, t('languageLabel')),
-            el('select', {
-              className: 'cm-input',
-              value: draft?.locale ?? 'auto',
-              onChange: event => setField('locale', event.target.value),
-            },
-              el('option', { value: 'auto' }, t('localeAuto')),
-              el('option', { value: 'zh' }, t('localeZh')),
-              el('option', { value: 'en' }, t('localeEn'))))))
+          numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, formatMoneyUsd, onNavigate: setTab,
+          renderSidebar: preview => renderSidebarFooter({ ...state, config: preview }, true, undefined, true),
+          renderStyleSample: preview => {
+            const simple = preview.sidebarSimple === true
+            const sampleConfig = { ...preview, peakNotice: false, hideBudget: false, hideTodayCost: false,
+              budget: { ...preview.budget, enabled: true, amount: Number(preview.budget?.amount) > 0 ? preview.budget.amount : 100 } }
+            const sampleState = { ...state, config: sampleConfig }
+            const windows = miniMaxWindowsOf(state.codingPlans?.minimax?.windows ?? {})
+            return el('div', { className: 'cm-footer-stack' + (simple ? ' simple' : preview.sidebarStyle === 'compact' ? ' compact' : '') },
+              el(BudgetBoxContent, { state: sampleState, wide: true, summary: simple }),
+              el(MiniMaxPlanCard, { five: windows.five ?? { percent: 24 }, seven: windows.seven ?? { percent: 18 }, fetchedAt: 0, t, wide: true, direction: barDirectionOf(preview, 'plan') }))
+          },
+          renderModelsSettings: () => el(ModelSidebarSettings, { draft, setDraft, t }) }))
         : null,
         // ── 价格:峰谷计价、价格表、模型名匹配、官方价格同步、OpenRouter 公开报价 ──
         tab === 'pricing' ? el(Fragment, { key: 'pricing' },

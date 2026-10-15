@@ -15,11 +15,11 @@ const { chromium } = req('playwright-core')
 const executablePath = process.env.CM_TEST_BROWSER ?? ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', '/usr/bin/google-chrome', '/usr/bin/chromium'].find(existsSync)
 const output = resolve('.tmp-display-review'); mkdirSync(output, { recursive: true })
 let saved = sanitizeConfig({ locale: 'zh', exchangeRate: 1, currency: 'CNY', symbol: '¥', sidebarSimple: false, budget: { enabled: true, amount: 100 },
-  goQuota: { enabled: false }, quotaStrip: { enabled: true, budget: true, go: false, plans: true }, peakEnabled: true, peakNotice: true, position: 'off' })
+  sidebarModels: { enabled: true }, goQuota: { enabled: false }, quotaStrip: { enabled: true, budget: true, go: false, plans: true }, peakEnabled: true, peakNotice: true, position: 'off' })
 const client = readdirSync('src/client').filter(n => n.endsWith('.js')).sort().map(n => readFileSync('src/client/' + n, 'utf8')).join('')
   .replace('exports.apply = apply', 'exports.preview = { CostSection, parseConfig, SidebarFooter }; exports.apply = apply')
 const day = { ...zeroDay(), cost: 1.28, apiCost: 1.28 }
-const state = { config: saved, today: day, month: day, total: day, history: [], balance: { status: 'off' }, codingPlans: {}, budgetUsed: 32 }
+const state = { config: saved, today: day, month: day, total: day, history: [], balance: { status: 'error', message: 'Synthetic balance error' }, codingPlans: {}, budgetUsed: 32 }
 const code = `
 import React from ${literal(req.resolve('react'))};import{createRoot}from ${literal(req.resolve('react-dom/client'))};
 const h=React.createElement;
@@ -36,7 +36,7 @@ const api={loadDisplay:async()=>Display,loadCommunity:async()=>()=>null,loadStat
   if(window.failSave)throw Error('synthetic save failure');const config=await window.saveConfig(patch);window.patches.push(patch);state={...state,config:parseConfig(config,'config')};return publish()}};
 function useCost(){const[value,setValue]=React.useState(state);React.useEffect(()=>{window.listeners.add(setValue);return()=>window.listeners.delete(setValue)},[]);return{state:value,status:'ready'}}
 window.attachFixtureSidebar=container=>createRoot(container).render(h(SidebarFooter,{useCost,api,wide:true}));
-function App(){return h(React.Fragment,null,h(CostSection,{useCost,api}),h('div',{id:'actual-sidebar',hidden:true},h(SidebarFooter,{useCost,api,wide:true})))}
+function App(){return h(React.Fragment,null,h(CostSection,{useCost,api}),h('div',{id:'actual-sidebar',style:{position:'fixed',left:-2000,width:352,fontSize:14,lineHeight:1.6}},h(SidebarFooter,{useCost,api,wide:true})))}
 const root=createRoot(document.getElementById('root'));window.remount=()=>root.render(h(App,{key:++window.mounts}));window.remount();
 `
 const compiled = await build({ stdin: { contents: code, resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'iife', platform: 'browser' })
@@ -54,6 +54,7 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
 const url = `http://127.0.0.1:${server.address().port}/`
 const browser = await chromium.launch({ executablePath, headless: true })
 const page = await browser.newPage({ viewport: { width: 1100, height: 1000 } })
+page.setDefaultTimeout(15000)
 const errors = [], external = []
 page.on('pageerror', error => errors.push(String(error)))
 await page.route('**/*', route => {
@@ -69,41 +70,68 @@ try {
   await page.goto(url)
   await page.evaluate(()=>{
     const host=document.createElement('div');host.id='host-fixture';host.style.cssText='position:absolute;top:5000px;height:1px;contain:strict;overflow:hidden'
-    const sidebar=document.createElement('aside');sidebar.className='_2H3hWW_root';sidebar.style.cssText='background:rgb(238,243,248);border-radius:19px'
+    const sidebar=document.createElement('aside');sidebar.className='_2H3hWW_root';sidebar.style.cssText='background:rgb(238,243,248);border-radius:19px;width:324px'
     const composer=document.createElement('div');composer.className='RlGAzG_card';composer.style.cssText='background:rgb(244,248,252);border-radius:31px'
     const history=document.createElement('div');history.id='long-conversation'
     const fragment=document.createDocumentFragment()
     for(let i=0;i<20000;i++){const n=document.createElement('span');n.textContent='Long conversation '+i;fragment.appendChild(n)}
-    history.appendChild(fragment);host.append(sidebar,composer,history);document.body.appendChild(host)
-    window.outsideStyleReads=0;window.historyReads=0;window.historyClones=0;window.previewObservers=0
+    history.appendChild(fragment);host.append(sidebar,composer,history);document.body.appendChild(host);window.attachFixtureSidebar(sidebar)
+    window.outsideStyleReads=0;window.historyReads=0;window.historyClones=0;window.previewObservers=0;window.previewResizeObservers=0
     const read=window.getComputedStyle;window.getComputedStyle=(node,...args)=>{if(node.closest?.('#host-fixture'))window.outsideStyleReads++;if(node.closest?.('#long-conversation'))window.historyReads++;return read(node,...args)}
     const clone=Node.prototype.cloneNode;Node.prototype.cloneNode=function(...args){if(this.closest?.('#host-fixture'))window.historyClones++;return clone.apply(this,args)}
+    const Resize=window.ResizeObserver;window.ResizeObserver=class extends Resize{active=false;observe(...args){if(!this.active){window.previewResizeObservers++;this.active=true}return super.observe(...args)}disconnect(){if(this.active){window.previewResizeObservers--;this.active=false}return super.disconnect()}}
     const Observe=window.MutationObserver
     window.MutationObserver=class extends Observe{active=false;observe(...args){if(args[1]?.attributeFilter?.includes('data-theme')&&!this.active){window.previewObservers++;this.active=true}return super.observe(...args)}disconnect(){if(this.active){window.previewObservers--;this.active=false}return super.disconnect()}}
   })
   await page.getByRole('tab',{name:'显示',exact:true}).click();await page.locator('.cm-display').waitFor()
   const region=async name=>page.getByRole('tab',{name,exact:true}).click()
   const item=key=>page.locator('.cm-preview [data-display="'+key+'"]')
-  const selectStyle=async label=>{await page.locator('.cm-preview-style-trigger').click();await page.getByRole('button',{name:label,exact:true}).click();await page.keyboard.press('Escape')}
-  assert.equal(await page.locator('.cm-display-model-options').evaluate(n=>n.open),false,'model options start collapsed below the preview')
-  assert.equal(await page.locator('.cm-display-details').evaluate(n=>n.open),false)
+  const selectStyle=async label=>page.getByRole('button',{name:label,exact:true}).click()
+  const customize=async key=>{await item(key).first().click({position:{x:8,y:8}});await page.locator('[data-inspector="'+key+'"]').waitFor()}
+  const toggle=async key=>{await customize(key);await page.getByRole('checkbox',{name:'显示此组件',exact:true}).click()}
+  assert.equal(await page.locator('.cm-display-model-options,.cm-display-details').count(),0,'options live in the inspector instead of folded forms')
   assert.equal(await page.locator('iframe,.cm-native-desktop,.cm-preview-reference').count(),0,'no desktop copy or scaled reference')
   await page.waitForFunction(()=>document.querySelector('.cm-preview-sidebar').style.backgroundColor==='rgb(238, 243, 248)')
   assert.equal(await page.locator('.cm-preview-sidebar').evaluate(n=>getComputedStyle(n).borderRadius),'19px','current skin surface is reused')
-  assert.ok(await page.locator('.cm-preview').evaluate(n=>parseFloat(getComputedStyle(n).fontSize)>=14),'preview uses readable normal-size text')
-  await item('balance').click();await page.waitForFunction(()=>window.current().hideOfficialBalance===true)
-  assert.ok(await item('balance').locator('.cm-display-item-content').evaluate(n=>Number(getComputedStyle(n).opacity)<.6))
-  await item('balance').focus();await page.keyboard.press('Space');await page.waitForFunction(()=>window.current().hideOfficialBalance===false)
-  await item('budget').click();await page.waitForFunction(()=>window.current().hideBudget===true);assert.equal(saved.budget.enabled,true)
-  await item('budget').click();await page.waitForFunction(()=>window.current().hideBudget===false)
-  await item('peak').click();await page.waitForFunction(()=>window.current().peakNotice===false);assert.equal(saved.peakEnabled,true)
-  await selectStyle('简洁');await page.waitForFunction(()=>window.current().sidebarSimple===true)
+  assert.equal(await page.locator('.cm-sidebar-live').evaluate(n=>Math.round(n.getBoundingClientRect().width)),324,'preview follows the actual footer width')
+  const previews=page.locator('.cm-style-thumbnail')
+  assert.equal(await previews.count(),3)
+  for(const preview of await previews.all()) assert.equal(await preview.locator('.cm-mm-row .cm-bbox-bar').count(),2,'each style preview uses real quota progress rows')
+  const progressRows=await page.evaluate(()=>['standard','compact'].map(mode=>[...document.querySelectorAll('.cm-style-thumbnail .cm-footer-stack'+(mode==='compact'?'.compact':':not(.simple):not(.compact)')+' .cm-mm-row')].map(n=>n.getBoundingClientRect().y)))
+  assert.ok(progressRows[0][1]>progressRows[0][0],'standard rows stack vertically')
+  assert.ok(Math.abs(progressRows[1][1]-progressRows[1][0])<1,'compact rows sit side by side')
+  assert.ok(await page.locator('.cm-preview').evaluate(n=>parseFloat(getComputedStyle(n).fontSize)>=14))
+  // Compare actual card DOM and geometry at equal width in all three modes.
+  const parity=async()=>{
+    await page.evaluate(()=>{document.getElementById('actual-sidebar').style.width=document.querySelector('.cm-sidebar-live').getBoundingClientRect().width+'px'})
+    const values=await page.evaluate(()=>{
+      const snapshot=root=>{const host=root.getBoundingClientRect();return [...root.querySelectorAll('.cm-footer-stack > *,[data-cm-display],.cm-bbox-head,.cm-bbox-line,.cm-bbox-bar')].map(n=>{const r=n.getBoundingClientRect();return{class:n.className,text:n.textContent,x:Math.round(r.x-host.x),y:Math.round(r.y-host.y),w:Math.round(r.width),h:Math.round(r.height)}})}
+      return[snapshot(document.querySelector('.cm-sidebar-live')),snapshot(document.getElementById('actual-sidebar'))]
+    })
+    assert.deepEqual(values[0],values[1],'preview and real sidebar share exact card layout')
+  }
+  for(const mode of ['标准','紧凑','简洁']){await selectStyle(mode);await page.waitForTimeout(650);await parity()}
   await selectStyle('紧凑');await page.waitForFunction(()=>window.current().sidebarStyle==='compact'&&!window.current().sidebarSimple)
-  await selectStyle('分段');await page.waitForFunction(()=>window.current().peakStyle==='classic')
-  await region('输入区');await item('strip-go').click();await page.waitForFunction(()=>window.current().quotaStrip.go===true);assert.equal(saved.goQuota.enabled,false)
+  assert.equal(await item('budget').evaluate(n=>getComputedStyle(n).borderTopStyle),'dashed')
+  const positions=await page.evaluate(()=>[document.querySelector('.cm-preview-sidebar').getBoundingClientRect().right,document.querySelector('.cm-display-inspector').getBoundingClientRect().left])
+  assert.ok(positions[1]>positions[0],'style controls are on the right')
+  await toggle('balance');await page.waitForFunction(()=>window.current().hideOfficialBalance===true)
+  assert.equal(await page.locator('.cm-sidebar-live [data-cm-display=balance]').count(),0)
+  await toggle('balance');await page.waitForFunction(()=>window.current().hideOfficialBalance===false)
+  await toggle('budget');await page.waitForFunction(()=>window.current().hideBudget===true);assert.equal(saved.budget.enabled,true)
+  await toggle('budget');await page.waitForFunction(()=>window.current().hideBudget===false)
+  await customize('budget');await page.getByRole('checkbox',{name:'显示今日用量',exact:true}).uncheck();await page.waitForFunction(()=>window.current().hideTodayCost===true)
+  await page.getByRole('checkbox',{name:'显示今日用量',exact:true}).check();await page.waitForFunction(()=>window.current().hideTodayCost===false)
+  await customize('models');await page.getByRole('checkbox',{name:'默认展开',exact:true}).check();await page.waitForFunction(()=>window.current().sidebarModels.defaultOpen)
+  assert.equal(await page.locator('.cm-sidebar-live .cm-collapse-h').getAttribute('aria-expanded'),'true')
+  await page.locator('.cm-display').screenshot({path:join(output,'models-inspector.png')})
+  await page.getByRole('checkbox',{name:'默认展开',exact:true}).uncheck();await page.waitForFunction(()=>!window.current().sidebarModels.defaultOpen)
+  await customize('peak');await selectStyle('分段');await page.waitForFunction(()=>window.current().peakStyle==='classic')
+  await toggle('peak');await page.waitForFunction(()=>window.current().peakNotice===false);assert.equal(saved.peakEnabled,true)
+  await region('输入区');await toggle('strip-go');await page.waitForFunction(()=>window.current().quotaStrip.go===true);assert.equal(saved.goQuota.enabled,false)
   await page.waitForFunction(()=>document.querySelector('.cm-native-input-card').style.borderRadius==='31px')
-  await item('session-dock').click();await item('badge').click();await page.waitForFunction(()=>window.current().hideSessionCostDock&&window.current().position==='dock')
-  await region('会话内容');await item('turn').click();await item('session-header').click();await page.waitForFunction(()=>window.current().hideTurnCost&&window.current().hideSessionCostHeader)
+  await toggle('session-dock');await toggle('badge');await page.waitForFunction(()=>window.current().hideSessionCostDock&&window.current().position==='dock')
+  await region('会话内容');await toggle('turn');await toggle('session-header');await page.waitForFunction(()=>window.current().hideTurnCost&&window.current().hideSessionCostHeader)
   for(const theme of ['light','dark']){
     await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.querySelector('._2H3hWW_root').style.backgroundColor=theme==='dark'?'rgb(37,39,43)':'rgb(238,243,248)'},theme)
     for(const width of [1100,720,390]){
@@ -113,15 +141,11 @@ try {
         assert.equal(await page.locator('.cm-preview').evaluate(n=>n.scrollWidth>n.clientWidth+2),false,'preview fits '+theme+'/'+width+'/'+name)
         await page.locator('.cm-display').screenshot({path:join(output,theme+'-'+width+'-'+name+'.png')})
       }
-      await region('侧栏');await page.locator('.cm-preview-style-trigger').click()
-      const r=await page.locator('.cm-preview-style-panel').boundingBox();assert.ok(r.x>=0&&r.x+r.width<=width,'style picker stays on screen')
-      await page.keyboard.press('Escape')
+
     }
   }
   await page.setViewportSize({width:1100,height:1000});await page.evaluate(()=>document.documentElement.dataset.theme='light')
   await page.getByRole('button',{name:'放大预览',exact:true}).click();await page.locator('.cm-display-dialog[open]').waitFor()
-  await page.locator('.cm-preview-style-trigger').click();await page.keyboard.press('Escape')
-  assert.equal(await page.locator('.cm-display-dialog[open]').count(),1)
   await page.keyboard.press('Escape');assert.equal(await page.locator('.cm-display-dialog[open]').count(),0)
   assert.equal(await page.getByRole('button',{name:'放大预览',exact:true}).evaluate(n=>n===document.activeElement),true)
   // Reopening with a long real page must not scan its contents or accumulate observers.
@@ -131,11 +155,11 @@ try {
   for(let i=0;i<25;i++){
     await page.getByRole('tab',{name:'概览',exact:true}).click()
     await page.locator('.cm-display').waitFor({state:'detached'})
-    await page.waitForFunction(()=>window.previewObservers===0)
+    await page.waitForFunction(()=>window.previewObservers===0&&window.previewResizeObservers===0)
     assert.equal(await page.evaluate(()=>window.previewObservers),0,'preview observer is cleaned on close')
     const duration=await page.evaluate(async()=>{const start=performance.now();[...document.querySelectorAll('[role=tab]')].find(n=>n.textContent==='显示').click();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return performance.now()-start})
     await page.locator('.cm-preview').waitFor();timings.push(duration)
-    assert.equal(await page.evaluate(()=>window.previewObservers),1,'only one small theme observer exists')
+    assert.equal(await page.evaluate(()=>window.previewObservers),1,'only one small theme observer exists');assert.equal(await page.evaluate(()=>window.previewResizeObservers),1,'one local preview resize observer')
   }
   await session.send('Emulation.setCPUThrottlingRate',{rate:1})
   const metrics=await page.evaluate(()=>({styleReads:window.outsideStyleReads,historyReads:window.historyReads,historyClones:window.historyClones,previewNodes:document.querySelector('.cm-display').querySelectorAll('*').length}))
@@ -144,9 +168,9 @@ try {
   assert.ok(metrics.previewNodes<1000,'bounded preview subtree')
   const sorted=[...timings].sort((a,b)=>a-b),p95=sorted[Math.ceil(sorted.length*.95)-1]
   assert.ok(p95<1000,'opening stays responsive under 4x CPU throttle: '+p95)
-  await region('会话内容');assert.equal(await item('turn').getAttribute('aria-pressed'),'false','saved toggles survive repeated reopening')
-  await page.locator('.cm-toolbar select').selectOption('en');await page.waitForFunction(()=>window.current().locale==='en')
-  await region('Sidebar');await page.evaluate(()=>window.failSave=true);await item('balance').click();await page.getByText(/synthetic save failure/).waitFor()
+  await region('会话内容');assert.equal(await item('turn').getAttribute('data-visible'),'false','saved toggles survive repeated reopening')
+  await page.getByLabel('界面语言',{exact:true}).selectOption('en');await page.waitForFunction(()=>window.current().locale==='en')
+  await region('Sidebar');await page.evaluate(()=>window.failSave=true);await customize('balance');await page.getByRole('checkbox',{name:'Show this component',exact:true}).click();await page.getByText(/synthetic save failure/).waitFor()
   assert.deepEqual(errors,[]);assert.deepEqual(external,[])
   const result={themes:2,widths:[1100,720,390],regions:3,normalFontSize:true,skinSurfaces:true,autosave:true,keyboard:true,reopenCount:25,hostConversationNodes:20000,cpuThrottle:4,openMedianMs:Math.round(sorted[Math.floor(sorted.length/2)]),openP95Ms:Math.round(p95),...metrics,externalRequests:external.length,browserErrors:errors.length}
   writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log('[ok] '+JSON.stringify(result))
