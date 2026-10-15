@@ -108,7 +108,7 @@ try {
     }
   }
   const select = page.locator('.cm-mstats-row select').first()
-  assert.equal(await select.locator('option[value^="plan:"]').count(), 13, 'each supported subscription family is selectable')
+  assert.equal(await select.locator('option[value^="plan:"]').count(), 18, 'each supported subscription family is selectable')
   await select.selectOption('plan:volcengine')
   await page.waitForFunction(() => window.patches.length === 1)
   assert.deepEqual(await page.evaluate(() => window.patches[0]), { planBilling: { ...initialState.config.planBilling, models: { [longKey]: 'plan' }, modelPlans: { [longKey]: 'volcengine' } } })
@@ -122,6 +122,12 @@ try {
   await select.selectOption('auto')
   await page.waitForFunction(() => window.patches.length === 4)
   assert.deepEqual(await page.evaluate(() => window.patches[3]), { planBilling: { ...initialState.config.planBilling, models: {}, modelPlans: {} } })
+  for (const [i, id] of ['codex', 'volcengine-agent', 'tencent-coding', 'tencent-token', 'baidu-coding'].entries()) {
+    await select.selectOption('plan:' + id)
+    await page.waitForFunction(count => window.patches.length === count, 5 + i)
+    assert.equal(await select.inputValue(), 'plan:' + id)
+    assert.deepEqual(await page.evaluate(() => window.patches.at(-1)), { planBilling: { ...initialState.config.planBilling, models: { [longKey]: 'plan' }, modelPlans: { [longKey]: id } } })
+  }
   assert.deepEqual(external, [])
   assert.deepEqual(errors, [])
   writeFileSync(join(output, 'report.json'), JSON.stringify({ checks, errors, external, billingChangesSaved: true }, null, 2) + '\n')
