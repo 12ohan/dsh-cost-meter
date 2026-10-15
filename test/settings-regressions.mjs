@@ -10,10 +10,11 @@ import { stateSchema } from '../lib/typert.host.js'
 const dir = new URL('../src/client/', import.meta.url)
 const source = readdirSync(dir).filter(name => name.endsWith('.js')).sort().map(name => readFileSync(new URL(name, dir), 'utf8')).join('')
 const code = source.replace('exports.apply = apply', 'exports.test = { PlanQuotaCard, CostSection, parseConfig, makeT, codingPlanWindowLabel }; exports.apply = apply')
-let active, pricing
+let active, pricing, display
 const react = {
   createElement: (type, props, ...children) => type?.name === 'BillingStatistics' && props?.mode === 'matching'
-    ? pricing.Matching(props) : ({ type, props: props ?? {}, children: children.flat(Infinity) }),
+    ? pricing.Matching(props) : type?.name === 'BillingStatistics' && props?.displayOptions
+      ? display.DetailedSettings(props) : ({ type, props: props ?? {}, children: children.flat(Infinity) }),
   Fragment: 'fragment',
   useState: initial => {
     const runner = active, i = runner.cursor++
@@ -48,6 +49,11 @@ vm.runInNewContext(readFileSync(new URL('../src/pricing/index.js', import.meta.u
   window: { __ModuleLoader__: { load: value => { factory = value.factory } } },
 })
 pricing = factory(name => name === 'react' ? react : {})
+const displaySource = readFileSync(new URL('../src/display/index.js', import.meta.url), 'utf8')
+  .replace('/* DISPLAY_NATIVE_SOURCE */', readFileSync(new URL('../src/display/native.js', import.meta.url), 'utf8'))
+  .replace('return { mount, DisplaySettings }', 'return { DetailedSettings }')
+vm.runInNewContext(displaySource, { window: { __ModuleLoader__: { load: value => { factory = value.factory } } } })
+display = factory(name => name === 'react' ? react : {})
 function renderer(component, props) {
   const runner = { slots: [], cursor: 0, effects: [], dirty: false }
   return () => {

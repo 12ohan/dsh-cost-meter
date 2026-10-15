@@ -133,6 +133,7 @@
         // 会话列表附显 ID 自上线以来实际从未生效(v1.5.38 起一并修复)。
         showSessionId: v.showSessionId === true,
         hideOfficialBalance: v.hideOfficialBalance === true,
+        hideBudget: v.hideBudget === true,
         hideTodayCost: v.hideTodayCost === true,
         ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost'], value => value === true),
         sessionCostCompact: v.sessionCostCompact === true,
@@ -3150,7 +3151,7 @@
       const pct = amount > 0 ? Math.min(999, used / amount * 100) : null
       const level = pct === null ? 'ok' : pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok'
 
-      if (budget.enabled === true) {
+      if (budget.enabled === true && config.hideBudget !== true) {
         // 预算圆角方形图框(渲染在设置按钮上方、余额行下方)。
         const todayApi = displayCostOf(today, config)
         const todayUsed = todayApi * (Number.isFinite(rate) && rate > 0 ? rate : 1)
@@ -3243,7 +3244,7 @@
       // 其余显示全关时也要为它保留渲染入口(模块装载即有被动探测,快照同步读)。
       const codexOn = config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false && codexQuotaCache.status === 'ok'
         && codexQuotaCache.windows.weekly !== null
-      const budgetOn = (config.budget ?? {}).enabled === true
+      const budgetOn = (config.budget ?? {}).enabled === true && config.hideBudget !== true
       const showToday = config.sidebar !== false && config.hideTodayCost !== true
       const modelsOn = config.sidebarModels?.enabled === true
       if (!modelsOn && !showBalance && !showCustomBalance && !goOk && !plansOn && !codexOn && !budgetOn && !showToday && gatewayNodes.length === 0) return null

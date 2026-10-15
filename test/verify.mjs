@@ -131,12 +131,13 @@ function readClientSource() {
   assert.ok(parts.length > 0, 'src/client/ 源码片段缺失')
   return parts.map(name => readFileSync(new URL(name, dir), 'utf8').replace(/\r\n/g, '\n')).join('')
 }
+const displaySource = readFileSync(new URL('../src/display/index.js', import.meta.url), 'utf8')
 
 // 浏览器端 bundle 语法门禁(v1.5.23 教训):client.js 只在浏览器经 <script> 执行,
 // classic script 语法错误不触发 error 事件、宿主只报「loaded without registering」,
 // 而本套件此前只做字符串断言、从不解析该文件——语法错误一路溜到线上。
 // 这里用 vm.Script 整份编译(只编译不执行,window 引用无碍),任何语法错误当场失败。
-for (const browserBundle of ['../lib/client.js', '../lib/client.statistics.js', '../lib/client.openrouter.js', '../lib/client.community.js', '../lib/client.pricing.js']) {
+for (const browserBundle of ['../lib/client.js', '../lib/client.statistics.js', '../lib/client.openrouter.js', '../lib/client.community.js', '../lib/client.pricing.js', '../lib/client.display.js']) {
   const src = readFileSync(new URL(browserBundle, import.meta.url), 'utf8')
   new vm.Script(src, { filename: browserBundle })
 }
@@ -1296,6 +1297,13 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   const base = sanitizeConfig({})
   assert.equal(base.hideOfficialBalance, false, '隐藏官方余额默认关闭')
   assert.equal(base.hideTodayCost, false, '隐藏今日消耗默认关闭')
+  assert.equal(base.hideBudget, false, '旧配置默认显示预算卡片')
+  const hiddenBudget = applyConfigPatch(sanitizeConfig({ budget: { enabled: true, amount: 75 } }), { hideBudget: true })
+  assert.deepEqual(hiddenBudget.errors, [])
+  assert.equal(hiddenBudget.config.budget.enabled, true, '隐藏预算不关闭预算统计')
+  assert.equal(hiddenBudget.config.budget.amount, 75)
+  assert.equal(stateSchema.shape.config.parse(hiddenBudget.config).hideBudget, true)
+  assert.ok(applyConfigPatch(base, { hideBudget: 'yes' }).errors.length > 0)
   assert.equal(base.sidebarTodayMetric, 'cost', '侧边栏默认显示费用')
   assert.equal(applyConfigPatch(base, { sidebarTodayMetric: 'tokens' }).config.sidebarTodayMetric, 'tokens', '可切换显示 Token')
   assert.ok(applyConfigPatch(base, { sidebarTodayMetric: 'unknown' }).errors.length > 0, '未知显示方式被拒绝')
@@ -1322,12 +1330,12 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   assert.ok(clientSource.includes('config.hideTodayCost === true ? null : el(\'div\', { className: \'cm-bbox-line cm-num\' }'), '预算盒明细今日金额行可隐藏')
   assert.ok(clientSource.includes("...(config.hideTodayCost === true ? [] : [config.sidebarTodayMetric === 'tokens'"), '预算 tooltip 今日金额行可隐藏')
   // 设置开关与读侧白名单。
-  assert.ok(clientSource.includes("setField('hideOfficialBalance'"), '设置 UI 含隐藏官方余额开关')
-  assert.ok(clientSource.includes("setField('hideTodayCost'"), '设置 UI 含隐藏今日消耗开关')
+  assert.ok(displaySource.includes("setField('hideOfficialBalance'"), '独立显示页含隐藏官方余额开关')
+  assert.ok(displaySource.includes("setField('hideTodayCost'"), '独立显示页含隐藏今日消耗开关')
   assert.ok(clientSource.includes('hideOfficialBalanceLabel') && clientSource.includes('hideTodayCostLabel'), '开关文案存在(zh/en)')
   assert.ok(clientSource.includes('hideOfficialBalance: v.hideOfficialBalance === true'), 'parseConfig 白名单含 hideOfficialBalance(读侧不剥离)')
   assert.ok(clientSource.includes('hideTodayCost: v.hideTodayCost === true'), 'parseConfig 白名单含 hideTodayCost(读侧不剥离)')
-  assert.ok(clientSource.includes("sidebarTodayMetric: v.sidebarTodayMetric === 'tokens'") && clientSource.includes("setField('sidebarTodayMetric'"), '今日指标双端接线')
+  assert.ok(clientSource.includes("sidebarTodayMetric: v.sidebarTodayMetric === 'tokens'") && displaySource.includes("setField('sidebarTodayMetric'"), '今日指标双端接线')
   assert.ok(clientSource.includes('showSessionId: v.showSessionId === true'), 'parseConfig 白名单补齐 showSessionId(既有缺陷修复)')
   // v1.5.38 的隐私模式遮罩已整体移除。
   assert.ok(!clientSource.includes('hideAmounts'), '客户端不再含 hideAmounts 隐私遮罩')
@@ -3753,7 +3761,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   between("t('clearAllHistory')", branch.usage, branch.display, '清除全部历史按钮在用量标签')
   // 显示:语言 + 显示设置分组。
   between("t('languageLabel')", branch.display, branch.pricing, '语言选择在显示标签')
-  between("t('displaySettings')", branch.display, branch.pricing, '显示设置分组在显示标签')
+  between('load: api.loadDisplay', branch.display, branch.pricing, '交互预览在显示标签按需加载')
   // 价格:峰谷 + 价格表 + 匹配 + 拓展目录 + 官方同步。
   between('el(PeakPanel, { state, draft, setDraft, t })', branch.pricing, tabsSrc.length, '峰谷计价面板在价格标签')
   between("t('priceTableTitle')", branch.pricing, tabsSrc.length, '价格表在价格标签')

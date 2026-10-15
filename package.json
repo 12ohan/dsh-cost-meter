@@ -113,7 +113,9 @@
     "docs/cost-share-overview.png",
     "docs/call-detail-preview.png",
     "docs/step-billing-preview.png",
-    "docs/maintenance-review-2026-10-10.md"
+    "docs/maintenance-review-2026-10-10.md",
+    "THIRD_PARTY_NOTICES.md",
+    "docs/display-settings.md"
   ],
   "dependencies": {
     "zod": "4.6.5"
