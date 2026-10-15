@@ -1,12 +1,12 @@
 // Real footer markup, clipped and scaled only in the small style selector.
 // The editable scene itself always stays at its normal size.
-function SidebarStyleSample({ render, config, mode }) {
-  const sample = React.useMemo(() => render({ ...config, sidebarSimple: mode === 'simple', sidebarStyle: mode === 'compact' ? 'compact' : 'standard' }), [render, config, mode])
+function SidebarStyleSample({ render, config, mode, data, examples }) {
+  const sample = React.useMemo(() => render({ ...config, sidebarSimple: mode === 'simple', sidebarStyle: mode === 'compact' ? 'compact' : 'standard' }, data, examples), [render, config, mode, data, examples])
   return el('div', { className: 'cm-style-thumbnail', 'aria-hidden': true, inert: '' },
     el('div', { className: 'cm-style-thumbnail-content' }, sample))
 }
 
-function DisplayInspector({ props, config, set, selected, select, labels, registry, text, region, general = false }) {
+function DisplayInspector({ props, config, set, selected, select, labels, registry, text, region, general = false, examples, previewData }) {
   const { t, numInput, CURRENCY_PRESETS, displayOptions, USAGE_POSITION_SWITCHABLE } = props
   const nested = (key, patch) => set({ [key]: { ...config[key], ...patch } })
   const check = (label, value, change) => el('label', { className: 'cm-check', key: label },
@@ -24,11 +24,12 @@ function DisplayInspector({ props, config, set, selected, select, labels, regist
   const sessionControls = () => [
     choice(t('positionLabel'), config.position ?? 'dock', [['dock', t('positionDock')], ['header', t('positionHeader')], ['off', t('off')]], value => set({ position: value })),
     check(t('sessionCostCompact'), config.sessionCostCompact === true, value => set({ sessionCostCompact: value })),
+    el('p', { className: 'cm-inspector-note cm-inspector-help' }, text('悬停查看费用分项。', 'Hover to see the cost breakdown.')),
     check(t('showSessionIdLabel'), config.showSessionId === true, value => set({ showSessionId: value })),
     check(t('includeSubagentCost'), config.includeSubagentCost === true, value => set({ includeSubagentCost: value }))]
   let controls = []
   if (selected === 'budget') controls = [
-    config.budget?.enabled !== true ? el('p', { className: 'cm-inspector-note' }, text('先在“概览”中设置预算，启用后会在这里显示。', 'Set up a budget in Overview to show it here.')) : null,
+    config.budget?.enabled !== true && !examples ? el('p', { className: 'cm-inspector-note' }, text('先在“概览”中设置预算，启用后会在这里显示。', 'Set up a budget in Overview to show it here.')) : null,
     check(t('budgetDetailLabel'), config.budget?.detail !== false, value => nested('budget', { detail: value })), direction('budget'), ...todayControls()]
   if (selected === 'today') controls = todayControls()
   if (selected === 'balance') controls = [display('balance'),
@@ -36,7 +37,7 @@ function DisplayInspector({ props, config, set, selected, select, labels, regist
     config.balance?.showProgressBar === true ? number(t('balanceBudgetCapLabel'), config.balance?.budgetCap ?? '', value => nested('balance', { budgetCap: value || null }), 0, 1e12) : null,
     direction('balance'), number(t('refreshIntervalLabel'), config.balance?.refreshMinutes ?? 5, value => nested('balance', { refreshMinutes: Math.floor(value) }), 1)]
   if (selected === 'go') controls = [
-    props.state.goQuota?.status !== 'ok' ? el('p', { className: 'cm-inspector-note' }, text('配置并获取 Go 额度后显示；这里只调整外观。', 'Shown after Go quota is configured and available.')) : null,
+    props.state.goQuota?.status !== 'ok' && !examples ? el('p', { className: 'cm-inspector-note' }, text('配置并获取 Go 额度后显示；这里只调整外观。', 'Shown after Go quota is configured and available.')) : null,
     display('goQuota'), choice(text('主进度条', 'Primary window'), config.goQuota?.main ?? 'rolling', [['rolling', '5h'], ['weekly', text('周', 'Week')], ['monthly', text('月', 'Month')]], value => nested('goQuota', { main: value })),
     check(t('goDetailLabel'), config.goQuota?.detail !== false, value => nested('goQuota', { detail: value })), direction('go'),
     number(t('refreshIntervalLabel'), config.goQuota?.refreshMinutes ?? 15, value => nested('goQuota', { refreshMinutes: Math.floor(value) }), 1)]
@@ -78,12 +79,12 @@ function DisplayInspector({ props, config, set, selected, select, labels, regist
         el('div', { key: value, role: 'button', tabIndex: 0, 'aria-pressed': mode === value,
           onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.currentTarget.click() } },
           onClick: () => set({ sidebarSimple: value === 'simple', sidebarSimplePromptSeen: true, ...(value === 'simple' ? {} : { sidebarStyle: value }) }) },
-          el(SidebarStyleSample, { render: props.renderStyleSample, config, mode: value }), el('span', { className: 'cm-style-caption' }, label)))) : null,
+          el(SidebarStyleSample, { render: props.renderStyleSample, config: previewData.config, data: previewData.state, examples, mode: value }), el('span', { className: 'cm-style-caption' }, label)))) : null,
     showStyles && mode === 'compact' ? el('p', { className: 'cm-inspector-note' }, text('多时段额度并排，预算卡保持完整。', 'Quota windows sit side by side; the budget card stays intact.')) : null,
     region === 'sidebar' ? el('div', { className: 'cm-inspector-divider' }) : null,
-    choice(text('调整组件', 'Customize'), selected ?? '', [['', text('点击左侧虚线框', 'Select an outlined item')],
-      ...(region === 'sidebar' ? ['budget','balance','today','peak','models','go','plan','customBalance','codex'] : region === 'composer' ? ['strip-budget','strip-go','strip-plans','session-dock','badge','corner','models'] : ['session-header','badge','turn']).map(key => [key, labels[key]]),
-      ], select),
+    field(text('调整组件', 'Customize'), el('select', { className: 'cm-input', value: selected ?? '', onChange: event => select(event.target.value) },
+      !selected ? el('option', { value: '', disabled: true, hidden: true }, text('选择组件', 'Choose a component')) : null,
+      ...(region === 'sidebar' ? ['budget','balance','today','peak','models','go','plan','customBalance','codex'] : region === 'composer' ? ['strip-budget','strip-go','strip-plans','session-dock','badge','corner','models'] : ['session-header','badge','turn']).map(key => el('option', { key, value: key }, labels[key])))),
     selected ? el('div', { className: 'cm-inspector-controls', key: selected, 'data-inspector': selected },
       selection && selected !== 'models' && selected !== 'today' ? check(text('显示此组件', 'Show this component'), selection.on, () => set(selection.patch)) : null,
       ...controls) : null)

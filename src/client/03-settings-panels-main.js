@@ -2156,13 +2156,14 @@
         // 显示设置：独立加载的交互预览，共用草稿与自动保存。
         el(BillingStatistics, { state, api, load: api.loadDisplay, draft, setDraft, t, locale,
           numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, formatMoneyUsd, onNavigate: setTab,
-          renderSidebar: preview => renderSidebarFooter({ ...state, config: preview }, true, undefined, true),
-          renderStyleSample: preview => {
+          renderSidebar: (preview, data = state) => renderSidebarFooter({ ...data, config: preview }, true, undefined, true),
+          renderStyleSample: (preview, data = state, examples = true) => {
+            if (!examples) return renderSidebarFooter({ ...data, config: preview }, true, undefined, true)
             const simple = preview.sidebarSimple === true
             const sampleConfig = { ...preview, peakNotice: false, hideBudget: false, hideTodayCost: false,
               budget: { ...preview.budget, enabled: true, amount: Number(preview.budget?.amount) > 0 ? preview.budget.amount : 100 } }
-            const sampleState = { ...state, config: sampleConfig }
-            const windows = miniMaxWindowsOf(state.codingPlans?.minimax?.windows ?? {})
+            const sampleState = { ...data, config: sampleConfig }
+            const windows = miniMaxWindowsOf(data.codingPlans?.minimax?.windows ?? {})
             return el('div', { className: 'cm-footer-stack' + (simple ? ' simple' : preview.sidebarStyle === 'compact' ? ' compact' : '') },
               el(BudgetBoxContent, { state: sampleState, wide: true, summary: simple }),
               el(MiniMaxPlanCard, { five: windows.five ?? { percent: 24 }, seven: windows.seven ?? { percent: 18 }, fetchedAt: 0, t, wide: true, direction: barDirectionOf(preview, 'plan') }))

@@ -55,10 +55,11 @@ const url = `http://127.0.0.1:${server.address().port}/`
 const browser = await chromium.launch({ executablePath, headless: true })
 const page = await browser.newPage({ viewport: { width: 1100, height: 1000 } })
 page.setDefaultTimeout(15000)
-const errors = [], external = []
+const errors = [], external = [], previewQueries = []
 page.on('pageerror', error => errors.push(String(error)))
 await page.route('**/*', route => {
   if (new URL(route.request().url()).origin !== new URL(url).origin) { external.push(route.request().url()); return route.abort() }
+  if (new URL(route.request().url()).pathname.startsWith('/plugins/')) previewQueries.push(route.request().url())
   return route.continue()
 })
 await page.exposeFunction('saveConfig', patch => {
@@ -89,6 +90,8 @@ try {
   const selectStyle=async label=>page.getByRole('button',{name:label,exact:true}).click()
   const customize=async key=>{await item(key).first().click({position:{x:8,y:8}});await page.locator('[data-inspector="'+key+'"]').waitFor()}
   const toggle=async key=>{await customize(key);await page.getByRole('checkbox',{name:'显示此组件',exact:true}).click()}
+  const examples=page.getByRole('checkbox',{name:'使用示例数据',exact:true})
+  assert.equal(await examples.isChecked(),true,'examples are on by default')
   assert.equal(await page.locator('.cm-display-model-options,.cm-display-details').count(),0,'options live in the inspector instead of folded forms')
   assert.equal(await page.locator('iframe,.cm-native-desktop,.cm-preview-reference').count(),0,'no desktop copy or scaled reference')
   await page.waitForFunction(()=>document.querySelector('.cm-preview-sidebar').style.backgroundColor==='rgb(238, 243, 248)')
@@ -100,12 +103,22 @@ try {
   const progressRows=await page.evaluate(()=>['standard','compact'].map(mode=>[...document.querySelectorAll('.cm-style-thumbnail .cm-footer-stack'+(mode==='compact'?'.compact':':not(.simple):not(.compact)')+' .cm-mm-row')].map(n=>n.getBoundingClientRect().y)))
   assert.ok(progressRows[0][1]>progressRows[0][0],'standard rows stack vertically')
   assert.ok(Math.abs(progressRows[1][1]-progressRows[1][0])<1,'compact rows sit side by side')
+  assert.ok((await page.locator('.cm-sidebar-live').innerText()).includes('3 模型'),'example model costs are populated')
+  assert.equal(await page.locator('.cm-sidebar-live .cm-bal-err').count(),0,'examples show the balance effect instead of a live error')
+  assert.equal(await page.evaluate(()=>window.current().goQuota.enabled),false,'showing an example does not enable queries')
+  const configBeforeSource=await page.evaluate(()=>JSON.stringify(window.current()))
+  const patchesBeforeSource=await page.evaluate(()=>window.patches.length)
+  await examples.uncheck()
+  assert.equal(await page.locator('.cm-sidebar-live .cm-bal-err').count(),1,'current data retains its actual error state')
+  await examples.check();await examples.uncheck()
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.current())),configBeforeSource)
+  assert.equal(await page.evaluate(()=>window.patches.length),patchesBeforeSource,'source switch never saves example configuration')
   assert.ok(await page.locator('.cm-preview').evaluate(n=>parseFloat(getComputedStyle(n).fontSize)>=14))
   // Compare actual card DOM and geometry at equal width in all three modes.
   const parity=async()=>{
     await page.evaluate(()=>{document.getElementById('actual-sidebar').style.width=document.querySelector('.cm-sidebar-live').getBoundingClientRect().width+'px'})
     const values=await page.evaluate(()=>{
-      const snapshot=root=>{const host=root.getBoundingClientRect();return [...root.querySelectorAll('.cm-footer-stack > *,[data-cm-display],.cm-bbox-head,.cm-bbox-line,.cm-bbox-bar')].map(n=>{const r=n.getBoundingClientRect();return{class:n.className,text:n.textContent,x:Math.round(r.x-host.x),y:Math.round(r.y-host.y),w:Math.round(r.width),h:Math.round(r.height)}})}
+      const snapshot=root=>{const host=root.getBoundingClientRect();return [...root.querySelectorAll('.cm-footer-stack > *,[data-cm-display],.cm-bbox-head,.cm-bbox-line,.cm-bbox-bar')].map(n=>{const r=n.getBoundingClientRect();return{class:n.className,text:n.dataset.cmDisplay==='peak'?n.textContent.replace(/\d+/g,'#'):n.textContent,x:Math.round(r.x-host.x),y:Math.round(r.y-host.y),w:Math.round(r.width),h:Math.round(r.height)}})}
       return[snapshot(document.querySelector('.cm-sidebar-live')),snapshot(document.getElementById('actual-sidebar'))]
     })
     assert.deepEqual(values[0],values[1],'preview and real sidebar share exact card layout')
@@ -132,6 +145,23 @@ try {
   await page.waitForFunction(()=>document.querySelector('.cm-native-input-card').style.borderRadius==='31px')
   await toggle('session-dock');await toggle('badge');await page.waitForFunction(()=>window.current().hideSessionCostDock&&window.current().position==='dock')
   await region('会话内容');await toggle('turn');await toggle('session-header');await page.waitForFunction(()=>window.current().hideTurnCost&&window.current().hideSessionCostHeader)
+  assert.equal(await page.locator('.cm-native-turn').innerText(),'▸ 本轮费用 ≈ —','no invented session value when examples are off')
+  assert.equal(await page.getByLabel('调整组件',{exact:true}).locator('option[value=""]').count(),0,'instruction is not an option after selection')
+  assert.equal(await page.getByText('点击左侧虚线框',{exact:true}).count(),0)
+  await region('输入区');await customize('badge')
+  assert.equal(await page.getByRole('checkbox',{name:'仅显示金额',exact:true}).count(),1)
+  assert.equal(await page.getByText('悬停查看费用分项。',{exact:true}).count(),1)
+  await examples.check();await region('侧栏')
+  await page.getByLabel('调整组件',{exact:true}).selectOption('codex')
+  await page.locator('.cm-sidebar-live [data-cm-display=codex]').waitFor()
+  assert.equal(await page.evaluate(()=>window.current().codexQuotaEnabled),false,'Codex example uses a supplied snapshot without enabling discovery')
+  await page.getByLabel('调整组件',{exact:true}).selectOption('customBalance')
+  await page.locator('.cm-sidebar-live [data-cm-display=customBalance]').waitFor()
+  assert.equal(await page.evaluate(()=>window.current().customBalance.enabled),false)
+  await toggle('budget');await page.waitForFunction(()=>window.current().hideBudget)
+  assert.equal(await page.locator('.cm-sidebar-live [data-cm-display=budget]').getAttribute('data-preview-hidden'),'true','hidden sample stays faded and adjustable')
+  await toggle('budget');await page.waitForFunction(()=>!window.current().hideBudget)
+  assert.equal(saved.goQuota.enabled,false)
   for(const theme of ['light','dark']){
     await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.querySelector('._2H3hWW_root').style.backgroundColor=theme==='dark'?'rgb(37,39,43)':'rgb(238,243,248)'},theme)
     for(const width of [1100,720,390]){
@@ -171,7 +201,7 @@ try {
   await region('会话内容');assert.equal(await item('turn').getAttribute('data-visible'),'false','saved toggles survive repeated reopening')
   await page.getByLabel('界面语言',{exact:true}).selectOption('en');await page.waitForFunction(()=>window.current().locale==='en')
   await region('Sidebar');await page.evaluate(()=>window.failSave=true);await customize('balance');await page.getByRole('checkbox',{name:'Show this component',exact:true}).click();await page.getByText(/synthetic save failure/).waitFor()
-  assert.deepEqual(errors,[]);assert.deepEqual(external,[])
+  assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert.deepEqual(previewQueries,[],'preview never starts account or Codex discovery requests')
   const result={themes:2,widths:[1100,720,390],regions:3,normalFontSize:true,skinSurfaces:true,autosave:true,keyboard:true,reopenCount:25,hostConversationNodes:20000,cpuThrottle:4,openMedianMs:Math.round(sorted[Math.floor(sorted.length/2)]),openP95Ms:Math.round(p95),...metrics,externalRequests:external.length,browserErrors:errors.length}
   writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log('[ok] '+JSON.stringify(result))
 } catch(error){await page.screenshot({path:join(output,'failure.png'),fullPage:true});console.error(errors);throw error}
