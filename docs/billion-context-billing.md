@@ -17,6 +17,8 @@ After durable proxy records are confirmed, those individual requests replace the
 
 Main requests retain the configured DSH provider price. Internal models use their actual upstream/model. The bridge observes existing responses, preserves the request body and upstream credentials, and removes the private correlation header before forwarding to a model endpoint.
 
+Prebuilt archives for the five verified versions are available in the [v1.8.27 release assets](https://github.com/Han-1413141/dsh-cost-meter/releases/tag/v1.8.27).
+
 ### Generate and install the matching archive
 
 The generator automatically adapts supported interfaces without executing the original package. It does not rewrite the source archive. Build from the original package for the version being installed:
@@ -26,7 +28,7 @@ npm pack billion-context --ignore-scripts
 node scripts/build-billion-context-compat.mjs <original-billion-context.tgz> <local-output-directory>
 ```
 
-The output version is `<upstream-version>-cost-meter.1` (for example, `0.1.197-cost-meter.1`). Install it alongside the matching dsh-cost-meter development build in the DSH profile already using billion-context, then fully restart the host. After updating the original plugin, generate and install a matching compatibility archive. A stock package without the metering bridge does not expose all internal calls merely because its version is newer.
+The output version is `<upstream-version>-cost-meter.1` (for example, `0.1.197-cost-meter.1`). Install it alongside dsh-cost-meter 1.8.27 or later in the DSH profile already using billion-context, then fully restart the host. After updating the original plugin, generate and install a matching compatibility archive. A stock package without the metering bridge does not expose all internal calls merely because its version is newer.
 
 The generator supports both observed native fetch implementations and optional summary helpers. Changed required contracts stop generation with feedback links. Runtime protocol mismatches or an unconnected bridge are surfaced in the popup; ordinary DSH billing remains available.
 
@@ -57,9 +59,11 @@ Actual npm releases **0.1.181, 0.1.185, 0.1.190, 0.1.196 and 0.1.197** were veri
 
 主请求沿用 DSH 渠道配置价格；内部模型按实际上游和模型匹配。零用量、缺失用量、部分回执和未定价明确区分，不按节省比例、余额差或估算上下文补算费用。关联标识在转发模型端点前删除，不改变请求正文和上游凭据。
 
+五个已验证版本的预编译兼容包见 [v1.8.27 发布附件](https://github.com/Han-1413141/dsh-cost-meter/releases/tag/v1.8.27)。
+
 ### 使用方法
 
-先取得所用版本的原始 npm 包，再运行上面的生成命令。生成结果按原始版本命名为 `<原版本>-cost-meter.1`，与费用插件开发包一起安装到已使用 billion-context 的 DSH Profile，然后完全重启宿主。
+先取得所用版本的原始 npm 包，再运行上面的生成命令。生成结果按原始版本命名为 `<原版本>-cost-meter.1`，与费用插件 1.8.27 或更新版本一起安装到已使用 billion-context 的 DSH Profile，然后完全重启宿主。
 
 **升级原插件后，需要为新版本生成并安装对应兼容包。**生成器会自动判断接口兼容性；仅升级原版包不能获得完整内部调用记录。必需接口变化时停止生成并给出反馈入口，运行期间的协议不匹配或未连接状态通过弹窗提示。
 

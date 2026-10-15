@@ -1,8 +1,8 @@
-# Billing update / 计费更新说明 — 2026-10-15
+# v1.8.27 — Billing update / 计费更新说明（2026-10-15）
 
 ## English
 
-These changes are in the development branch for the next release. The npm release remains **1.8.26**.
+Version **1.8.27** includes the following billing updates.
 
 - **Historical prices:** requests use saved price versions selected by their start time. Later edits to rates, price mappings or pricing currency affect subsequent requests. Conversation details, turns and cost charts follow the same versions. Versions not captured before this feature was enabled cannot be reconstructed.
 - **Explicit recalculation:** Settings → Cost → Prices → Historical pricing offers **Recalculate history at current prices**. A warning and confirmation precede any change. Fully replayable session/day records can be recalculated; incomplete records keep their amounts. Every run retains before/after amounts, original price versions and a complete ledger backup. The settings show previous runs.
@@ -18,7 +18,7 @@ See [billing statistics and historical pricing](billing-statistics.md), [billion
 
 ## 中文
 
-本次更新进入下一版本的开发代码；npm 正式版仍为 **1.8.26**。
+**1.8.27** 包含以下计费更新。
 
 ### 历史费用不再跟着改价变化
 

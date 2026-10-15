@@ -2,7 +2,7 @@
 
 ## English
 
-This development update addresses [#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274), requested by @playgithub. It adds an OpenDesign price channel and read-only workspace quota queries; it is not yet in the npm release. It does not install OpenDesign, create an account or change a model route.
+This release addresses [#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274), requested by @playgithub. It adds an OpenDesign price channel and read-only workspace quota queries; it is included in version 1.8.27. It does not install OpenDesign, create an account or change a model route.
 
 ### Conversation costs
 
@@ -39,7 +39,7 @@ Endpoint provenance: the official Cloud bundles `cloud-root-B21Emo2w.js` and `pr
 
 ## 中文
 
-本次开发更新实现了 @playgithub 在 [#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274) 提出的接入需求，尚未进入 npm 正式版。不会安装 OpenDesign、注册账户或改变模型路由。
+本版本实现了 @playgithub 在 [#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274) 提出的接入需求，随 1.8.27 发布。不会安装 OpenDesign、注册账户或改变模型路由。
 
 ### 会话计费
 
