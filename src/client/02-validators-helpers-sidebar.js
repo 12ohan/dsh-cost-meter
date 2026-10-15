@@ -809,7 +809,7 @@
       }
     }
 
-    const SCOPED_PRICE_PROVIDERS = new Set(['openrouter', 'opencode-zen', 'opencode-go', 'zen', 'opencode'])
+    const SCOPED_PRICE_PROVIDERS = new Set(['openrouter', 'opencode-zen', 'opencode-go', 'opencode-go-plus', 'zen', 'opencode'])
     const MODEL_VENDOR_PREFIXES = {
       openai: /^(?:gpt|o\d|codex)/i, anthropic: /^claude/i, google: /^gemini/i,
       deepseek: /^deepseek/i, moonshot: /^kimi/i, 'z-ai': /^glm/i, xai: /^grok/i,
@@ -898,7 +898,7 @@
           return { entry: prices.default ?? { cacheHit: 0, cacheMiss: 0, output: 0 }, priced: prices.default?.unpriced !== true, billingMode: 'deepseek-peak', matched: false }
         }
       }
-          if (['zen', 'opencode'].includes(targetProvider)) {
+          if (['zen', 'opencode', 'opencode-go-plus'].includes(targetProvider)) {
         const own = priceModelHit(targetModel, prices.providers?.[targetProvider]?.models ?? {}, 'opencode-go', mode, prices)
         if (own === null) targetProvider = 'opencode-go'
         else targetModel = own
@@ -1029,14 +1029,22 @@
     // ── Plan/API 双轨分类(issue #64):与 lib/plan-billing.js 同逻辑的镜像实现
     //    (bundle 无法导入 Node 模块,修改时两处同步)。──
     const PLAN_PROVIDER_ALIASES_LOCAL = {
-      go: ['go', 'zen', 'opencode', 'opencode-go'],
+      go: ['go', 'zen', 'opencode', 'opencode-go', 'opencode-go-plus'],
+      codex: ['codex', 'openai-codex', 'dsh-openai-codex'],
+      'volcengine-agent': ['volcengine-agent', 'ark-agent-plan', 'volcengine-agent-plan'],
+      'tencent-coding': ['tencent-coding', 'tencent-coding-plan', 'tokenhub-coding-plan'],
+      'tencent-token': ['tencent-token', 'tencent-token-plan', 'tokenhub-token-plan'],
+      'baidu-coding': ['baidu-coding-plan', 'qianfan-coding-plan'],
+
       qwen: ['qwen', 'qwen-tokenplan', 'qianwen-tokenplan', 'qwen-token-plan', 'qianwen-token-plan'],
       scnet: ['scnet', 'scnet-tokenplan', 'scnet-token-plan'],
       mimo: ['mimo', 'xiaomimimo', 'mimo-token-plan', 'xiaomi-token-plan', 'xiaomi-token-plan-cn', 'xiaomi-token-plan-sgp', 'xiaomi-token-plan-ams'],
       factory: ['factory', 'droid', 'factory-a', 'factory-g', 'factory-o'],
     }
-    const PLAN_PROVIDER_IDS_LOCAL = ['anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'scnet', 'volcengine', 'qwen', 'mimo', 'factory', 'go']
+    const PLAN_PROVIDER_IDS_LOCAL = ['anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'scnet', 'volcengine', 'qwen', 'mimo', 'factory', 'go', 'codex', 'volcengine-agent', 'tencent-coding', 'tencent-token', 'baidu-coding']
     const PLAN_NAME_HINTS_LOCAL = {
+      codex: 'codex|chatgpt', 'baidu-coding': 'baidu|qianfan|百度|千帆',
+      'tencent-coding': 'tencent|tokenhub|腾讯',
       anthropic: 'anthropic|claude', zai: 'z[._-]?ai|zhipu|glm|智谱', minimax: 'minimax|海螺',
       kimi: 'kimi|moonshot|moonshotai|月之暗面', openrouter: 'openrouter', siliconflow: 'siliconflow|硅基',
       commandcode: 'commandcode', scnet: 'scnet|sugon|超算',
@@ -1046,10 +1054,19 @@
     const PLAN_NAME_MATCHERS_LOCAL = Object.entries(PLAN_NAME_HINTS_LOCAL).map(([id, hints]) => [id, new RegExp('(?:^|[^a-z0-9])(?:' + hints + ')(?=$|[^a-z0-9])')])
     function inferPlanProviderIdLocal(provider, modelId) {
       for (const raw of [provider, modelId]) {
-        const text = String(raw ?? '').normalize('NFKC').replace(/([a-zA-Z0-9\u3400-\u9fff])(?=(?:Coding|Token|Plan|Subscription))/g, '$1-').replace(/([a-z0-9])((?:coding|token)?plan|subscription)$/i, '$1-$2').toLowerCase()
-        if (!/(?:^|[^a-z0-9])(?:(?:coding|token)[-_\s]*)?plan(?:$|[^a-z0-9])|(?:^|[^a-z0-9])subscription(?:$|[^a-z0-9])|套餐|订阅/.test(text)) continue
+        const text = String(raw ?? '').normalize('NFKC').replace(/([a-zA-Z0-9\u3400-\u9fff])(?=(?:Coding|Token|Agent|Plan|Subscription))/g, '$1-').replace(/([a-z0-9])((?:coding|token|agent)?plan|subscription)$/i, '$1-$2').toLowerCase()
+        if (!/(?:^|[^a-z0-9])(?:(?:coding|token|agent)[-_\s]*)?plan(?:$|[^a-z0-9])|(?:^|[^a-z0-9])subscription(?:$|[^a-z0-9])|套餐|订阅/.test(text)) continue
         const matches = PLAN_NAME_MATCHERS_LOCAL.filter(([, pattern]) => pattern.test(text))
-        if (matches.length) return matches.length === 1 ? matches[0][0] : null
+        if (matches.length) {
+          if (matches.length !== 1) return null
+          const id = matches[0][0]
+          if (id === 'volcengine' && /agent[-_\s]*plan|智能体.*套餐/.test(text)) return 'volcengine-agent'
+          if (id === 'tencent-coding') {
+            const token = /token[-_\s]*plan|令牌.*套餐/.test(text), coding = /coding[-_\s]*plan|编程.*套餐/.test(text)
+            return token === coding ? null : token ? 'tencent-token' : id
+          }
+          return id
+        }
       }
       return null
     }
@@ -1072,6 +1089,7 @@
         }
       }
       if (config?.goQuota?.enabled === true) out.add('go')
+      if (config?.codexQuotaEnabled === true) out.add('codex')
       return out
     }
     // 路由调用判定(与 lib/plan-billing.js 同逻辑的镜像):provider 空/deepseek

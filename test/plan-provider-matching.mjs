@@ -24,6 +24,14 @@ vm.runInNewContext(source.replace('exports.apply = apply', 'exports.test = { Mod
 })
 const ui = factory(name => name === 'react' ? React : {}).test
 const names = [
+  ['Codex Plan', 'gpt-6.1-sol', 'codex'], ['ChatGPT subscription', 'm', 'codex'],
+  ['my-ark-agent-plan', 'm', 'volcengine-agent'], ['VolcengineAgentPlan', 'm', 'volcengine-agent'],
+  ['Tencent Coding Plan', 'm', 'tencent-coding'], ['TokenHubTokenPlan', 'm', 'tencent-token'],
+  ['腾讯 Token Plan', 'm', 'tencent-token'], ['腾讯套餐', 'm', null],
+  ['Tencent Coding Plan Token Plan', 'm', null], ['OpenCode Go Plus Plan', 'm', 'go'],
+  ['Baidu Coding Plan', 'm', 'baidu-coding'], ['千帆套餐', 'm', 'baidu-coding'],
+  ['openai', 'gpt-6.1-sol', null], ['tencent', 'hy3', null], ['baidu', 'ernie', null],
+
   ['my-ark-coding-plan', 'm', 'volcengine'], ['VolcengineCodingPlan', 'm', 'volcengine'],
   ['火山方舟CodingPlan', 'm', 'volcengine'], ['MiniMaxTokenPlan', 'm', 'minimax'],
   ['my-claude-subscription', 'm', 'anthropic'], ['Z.ai CodingPlan', 'm', 'zai'],
@@ -134,6 +142,16 @@ try {
   const select = () => nodes(render()).find(node => node.type === 'select' && node.props.title === t('billingClassLabel'))
   assert.equal(select().props.value, 'plan:volcengine')
   assert.ok(nodes(select()).some(node => node.type === 'option' && node.props.value === 'plan:minimax'), 'all plan families can be selected')
+  for (const id of ['codex', 'volcengine-agent', 'tencent-coding', 'tencent-token', 'baidu-coding']) {
+    assert.ok(nodes(select()).some(node => node.type === 'option' && node.props.value === 'plan:' + id), id + ' option')
+    select().props.onChange({ target: { value: 'plan:' + id } })
+    const saved = applyConfigPatch(ledger.config, { planBilling: draft.planBilling })
+    assert.deepEqual(saved.errors, [])
+    const roundTrip = ui.parseConfig(stateSchema.shape.config.parse(saved.config), 'config')
+    assert.equal(roundTrip.planBilling.modelPlans[key], id)
+    assert.equal(billingClassOf('relay', 'example-model', roundTrip.planBilling, enabledPlanSetOf(roundTrip)), 'plan')
+    assert.equal(ui.billingClassOfLocal('relay', 'example-model', roundTrip), 'plan')
+  }
   select().props.onChange({ target: { value: 'plan:minimax' } })
   assert.equal(draft.planBilling.modelPlans[key], 'minimax', 'selecting another family changes attribution')
   select().props.onChange({ target: { value: 'api' } })

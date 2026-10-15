@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-03",
+  "generatedAt": "2026-10-15",
   "note": "Auto-generated from lib/pricing.js DEFAULT_PROVIDER_PRICE_TABLE. USD per 1M tokens; unpriced entries have no verified official price.",
   "providers": {
     "openai": {
@@ -528,6 +528,34 @@
           "sourceUrl": "https://developers.openai.com/api/docs/pricing",
           "checkedAt": "2026-10-03",
           "notes": "Official grouped Standard text-token price for Search. Extra search/tool fees excluded. No future-billing/restricted Rosalind, embeddings or moderation units inferred."
+        },
+        "gpt-rosalind-research": {
+          "input": 5,
+          "output": 25,
+          "cachedInput": 0.5,
+          "billingMode": "flat",
+          "sourceUrl": "https://developers.openai.com/api/docs/pricing",
+          "checkedAt": "2026-10-15",
+          "notes": "Standard global API token price. Trusted-access model; catalog inclusion does not grant access. Research billing begins 2026-10-05. Cache-write pricing does not apply."
+        },
+        "gpt-rosalind-discovery": {
+          "input": 5,
+          "output": 25,
+          "cachedInput": 0.5,
+          "billingMode": "flat",
+          "sourceUrl": "https://developers.openai.com/api/docs/pricing",
+          "checkedAt": "2026-10-15",
+          "notes": "Standard global API token price. Trusted-access model; catalog inclusion does not grant access. Research billing begins 2026-10-05. Cache-write pricing does not apply."
+        },
+        "gpt-5.6-cyber": {
+          "input": 12.5,
+          "output": 75,
+          "cachedInput": 1.25,
+          "billingMode": "flat",
+          "sourceUrl": "https://developers.openai.com/api/docs/pricing",
+          "checkedAt": "2026-10-15",
+          "cacheWrite": 15.625,
+          "notes": "Standard global API token price for the restricted-access cyber model. No separate long-context rate is published."
         }
       }
     },
@@ -655,13 +683,13 @@
         },
         "claude-sonnet-5-5": {
           "input": 2,
-          "cachedInput": 0.2,
-          "cacheWrite": 2.5,
           "output": 10,
+          "cachedInput": 0.1,
           "billingMode": "flat",
           "sourceUrl": "https://platform.claude.com/docs/en/about-claude/pricing",
-          "checkedAt": "2026-10-03",
-          "notes": "Official direct Claude API Standard global token rates. cacheWrite is5-minute creation;1-hour creation is4USD/M and requires separate TTL usage. Other tiers, regional premiums and tool fees excluded. Full1M context uses standard rates."
+          "checkedAt": "2026-10-15",
+          "cacheWrite": 2.5,
+          "notes": "Standard global API; 5-minute cache writes. Direct API cache-read rate differs from OpenCode Zen."
         },
         "claude-mythos-5-1": {
           "input": 10,
@@ -682,6 +710,23 @@
           "sourceUrl": "https://platform.claude.com/docs/en/about-claude/pricing",
           "checkedAt": "2026-10-03",
           "notes": "Official direct Claude API Standard global token rates. cacheWrite is5-minute creation;1-hour creation is20USD/M and requires separate TTL usage. Other tiers, regional premiums and tool fees excluded. Invite-only availability does not change published per-token rates. Full1M context uses standard rates."
+        },
+        "claude-haiku-5-5": {
+          "input": 0.1,
+          "output": 0.5,
+          "cachedInput": 0.01,
+          "billingMode": "flat",
+          "sourceUrl": "https://platform.claude.com/docs/en/about-claude/pricing",
+          "checkedAt": "2026-10-15",
+          "cacheWrite": 0.125,
+          "longContext": {
+            "aboveInputTokens": 100000,
+            "cacheMiss": 0.5,
+            "cacheHit": 0.05,
+            "cacheWrite": 0.625,
+            "output": 2.5
+          },
+          "notes": "Standard global API; cache writes use 5-minute TTL. Prompts over 100000 tokens, including cache reads/writes, use the higher tier for the entire request. 1-hour TTL and fast/regional surcharges are excluded."
         }
       }
     },
@@ -788,6 +833,15 @@
           "sourceUrl": "https://ai.google.dev/gemini-api/docs/pricing?hl=en",
           "checkedAt": "2026-10-03",
           "notes": "Standard paid text/image/video input. Audio input0.50/cacheRead0.05 USD/M is a different modality; this generic token row cannot price that accurately. Cache storage1USD/M/hour and grounding excluded."
+        },
+        "gemini-4-argon": {
+          "input": 2,
+          "output": 10,
+          "cachedInput": 0.1,
+          "billingMode": "flat",
+          "sourceUrl": "https://ai.google.dev/gemini-api/docs/pricing",
+          "checkedAt": "2026-10-15",
+          "notes": "Standard paid tier. Promotional USD 2/10/0.10 input/output/cache read through 2026-11-30; official announced prices from 2026-12-01 are USD 4/20/0.20. Implicit caching only. Recheck the catalog when the promotion ends; the source does not specify a timezone."
         }
       }
     },
@@ -1546,6 +1600,15 @@
           "sourceUrl": "https://docs.mistral.ai/inference/pricing",
           "checkedAt": "2026-10-03",
           "notes": "Standard direct Mistral global token prices. Batch/Priority/regional/tool fees excluded. Embedding-only endpoint, no generated output token charge; output0 represents not applicable, not free generated completions."
+        },
+        "mistral-large-4": {
+          "input": 0.68,
+          "output": 2.09,
+          "cachedInput": 0.07,
+          "billingMode": "flat",
+          "sourceUrl": "https://docs.mistral.ai/inference/pricing",
+          "checkedAt": "2026-10-15",
+          "notes": "Current published sale price: 50% off USD 1.36/4.18/0.14 input/output/cached input. Public-preview model ID from https://docs.mistral.ai/models/mistral-large-4-0 . No promotion end date is published."
         }
       }
     },
@@ -1873,6 +1936,55 @@
             "cacheHit": 0.04,
             "cacheWrite": 0.5
           }
+        },
+        "step-5-preview-free": {
+          "input": 0,
+          "output": 0,
+          "cachedInput": 0,
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/go/",
+          "checkedAt": "2026-10-15"
+        },
+        "cat-jam-free": {
+          "input": 0,
+          "output": 0,
+          "cachedInput": 0,
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/go/",
+          "checkedAt": "2026-10-15"
+        },
+        "space-bunny": {
+          "input": 0.15,
+          "output": 0.6,
+          "cachedInput": 0.03,
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/go/",
+          "checkedAt": "2026-10-15"
+        },
+        "claude-haiku-5-5": {
+          "input": 0.1,
+          "output": 0.5,
+          "cachedInput": 0.01,
+          "cacheWrite": 0.125,
+          "longContext": {
+            "aboveInputTokens": 100000,
+            "cacheMiss": 0.5,
+            "cacheHit": 0.05,
+            "output": 2.5,
+            "cacheWrite": 0.625
+          },
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/go/",
+          "checkedAt": "2026-10-15"
+        },
+        "gemini-4-argon-contributor": {
+          "input": 4,
+          "output": 20,
+          "cachedInput": 0.2,
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/go/",
+          "checkedAt": "2026-10-15",
+          "notes": "Current published promotional rate; gateway pricing is independent of the direct API."
         }
       }
     },
@@ -2468,20 +2580,20 @@
           }
         },
         "gpt-6.1-sol": {
-          "billingMode": "flat",
-          "sourceUrl": "https://opencode.ai/docs/zen",
-          "checkedAt": "2026-10-03",
           "input": 2,
           "output": 10,
-          "cachedInput": 0.1,
+          "cachedInput": 0.2,
           "cacheWrite": 2.5,
           "longContext": {
             "aboveInputTokens": 272000,
             "cacheMiss": 4,
+            "cacheHit": 0.4,
             "output": 15,
-            "cacheHit": 0.2,
             "cacheWrite": 5
-          }
+          },
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/models/",
+          "checkedAt": "2026-10-15"
         },
         "gpt-6-luna": {
           "billingMode": "flat",
@@ -2694,6 +2806,81 @@
           "input": 0.05,
           "output": 0.4,
           "cachedInput": 0.005
+        },
+        "deepseek-v4.1-flash-free": {
+          "input": 0,
+          "output": 0,
+          "cachedInput": 0,
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/models/",
+          "checkedAt": "2026-10-15"
+        },
+        "cat-jam-free": {
+          "input": 0,
+          "output": 0,
+          "cachedInput": 0,
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/models/",
+          "checkedAt": "2026-10-15"
+        },
+        "step-5-preview-free": {
+          "input": 0,
+          "output": 0,
+          "cachedInput": 0,
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/models/",
+          "checkedAt": "2026-10-15"
+        },
+        "exo-free": {
+          "input": 0,
+          "output": 0,
+          "cachedInput": 0,
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/models/",
+          "checkedAt": "2026-10-15"
+        },
+        "mistral-large-4": {
+          "input": 0.68,
+          "output": 2.09,
+          "cachedInput": 0.07,
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/models/",
+          "checkedAt": "2026-10-15",
+          "notes": "Current published gateway rate; independent of the direct API."
+        },
+        "claude-sonnet-5-5": {
+          "input": 2,
+          "output": 10,
+          "cachedInput": 0.2,
+          "cacheWrite": 2.5,
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/models/",
+          "checkedAt": "2026-10-15"
+        },
+        "claude-haiku-5-5": {
+          "input": 0.1,
+          "output": 0.5,
+          "cachedInput": 0.01,
+          "cacheWrite": 0.125,
+          "longContext": {
+            "aboveInputTokens": 100000,
+            "cacheMiss": 0.5,
+            "cacheHit": 0.05,
+            "output": 2.5,
+            "cacheWrite": 0.625
+          },
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/models/",
+          "checkedAt": "2026-10-15"
+        },
+        "gemini-4-argon": {
+          "input": 2,
+          "output": 10,
+          "cachedInput": 0.1,
+          "billingMode": "flat",
+          "sourceUrl": "https://opencode.ai/v2/docs/console/models/",
+          "checkedAt": "2026-10-15",
+          "notes": "Current published promotional rate; gateway pricing is independent of the direct API."
         }
       }
     }
