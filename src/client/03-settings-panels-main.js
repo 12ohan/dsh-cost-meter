@@ -563,10 +563,56 @@
       })
     }
 
-    function cacheWriteInput(tier, label, t, onChange, fallback = 0) {
-      return numInput({ value: tier?.cacheWrite ?? null, emptyMode: 'clear',
-        placeholder: String(tier?.cacheHit ?? tier?.cachedInput ?? tier?.cacheMiss ?? tier?.input ?? fallback),
-        label: label + ' · ' + t('flatCacheWrite'), title: t('cacheWriteFallback') }, onChange)
+    function PriceInput({ value, entry, path, emptyMode, placeholder, label, title, t, onCommit }) {
+      const factor = priceFactor(entry, path)
+      const formatted = value == null ? '' : String(value) + (entry.multiplier !== undefined || entry.separateMultipliers ? ' × ' + factor : '')
+      const [text, setText] = useState(formatted), [invalid, setInvalid] = useState(false)
+      const dirty = useRef(false)
+      useEffect(() => { if (!dirty.current) setText(formatted) }, [formatted])
+      const commit = () => {
+        if (!dirty.current) return
+        const parts = text.trim().split(/\s*[×*xX]\s*/)
+        const number = /^[+]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i
+        if (text.trim() === '') {
+          dirty.current = false; setInvalid(false)
+          if (emptyMode === 'clear') onCommit(null)
+          else setText(formatted)
+          return
+        }
+        if (parts.length > 2 || !parts.every(part => number.test(part) && Number.isFinite(Number(part)))
+          || !Number.isFinite(Number(parts[0]) * (parts.length === 2 ? Number(parts[1]) : factor))) { setInvalid(true); return }
+        dirty.current = false; setInvalid(false)
+        setText(String(Number(parts[0])) + (entry.multiplier !== undefined || entry.separateMultipliers || parts.length === 2 ? ' × ' + (parts.length === 2 ? Number(parts[1]) : factor) : ''))
+        onCommit(Number(parts[0]), parts.length === 2 ? Number(parts[1]) : undefined)
+      }
+      return el('input', { className: 'cm-input narrow', type: 'text', value: text,
+        placeholder, 'aria-label': label, 'aria-invalid': invalid,
+        title: invalid ? t('priceMultiplyInvalid') : [title, t(entry.separateMultipliers ? 'priceMultiplySingle' : 'priceMultiplyAll'), value == null ? '' : '= ' + Number((value * factor).toPrecision(12))].filter(Boolean).join(' · '),
+        onChange: event => { dirty.current = true; setText(event.target.value); setInvalid(false) }, onBlur: commit,
+        onKeyDown: event => {
+          if (event.key === 'Enter') { event.preventDefault(); commit() }
+          if (event.key === 'Escape') { event.stopPropagation(); dirty.current = false; setInvalid(false); setText(formatted) }
+        } })
+    }
+    function setPriceFactor(entry, path, factor) {
+      if (factor !== undefined) {
+        if (entry.separateMultipliers) entry.multipliers = { ...entry.multipliers, [path]: factor }
+        else entry.multiplier = factor
+      }
+    }
+    function priceInput(entry, tier, path, field, label, t, commit, fallback = 0) {
+      const write = field === 'cacheWrite'
+      const value = tier?.[field] ?? (field === 'cacheMiss' ? tier?.input : field === 'cacheHit' ? tier?.cachedInput : undefined) ?? null
+      return el(PriceInput, { entry, value, path: path + '.' + field, t,
+        emptyMode: write || !['base', 'cny'].includes(path) ? 'clear' : 'ignore',
+        placeholder: write ? String(tier?.cacheHit ?? tier?.cachedInput ?? tier?.cacheMiss ?? tier?.input ?? fallback) : undefined,
+        label: label + ' · ' + t({ cacheHit: 'flatCached', cacheMiss: 'flatInput', cacheWrite: 'flatCacheWrite', output: 'flatOutput' }[field]),
+        title: write ? t('cacheWriteFallback') : undefined, onCommit: commit })
+    }
+    function multiplierOptions(entry, t, onChange) {
+      return el('div', { className: 'cm-price-multiplier' },
+        el('label', null, el('input', { type: 'checkbox', checked: entry.separateMultipliers === true, onChange: event => onChange(event.target.checked) }), t('priceMultiplySeparate')),
+        el('span', { title: t(entry.separateMultipliers ? 'priceMultiplySingle' : 'priceMultiplyAll') }, t('priceMultiplyHint')))
     }
 
     function PriceCard(props) {
@@ -581,7 +627,12 @@
         }
         return next
       }
-      const setTier = (tierKey, field, value) => {
+      const write = next => {
+        const prices = isDefault ? { ...draft.prices, default: next }
+          : { ...draft.prices, models: { ...draft.prices.models, [modelId]: next } }
+        setDraft({ ...draft, prices })
+      }
+      const setTier = (tierKey, field, value, factor) => {
         const raw = isDefault ? draft.prices.default : draft.prices.models[modelId]
         const next = editablePrice(raw ?? { cacheHit: 0, cacheMiss: 0, output: 0 })
         const tier = tierKey === 'base' ? next : { ...(next[tierKey] ?? (value === null ? {} : normalizeClientTier(next))) }
@@ -592,9 +643,8 @@
           if (Object.keys(tier).length) next[tierKey] = tier
           else delete next[tierKey]
         }
-        const prices = isDefault ? { ...draft.prices, default: next }
-          : { ...draft.prices, models: { ...draft.prices.models, [modelId]: next } }
-        setDraft({ ...draft, prices })
+        setPriceFactor(next, tierKey + '.' + field, factor)
+        write(next)
       }
       const remove = () => {
         const models = { ...draft.prices.models }
@@ -603,13 +653,10 @@
       }
       const tierRow = (label, tierKey) => {
         const tier = tierKey === 'base' ? entry : entry[tierKey] ?? null
-        const emptyMode = tierKey === 'base' ? 'ignore' : 'clear'
         return el('div', { className: 'cm-price-row', key: tierKey },
           el('span', null, label),
-          numInput({ value: tier?.cacheHit ?? null, emptyMode }, v => setTier(tierKey, 'cacheHit', v)),
-          numInput({ value: tier?.cacheMiss ?? null, emptyMode }, v => setTier(tierKey, 'cacheMiss', v)),
-          cacheWriteInput(tier, label, t, v => setTier(tierKey, 'cacheWrite', v), entry.cacheHit),
-          numInput({ value: tier?.output ?? null, emptyMode }, v => setTier(tierKey, 'output', v)))
+          ...['cacheHit', 'cacheMiss', 'cacheWrite', 'output'].map(field => el(Fragment, { key: field },
+            priceInput(entry, tier, tierKey, field, label, t, (v, factor) => setTier(tierKey, field, v, factor), entry.cacheHit))))
       }
       return el('div', { className: 'cm-price-card' },
         el('div', { className: 'cm-price-head' },
@@ -625,6 +672,7 @@
         tierRow(t('tierBase'), 'base'),
         tierRow(t('tierOffPeak'), 'offPeak'),
         tierRow(t('tierPeak'), 'peak'),
+        multiplierOptions(entry, t, separate => write({ ...rawEntry, separateMultipliers: separate, multipliers: {} })),
         Array.isArray(rawEntry?.rateHistory) && rawEntry.rateHistory.length > 0
           ? el('p', { className: 'cm-note' }, t('datedPriceNote')) : null)
     }
@@ -986,19 +1034,24 @@
         providers[provider] = { ...table, models }
         setDraft({ ...draft, prices: { ...draft.prices, providers } })
       }
-      const setNum = (field, value) => {
+      const setNum = (field, value, factor) => {
         if (draft === null) return
         const models = { ...((draft.prices.providers ?? {})[provider]?.models ?? {}) }
         models[modelId] = { ...(models[modelId] ?? {}), [field]: Math.max(0, value) }
         if (value === null) delete models[modelId][field]
+        // Canonical aliases may be present in imported price tables.
+        if (field === 'input') delete models[modelId].cacheMiss
+        if (field === 'cachedInput') { delete models[modelId].cacheHit; delete models[modelId].cacheRead }
+        setPriceFactor(models[modelId], 'base.' + ({ input: 'cacheMiss', cachedInput: 'cacheHit' }[field] ?? field), factor)
         writeModels(models)
       }
-      const setCny = (field, value) => {
+      const setCny = (field, value, factor) => {
         if (draft === null) return
         const models = { ...((draft.prices.providers ?? {})[provider]?.models ?? {}) }
         const current = models[modelId] ?? {}
         models[modelId] = { ...current, cny: { ...current.cny, [field]: Math.max(0, value) } }
         if (value === null) delete models[modelId].cny[field]
+        setPriceFactor(models[modelId], 'cny.' + field, factor)
         writeModels(models)
       }
       const remove = () => {
@@ -1027,16 +1080,13 @@
             el('div', { className: 'cm-price-row' },
               el('span', null, 'USD'),
               // 第三方三桶为必填计价结构:清空不提交(保留原值),避免误清成 0 价免费。
-              numInput({ value: entry?.input ?? null, emptyMode: 'ignore' }, v => setNum('input', v)),
-              numInput({ value: entry?.cachedInput ?? null, emptyMode: 'ignore' }, v => setNum('cachedInput', v)),
-              cacheWriteInput(entry, 'USD', t, v => setNum('cacheWrite', v)),
-              numInput({ value: entry?.output ?? null, emptyMode: 'ignore' }, v => setNum('output', v))),
+              ...['cacheMiss', 'cacheHit', 'cacheWrite', 'output'].map(field => el(Fragment, { key: field },
+                priceInput(entry, entry, 'base', field, 'USD', t, (v, factor) => setNum({ cacheMiss: 'input', cacheHit: 'cachedInput' }[field] ?? field, v, factor))))),
             entry?.cny ? el('div', { className: 'cm-price-row' },
               el('span', null, 'CNY'),
-              numInput({ value: entry.cny.cacheMiss, emptyMode: 'ignore' }, v => setCny('cacheMiss', v)),
-              numInput({ value: entry.cny.cacheHit, emptyMode: 'ignore' }, v => setCny('cacheHit', v)),
-              cacheWriteInput(entry.cny, 'CNY', t, v => setCny('cacheWrite', v)),
-              numInput({ value: entry.cny.output, emptyMode: 'ignore' }, v => setCny('output', v))) : null))
+              ...['cacheMiss', 'cacheHit', 'cacheWrite', 'output'].map(field => el(Fragment, { key: field },
+                priceInput(entry, entry.cny, 'cny', field, 'CNY', t, (v, factor) => setCny(field, v, factor))))) : null,
+            multiplierOptions(entry, t, separate => writeModels({ ...draft.prices.providers[provider].models, [modelId]: { ...entry, separateMultipliers: separate, multipliers: {} } }))))
     }
 
     // ── 余额面板(设置页,按 balance.display 配置挂载) ────────────────────────
