@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- 修复 [@playgithub 反馈的 #274](https://github.com/Han-1413141/dsh-cost-meter/issues/274#issuecomment-6215322540)：后台旧查询不能再覆盖刚保存的 OpenDesign 开关、工作区及其他费用配置；保存期间暂停重复读取，保存失败后恢复轮询。
+
 ## [1.8.33] - 2026-10-16
 
 - 修复 [ztszzz733 报告并定位的 #292](https://github.com/Han-1413141/dsh-cost-meter/issues/292)：移除 V4 Pro 错套 Flash 价的规则，恢复官方独立 CNY/USD 峰谷价格；只升级可识别的旧错误模板，保留手动价格、倍率与第三方渠道价。
