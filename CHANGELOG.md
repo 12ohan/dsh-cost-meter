@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- **Antigravity 网关额度首选全量端点**：调整 `ANTIGRAVITY_QUOTA_URLS` 顺序，将生产全量端点 `cloudcode-pa.googleapis.com` 置于首位。修复因 `queryApiAccount` 遇到首个成功即 break、原顺序优先请求仅返回第三方模型的 daily 端点导致 Gemini 额度恒丢失的问题；daily 和 sandbox 端点保留作为回退。
+
 ## [1.8.31] - 2026-10-16
 
 - 接入 [UNscientific-9 的 PR #287](https://github.com/Han-1413141/dsh-cost-meter/pull/287)：价格模型搜索与选择合为单框，支持键盘和输入法，候选浮层沿用宿主主题并避开滚动裁剪。
