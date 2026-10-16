@@ -178,8 +178,13 @@ if (process.argv[2] === '--worker') {
     process.env.DSH_HOME = join(root, 'processes')
     const shared = Ledger.open(); ledgers.push(shared)
     call(shared, 'seed'); save(shared)
-    const children = Array.from({ length: 8 }, () => launch('write'))
-    await Promise.all(children.map(c => c.ready))
+    // Startup itself takes the ledger lock. Prepare one reader at a time so
+    // Windows process startup cannot exhaust the normal five-second lock wait.
+    // Each still reads the same snapshot; release all eight writers together.
+    const children = []
+    for (let i = 0; i < 8; i++) {
+      const child = launch('write'); children.push(child); await child.ready
+    }
     for (const child of children) child.child.send('flush')
     await Promise.all(children.map(c => c.done))
     save(shared)
