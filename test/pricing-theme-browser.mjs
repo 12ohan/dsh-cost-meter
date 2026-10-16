@@ -38,8 +38,9 @@ ${client}
 ${readSource('src/pricing/index.js')}
 const {CostSection,parseConfig}=window.costUI.preview;
 const state=${literal(initialState)};state.config=parseConfig(state.config,'config');
-window.patches=[];window.reprices=[];
-const pricing=window.priceUI.mount({effect:fn=>fn(),get:key=>key==='remote'?{$mount:async()=>()=>{}}:{getRepricingHistory:async()=>({ok:true,value:window.reprices.length?[{at:1792050000000,before:1,after:2,days:1,sessions:1,skipped:0}]:[]}),repriceHistory:async confirmed=>{window.reprices.push(confirmed);return {ok:true,value:{ok:true,message:'已重算，原金额已保留。'}}}}});
+if(new URLSearchParams(location.search).has('many'))state.today.byProviderModel=state.month.byProviderModel=Object.fromEntries(Array.from({length:500},(_,i)=>['channel:model-'+i,{calls:1,input:1,output:1,cost:0}]));
+window.patches=[];window.reprices=[];window.historyReads=0;
+const pricing=window.priceUI.mount({effect:fn=>fn(),get:key=>key==='remote'?{$mount:async()=>()=>{}}:{getRepricingHistory:async()=>{window.historyReads++;return ({ok:true,value:window.reprices.length?[{at:1792050000000,before:1,after:2,days:1,sessions:1,skipped:0}]:[]})},repriceHistory:async confirmed=>{window.reprices.push(confirmed);return {ok:true,value:{ok:true,message:'已重算，原金额已保留。'}}}}});
 const api={reload:async()=>{},loadPricing:()=>pricing,loadOpenRouter:async()=>()=>null,updateConfig:async patch=>{window.patches.push(patch)}};
 createRoot(document.getElementById('root')).render(React.createElement(CostSection,{useCost:()=>({state,status:'ready'}),api}));
 window.fixtureReady=true;
@@ -53,7 +54,7 @@ const dark = { ...midnight, '--dsw-alias-label-primary': '#ececee', '--dsw-alias
 const html = '<!doctype html><html style="color-scheme:light"><head><meta charset="utf-8"><style>body{margin:0;padding:24px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:13px/1.5 system-ui}#root{max-width:900px;margin:auto}</style></head><body><div id="root"></div><select id="host-control"><option>Host control</option><option>Other plugin</option></select><script src="/app.js"></script></body></html>'
 const server = createServer((request, response) => {
   if (request.url === '/app.js') { response.setHeader('content-type', 'text/javascript'); response.end(compiled.outputFiles[0].contents) }
-  else if (request.url === '/') { response.setHeader('content-type', 'text/html; charset=utf-8'); response.end(html) }
+  else if (request.url.split('?')[0] === '/') { response.setHeader('content-type', 'text/html; charset=utf-8'); response.end(html) }
   else { response.statusCode = 404; response.end() }
 })
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -89,7 +90,7 @@ try {
       color: getComputedStyle(select).color, background: getComputedStyle(select).backgroundColor,
       options: [...select.options].map(option => ({ color: getComputedStyle(option).color, background: getComputedStyle(option).backgroundColor })),
     })))
-    assert.ok(colors.length >= 4 && colors.every(select => select.options.length > 1), 'pricing choices are present')
+    assert.ok(colors.length === 3 && colors.every(select => select.options.length > 1), 'pricing choices are present')
     for (const select of colors) for (const option of select.options) {
       assert.equal(option.background, select.background, `${theme}: every unhovered native option has the theme background`)
       assert.equal(option.color, select.color, `${theme}: every unhovered native option has the theme text color`)
@@ -109,6 +110,12 @@ try {
     await page.screenshot({ path: join(output, theme + '.png'), fullPage: true })
     checks.push({ theme, selectors: colors.length, options: colors.reduce((sum, select) => sum + select.options.length, 0) })
   }
+  assert.equal(await page.locator('.cm-price-card').count(), 0, 'catalog cards stay unmounted on model pricing');
+  assert.equal(await page.evaluate(() => window.historyReads), 0, 'model pricing does not load historical pricing');
+  const modelFilter = page.getByRole('searchbox', { name: '查找已用模型' });
+  await modelFilter.fill('fixture'); assert.equal(await page.locator('.cm-match-row').count(), 1);
+  await modelFilter.press('Escape'); assert.equal(await page.locator('.cm-match-row').count(), 2);
+  assert.equal(await page.evaluate(() => window.patches.length), 0, 'model filtering does not save configuration');
   const model = page.locator('.cm-match-row select').first()
   const search = page.locator('.cm-match-row input[type=search]').first()
   await search.fill('opencode gpt')
@@ -137,7 +144,7 @@ try {
   await custom.getByRole('checkbox', { name: '分别设置倍率' }).check()
   await outputPrice.fill('8 x 0.5'); await outputPrice.press('Tab')
   await page.waitForFunction(() => window.patches.some(p => p.prices?.custom?.['fixture:unknown']?.multipliers?.['base.output'] === .5))
-  assert.ok((await custom.getByRole('status').textContent()).includes('1.6 / 0 / 4'), 'effective prices use the shared and separate factors')
+  assert.deepEqual(await custom.locator('.cm-effective-grid strong').allTextContents(), ['$1.6', '$0', '$4'], 'effective prices use the shared and separate factors')
   const countBeforeInvalid = await page.evaluate(() => window.patches.length)
   await inputPrice.fill('2 × nope'); await inputPrice.press('Enter')
   await page.waitForTimeout(180)
@@ -157,6 +164,7 @@ try {
     assert.ok(bounds.fields.length >= 3 && bounds.fields.every(value => value >= 80), 'custom price fields remain readable at '+width)
   }
   await page.screenshot({ path: join(output, 'custom-channel-price.png'), fullPage: true })
+  await page.getByRole('tab', { name: '同步与规则', exact: true }).click()
   const reprice = page.getByRole('button', { name: '按当前价格重算历史', exact: true })
   await reprice.click()
   await page.getByRole('alert').filter({ hasText: '这会改变历史费用' }).waitFor()
@@ -169,11 +177,26 @@ try {
   assert.deepEqual(await page.evaluate(() => window.reprices), [true])
   await page.getByText('重算记录 · 原金额已保留', { exact: true }).click()
   await page.getByRole('columnheader', { name: '原金额', exact: true }).waitFor()
+  await page.getByRole('tab', { name: '模型定价', exact: true }).click()
+  await page.getByRole('tab', { name: '模型定价', exact: true }).press('ArrowRight')
+  assert.equal(await page.getByRole('tab', { name: '参考价格表', exact: true }).getAttribute('aria-selected'), 'true')
+  await page.getByRole('heading', { name: '已挂载的价格表', exact: true }).waitFor()
+  await page.goto(url + '?many=1'); await page.waitForFunction(() => window.fixtureReady)
+  await page.getByRole('tab', { name: '价格', exact: true }).click()
+  await page.locator('.cm-match-row').first().waitFor()
+  assert.equal(await page.locator('.cm-match-row').count(), 24, 'large model lists render only their first page')
+  await page.getByRole('button', { name: '显示更多 · 还有 476 个', exact: true }).click()
+  assert.equal(await page.locator('.cm-match-row').count(), 48)
+  await page.getByRole('searchbox', { name: '查找已用模型' }).fill('channel model-499')
+  assert.equal(await page.locator('.cm-match-row').count(), 1, 'filter searches models beyond the rendered page')
+  assert.ok((await page.locator('.cm-model-identity').textContent()).includes('model-499'))
+  assert.equal(await page.evaluate(() => window.patches.length), 0)
   assert.deepEqual(external, [], 'theme test sends no external requests')
   assert.deepEqual(errors, [], 'settings render without browser errors')
   writeFileSync(join(output, 'report.json'), JSON.stringify({ checks, baseline, errors, external }, null, 2) + '\n')
   console.log(JSON.stringify({ checks, selectionSaved: true, browserErrors: errors.length, externalRequests: external.length }))
 } catch (error) {
+  console.error(error)
   console.error(await page.locator('.cm-repricing').evaluateAll(nodes => nodes.map(node => node.outerHTML)))
   console.error(JSON.stringify({ browserErrors: errors, styles: await page.evaluate(() => [...document.styleSheets].flatMap(sheet => [...sheet.cssRules].filter(rule => rule.selectorText?.includes('option')).map(rule => rule.cssText))), sample: await page.locator('select.cm-input').evaluateAll(selects => selects.map(select => ({html: select.outerHTML.slice(0, 180), background: getComputedStyle(select).backgroundColor, options: [...select.options].slice(0,2).map(option=>({html:option.outerHTML,color:getComputedStyle(option).color,background:getComputedStyle(option).backgroundColor}))}))) }))
   throw error

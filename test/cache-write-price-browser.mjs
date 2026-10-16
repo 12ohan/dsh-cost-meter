@@ -35,13 +35,15 @@ const source = readdirSync('src/client').filter(name => name.endsWith('.js')).so
 const code = `
 import React from ${literal(req.resolve('react'))};
 import {createRoot} from ${literal(req.resolve('react-dom/client'))};
-window.__ModuleLoader__={load:mod=>window.costUI=mod.factory(name=>name==='react'?React:{Tooltip:({children})=>children})};
+window.__ModuleLoader__={load:mod=>{const value=mod.factory(name=>name==='react'?React:{Tooltip:({children})=>children});if(mod.chunk==='client.pricing.js')window.priceUI=value;else window.costUI=value}};
 ${source};
+${readFileSync('src/pricing/index.js', 'utf8')};
 (async()=>{
   const {CostSection,parseConfig}=window.costUI.preview;
   const state=${literal(state)}; state.config=parseConfig(await window.readSavedConfig(),'config');
   window.savedCount=0;
-  const api={loadOpenRouter:async()=>()=>null, updateConfig:async patch=>{
+  const pricing=window.priceUI.mount({effect:fn=>fn(),get:key=>key==='remote'?{$mount:async()=>()=>{}}:{}});
+  const api={loadPricing:()=>pricing,loadOpenRouter:async()=>()=>null, updateConfig:async patch=>{
     await window.saveConfig(patch);window.savedCount++;
   }};
   createRoot(document.getElementById('root')).render(React.createElement(CostSection,{useCost:()=>({state,status:'ready'}),api}));
@@ -76,7 +78,7 @@ const card = name => page.locator('.cm-price-card').filter({ has: page.locator('
 const open = async (english = false) => {
   await page.goto(url); await page.waitForFunction(() => window.fixtureReady)
   await page.getByRole('tab', { name: english ? 'Pricing' : '价格', exact: true }).click()
-  await page.getByRole('button', { name: english ? 'Price table (USD / 1M tokens)' : '价格表(美元 / 1M tokens)', exact: true }).click()
+  await page.getByRole('tab', { name: english ? 'Price tables' : '参考价格表', exact: true }).click()
   await page.locator('.cm-vendor-toggle').filter({ hasText: 'fixture' }).click()
   await card('cache-model').getByRole('textbox', { name: english ? 'USD · Cache write' : 'USD · 缓存写入', exact: true }).waitFor()
 }

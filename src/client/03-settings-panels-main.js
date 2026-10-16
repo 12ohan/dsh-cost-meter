@@ -1892,8 +1892,8 @@
       const [confirmImport, setConfirmImport] = useState(false)
       const [newModelId, setNewModelId] = useState('')
       const [busy, setBusy] = useState(false)
-      // 价格表折叠开关(默认收起,保持设置页简洁;三角按钮展开)。
-      const [priceOpen, setPriceOpen] = useState(false)
+      // 只渲染当前价格分区；模型定价为首屏，价格表和同步操作按需挂载。
+      const [pricingView, setPricingView] = useState('models')
       // 第三方厂商分组折叠状态(默认全部收起):拓展价格表面板移除后,第三方价格卡片
       // 改由价格表内的厂商分组承载,展开某厂商才渲染其卡片,避免一次渲染数百张卡片。
       const [openVendors, setOpenVendors] = useState({})
@@ -2055,7 +2055,7 @@
         setDraft({ ...draft, prices: { ...draft.prices, models } })
         setNewModelId('')
       }
-      const priceCards = tab !== 'pricing' || draft === null ? [] : Object.keys(draft.prices.models)
+      const priceCards = tab !== 'pricing' || pricingView !== 'catalog' || draft === null ? [] : Object.keys(draft.prices.models)
         .filter(modelId => {
           // priceTableDisplay 按模型门控:缺省直接显示;显式 false 的收入厂商折叠分组。
           const displayMap = draft?.priceTableDisplay ?? config.priceTableDisplay ?? {}
@@ -2225,13 +2225,19 @@
           renderModelsSettings: () => el(ModelSidebarSettings, { draft, setDraft, t }) }))
         : null,
         // ── 价格:峰谷计价、价格表、模型名匹配、官方价格同步、OpenRouter 公开报价 ──
-        tab === 'pricing' ? el(Fragment, { key: 'pricing' },
-        // 峰谷计价与提示(独立面板:启用/提示开关、样式切换、时段条预览)
-        el(PeakPanel, { state, draft, setDraft, t }),
-        // 价格表(可折叠,默认收起;priceTableDisplay 按模型门控:未勾选直接显示的模型收入厂商折叠分组)
-        el('div', null,
-          collapseHeader(priceOpen, () => setPriceOpen(!priceOpen), t('priceTableTitle')),
-          priceOpen ? el('div', { className: 'cm-collapse-body' },
+        tab === 'pricing' ? el('div', { key: 'pricing', className: 'cm-pricing-page' },
+        el('div', { className: 'cm-pricing-heading' },
+          el('div', null, el('h3', { className: 'cm-h' }, locale === 'en' ? 'Pricing' : '价格设置'), el('p', { className: 'cm-note' }, locale === 'en' ? 'New prices apply to future calls. Historical costs keep their original rates.' : '价格修改用于后续调用，历史费用沿用原价格。')),
+          el('span', { className: 'cm-pricing-unit' }, locale === 'en' ? 'Per 1M tokens' : '每百万 Token')),
+        el('div', { className: 'cm-pricing-nav', role: 'tablist', 'aria-label': locale === 'en' ? 'Pricing sections' : '价格分区' },
+          [['models', '模型定价', 'Model pricing'], ['catalog', '参考价格表', 'Price tables'], ['tools', '同步与规则', 'Sync & rules']].map(([key, zh, en]) => el('button', { key, id: 'cm-pricing-' + key, type: 'button', role: 'tab', 'aria-selected': pricingView === key, 'aria-controls': 'cm-pricing-panel', tabIndex: pricingView === key ? 0 : -1, className: 'cm-pricing-nav-item' + (pricingView === key ? ' active' : ''), onClick: () => setPricingView(key), onKeyDown: event => { const keys = ['models', 'catalog', 'tools']; const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0; if (step) { event.preventDefault(); const next = keys[(keys.indexOf(key) + step + 3) % 3]; setPricingView(next); event.currentTarget.parentElement.querySelector('#cm-pricing-' + next)?.focus() } } }, locale === 'en' ? en : zh))),
+        el('div', { id: 'cm-pricing-panel', className: 'cm-pricing-content', role: 'tabpanel', 'aria-labelledby': 'cm-pricing-' + pricingView },
+        pricingView === 'models' ?
+        el(BillingStatistics, { state, api, load: api.loadPricing, mode: 'matching', draft, setDraft, t, locale, resolveClientPrice, prettyProviderKey, setField, priceEditor: { PriceInput, priceFactor, setPriceFactor, multiplierOptions, priceMultiplierSettings } }) : null,
+        // 参考价格表：只在此分区挂载；未直接显示的模型保留在厂商分组。
+        pricingView === 'catalog' ? el('div', { className: 'cm-pricing-catalog' },
+          el('h3', { className: 'cm-h' }, t('priceTableTitle')),
+          el('div', { className: 'cm-collapse-body' },
           el('p', { className: 'cm-note' }, t('priceTableNote')),
           el('p', { className: 'cm-hint' }, t('priceTableDisplayHint')),
           el('div', { className: 'cm-catalog-vendor' }, t('deepseekMountedHeader')),
@@ -2282,12 +2288,12 @@
             })
           })(),
           el(BillingStatistics, { state, api, load: api.loadPricing, mode: 'restore', draft, setDraft, locale }))
-          : null),
-        // 模型名匹配(自动匹配开关 + 未命中模型的手动指定)
-        el(BillingStatistics, { state, api, load: api.loadPricing, mode: 'matching', draft, setDraft, t, locale, resolveClientPrice, prettyProviderKey, setField, priceEditor: { PriceInput, priceFactor, setPriceFactor, multiplierOptions, priceMultiplierSettings } }),
-        el(BillingStatistics, { state, api, load: api.loadPricing, mode: 'history', locale, disabled: busy || JSON.stringify(draft) !== savedRef.current }),
+          ) : null,
+        pricingView === 'tools' ? el('div', { className: 'cm-pricing-tools' },
+        el('section', { className: 'cm-pricing-tool' }, el(PeakPanel, { state, draft, setDraft, t })),
+        el('section', { className: 'cm-pricing-tool' }, el(BillingStatistics, { state, api, load: api.loadPricing, mode: 'history', locale, disabled: busy || JSON.stringify(draft) !== savedRef.current })),
         // 官方价格同步(与价格表同组;自动保存状态已移至标签栏常驻)
-        el('div', null,
+        el('section', { className: 'cm-pricing-tool' },
           el('h3', { className: 'cm-h' }, t('dataSync')),
           (draft ?? config).currency === 'CNY' && (draft ?? config).prices?.currency !== 'CNY'
             ? el('div', { className: 'cm-note', role: 'status' },
@@ -2321,7 +2327,7 @@
           el('p', { className: 'cm-note' }, t('syncScopeNote'))),
         // OpenRouter 公开报价(只读查阅,非必做设置):放在价格标签末尾,先呈现要操作的
         // 设置项;它本身是按需加载块,靠后渲染等于延后加载,不增加首屏开销。
-        el(BillingStatistics, { state, api, load: api.loadOpenRouter }))
+        el('section', { className: 'cm-pricing-tool' }, el(BillingStatistics, { state, api, load: api.loadOpenRouter }))) : null))
         : null,
         el(BillingStatistics, { state, api, load: api.loadCommunity, locale, quiet: true, footer: true }))
     }

@@ -288,6 +288,7 @@ for (const locale of ['zh', 'en']) {
   } }
   section = renderer(ui.CostSection, () => ({ useCost: () => ({ state: current, status: 'ready' }), api: currencyApi }))
   tree = openPrices()
+  button(tree, locale === 'en' ? 'Sync & rules' : '同步与规则').props.onClick(); tree = section()
   assert.ok(textOf(tree).includes(t('pricingCnyHint', { rate: 7.2 })))
   button(tree, t('pricingCurrencyCny')).props.onClick()
   section()
@@ -322,7 +323,7 @@ console.log('[ok] 设置交互：千问空费率/自动保存回读/模型移除
   const section = renderer(ui.CostSection, () => ({ useCost: () => ({ state: current }), api: {} }))
   let tree = section()
   button(tree, '价格').props.onClick(); tree = section()
-  button(tree, '价格表(美元 / 1M tokens)').props.onClick(); tree = section()
+  button(tree, '参考价格表').props.onClick(); tree = section()
   for (const [vendor, id] of [['DeepSeek', 'deepseek-v4-flash'], ['OpenAI', 'gpt-6-astra']]) {
     const group = nodes(tree).find(node => node.props.className === 'cm-catalog-vendor cm-vendor-toggle' && textOf(node).includes(vendor))
     assert.ok(group, vendor + ' is reachable')
