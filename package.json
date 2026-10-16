@@ -122,7 +122,8 @@
     "docs/context-stream-diagnostics.md",
     "docs/exchange-rates.md",
     "docs/update-notes-1.8.30.md",
-    "docs/idle-performance.md"
+    "docs/idle-performance.md",
+    "docs/custom-model-prices.md"
   ],
   "dependencies": {
     "acorn": "8.15.0",

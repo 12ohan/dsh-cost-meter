@@ -77,6 +77,14 @@ const textOf = tree => typeof tree === 'string' ? tree : (tree?.children ?? []).
 const button = (tree, label) => nodes(tree).find(node => node.type === 'button' && textOf(node) === label)
 const rowFor = (tree, model) => nodes(tree).find(node => node.props.className === 'cm-match-row' && textOf(node).includes(model))
 const roundTrip = config => ui.parseConfig(sanitizeConfig(config), 'config')
+{
+ const key = 'channel:model', custom = { cacheMiss: 2, cacheHit: .1, output: 8, currency: 'CNY', multiplier: .8, separateMultipliers: true, multipliers: { 'base.output': .5 } }
+ const config = roundTrip(stateSchema.shape.config.parse(sanitizeConfig({ prices: { custom: { [key]: custom } }, priceOverrides: { [key]: '__custom__' } })))
+ assert.equal(config.prices.custom[key].currency, 'CNY')
+ assert.equal(config.prices.custom[key].multiplier, .8)
+ assert.equal(config.prices.custom[key].multipliers['base.output'], .5)
+ assert.equal(config.priceOverrides[key], '__custom__')
+}
 assert.equal(roundTrip({}).codexQuotaSidebar, true, 'old configs retain the sidebar card')
 for (const key of ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'sessionCostCompact']) {
   assert.equal(roundTrip({})[key], false)

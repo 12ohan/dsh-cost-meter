@@ -93,7 +93,7 @@
     }
     function parsePrice(v, path) {
       needObject(v, path)
-      const out = parsePriceTier(v, path)
+      const out = { ...parsePriceTier(v, path), ...priceMultiplierSettings(v) }
       for (const key of ['offPeak', 'peak', 'legacyBase', 'longContext']) {
         if (v[key] === undefined) continue
         out[key] = parsePriceTier(v[key], path + '.' + key, ['cacheWrite', 'reasoning', 'aboveInputTokens'])
@@ -636,6 +636,25 @@
     }
     /** 一档价格补齐(v1.6.9 起与 lib/pricing.js completeTier 同口径的客户端镜像):
      *  只认非负有限数字,补齐 cacheMiss/cacheHit 缺省;子档(offPeak/peak/legacyBase)同规则。 */
+    function priceMultiplierSettings(entry) {
+      return Object.fromEntries(['multiplier', 'separateMultipliers', 'multipliers'].filter(key => entry?.[key] !== undefined).map(key => [key, entry[key]]))
+    }
+    function priceFactor(entry, path) {
+      return (entry.separateMultipliers ? entry.multipliers?.[path] : undefined) ?? entry.multiplier ?? 1
+    }
+    function multipliedTier(price, entry, path = 'base') {
+      const tier = {}
+      for (const field of ['cacheHit', 'cacheMiss', 'cacheWrite', 'output', 'reasoning']) {
+        if (price[field] !== undefined) tier[field] = price[field] * priceFactor(entry, path + '.' + field)
+      }
+      if (price.longContext) tier.longContext = { ...multipliedTier(price.longContext, entry, 'longContext'), aboveInputTokens: price.longContext.aboveInputTokens }
+      return tier
+    }
+    function cnyPrice(entry) {
+      const settings = priceMultiplierSettings(entry)
+      if (settings.multipliers) settings.multipliers = Object.fromEntries(Object.entries(settings.multipliers).filter(([path]) => path.startsWith('cny.')).map(([path, value]) => [path.replace('cny.', 'base.'), value]))
+      return { ...entry.cny, ...settings }
+    }
     function normalizeClientTier(raw) {
       if (raw === null || typeof raw !== 'object') return undefined
       const n = key => {
@@ -653,6 +672,7 @@
     function normalizeClientPrice(raw) {
       const base = normalizeClientTier(raw)
       if (base === undefined) return null
+      Object.assign(base, priceMultiplierSettings(raw))
       if (raw.billingMode === 'utc-peak') base.billingMode = 'utc-peak'
       // 峰谷/历史子档必须随主档一起保留:usageSplit 回退计价与 Plan 拆分靠 tierFor
       // 取子档,剥掉会把峰时调用按基础价(= 谷价)重算、低估约一半(v1.6.9 审计修复)。
@@ -718,30 +738,29 @@
     const LEGACY_BASE_BOUNDARY_MS = Date.parse('2026-08-16T16:00:00Z')
     function tierFor(entry, atMs, peak) {
       const base = priceAt(entry, atMs) ?? { cacheHit: 0, cacheMiss: 0, output: 0 }
-      const asTier = price => ({ cacheHit: price.cacheHit, cacheMiss: price.cacheMiss, output: price.output, reasoning: price.reasoning ?? 0,
-        ...(price.cacheWrite === undefined ? {} : { cacheWrite: price.cacheWrite }), ...(price.longContext === undefined ? {} : { longContext: price.longContext }) })
+      const asTier = (price, path = 'base') => ({ reasoning: 0, ...multipliedTier(price, base, path) })
       if (base.billingMode === 'utc-peak') {
         if (peak?.enabled !== true || !Number.isFinite(atMs)) return asTier(base)
         const date = new Date(atMs), day = date.getUTCDay(), hour = date.getUTCHours()
         const high = day > 0 && day < 6 && ((hour >= 1 && hour < 4) || (hour >= 6 && hour < 10))
-        return asTier((high ? base.peak : base.offPeak) ?? base)
+        return asTier((high ? base.peak : base.offPeak) ?? base, (high ? base.peak : base.offPeak) ? (high ? 'peak' : 'offPeak') : 'base')
       }
       // 峰谷时代之前按当时的基础价计费(历史正确;与 lib/pricing.js tierFor 同分支,
       // v1.6.9 审计修复:客户端镜像此前缺该分支,分界前回放桶会按当前价重算)。
       if (Number.isFinite(atMs) && atMs < LEGACY_BASE_BOUNDARY_MS) {
         const lb = base.legacyBase
-        return lb === undefined ? asTier(base) : asTier(lb)
+        return lb === undefined ? asTier(base) : asTier(lb, 'legacyBase')
       }
       if (peak?.enabled !== true) return asTier(base)
       // 非有限(如 Date.parse('') 的 NaN)视同「未知生效时刻」,与服务端 tierFor 同口径。
       const effectiveAtMs = typeof peak.effectiveAtMs === 'number' && Number.isFinite(peak.effectiveAtMs) ? peak.effectiveAtMs : undefined
       if (isPeakHour(atMs, effectiveAtMs, peak.windows, peak.holidays)) {
         const p = base.peak
-        return p === undefined ? asTier(base) : asTier(p)
+        return p === undefined ? asTier(base) : asTier(p, 'peak')
       }
       if (effectiveAtMs !== undefined && atMs >= effectiveAtMs) {
         const off = base.offPeak
-        return off === undefined ? asTier(base) : asTier(off)
+        return off === undefined ? asTier(base) : asTier(off, 'offPeak')
       }
       return asTier(base)
     }
@@ -923,8 +942,7 @@
       let targetModel = modelId
       const override = overrides[provider + ':' + modelId]
       if (override === '__custom__') {
-        const raw = prices.custom?.[provider + ':' + modelId], entry = raw ? { ...raw } : null
-        if (entry) for (const key of ['cacheMiss', 'cacheHit', 'output', 'cacheWrite', 'reasoning']) if (entry[key] !== undefined) entry[key] *= entry.multiplier ?? 1
+        const entry = prices.custom?.[provider + ':' + modelId]
         return { entry: entry ?? null, priced: !!entry, billingMode: 'flat', matched: true, currency: entry?.currency ?? 'USD' }
       }
       // 「本地模型(零消耗)」哨兵(与 pricing.js 同口径):覆盖目标 __local__ →
@@ -1028,7 +1046,7 @@
         result = legacyDeepseekOverride(normalized, config?.priceOverrides?.[normalized + ':' + modelId], config?.prices ?? {}, config?.priceMatch === 'exact' ? 'exact' : 'auto') ?? result
       }
       if (result.priced && config?.prices?.currency === 'CNY' && result.entry?.cny) {
-        return { ...result, entry: result.entry.cny, currency: 'CNY' }
+        return { ...result, entry: cnyPrice(result.entry), currency: 'CNY' }
       }
       return { ...result, currency: result.priced && result.billingMode === 'deepseek-peak' && config?.prices?.currency === 'CNY' ? 'CNY' : 'USD' }
     }
@@ -1588,7 +1606,7 @@
         ...(planPart > 0 ? [t('sessionDetailPlan', { amount: formatMoneyUsd(planPart, config) })] : []),
         modelCostDetail(usage, config),
       ].filter(Boolean).join('; ')
-      return el(Tooltip, { label: detail, side: 'top', delayMs: 500 },
+      return el(Tooltip, { portal: true, label: detail, side: 'top', delayMs: 500 },
         el('div', { className: 'cm-chip' }, planPart > 0
           ? t('costChipPlan', { amount: formatMoneyUsd(cost, config) })
           : t('cost', { amount: formatMoneyUsd(cost, config) })))
@@ -1798,7 +1816,7 @@
       const refresh = useClickRefresh(api ? () => api.refreshBalance() : null)
       if (!balance || balance.status === 'off') return null
       if (balance.status === 'error') {
-        return el(Tooltip, { label: [t('balanceQueryFailed', { message: balance.message || t('unknownError') }), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
+        return el(Tooltip, { portal: true, label: [t('balanceQueryFailed', { message: balance.message || t('unknownError') }), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
           el('div', { 'data-cm-display': 'balance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
             wide ? el(Fragment, null, t('balance'), ' ', el('span', { className: 'cm-num' }, t('queryFailed'))) : '⚠'))
       }
@@ -1813,7 +1831,7 @@
         ...(state.reconcile?.ok === false ? ['⚠ ' + state.reconcile.message] : []),
         ...clickRefreshTipLines(t, refresh),
       ].join('; ')
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { 'data-cm-display': 'balance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? el(Fragment, null, el('span', { className: 'cm-balance-name' }, t('balance'), rechargeLinkEl(t)), el('span', { className: 'cm-num cm-bal-amt' }, formatBalanceMoney(balance.totalBalance, state.config, balance.currency)), state.reconcile?.ok === false ? ' ⚠' : '') : el(WalletIcon, { size: 16 })))
     }
@@ -1844,7 +1862,7 @@
           el('span', { className: 'cm-balance-name' }, el('span', { className: 'cm-bbox-label' }, t('balance')), rechargeLinkEl(t)),
           el('span', { className: 'cm-bbox-pct cm-num cm-bal-amt' }, remaining)),
         el(BalanceBar, { segments, direction: barDirectionOf(config, 'balance') }))
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { 'data-cm-display': 'balance', className: 'cm-bbox clickable' + (wide ? '' : ' rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? body : el('div', { className: 'cm-bbox-rail cm-num' }, Math.round(segments.remainingPct) + '%')))
     }
@@ -1966,7 +1984,7 @@
       const refresh = useClickRefresh(api ? () => api.refreshCustomBalance(index) : null)
       const view = customBalanceBoxBody(state, config, t, snapshot, entry)
       const detail = [customBalanceDetailText(snapshot, config, t, state, entry), ...clickRefreshTipLines(t, refresh)].join(' · ')
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { 'data-cm-display': 'customBalance', className: 'cm-bbox clickable' + (view.level === 'ok' ? '' : ' ' + view.level) + (wide ? '' : ' rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? view.body : el('div', { className: 'cm-bbox-rail cm-num' }, view.rail)))
     }
@@ -1989,13 +2007,13 @@
       const refresh = useClickRefresh(api ? () => api.refreshCustomBalance(index) : null)
       const label = resolveCustomBalanceLabel(entry ?? config.customBalance ?? {}, resolveLocale(config))
       if (custom.status === 'error') {
-        return el(Tooltip, { label: [custom.message || t('unknownError'), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
+        return el(Tooltip, { portal: true, label: [custom.message || t('unknownError'), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
           el('div', { 'data-cm-display': 'customBalance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
             wide ? el(Fragment, null, el('span', { className: 'cm-bal-label', title: label }, label), el('span', { className: 'cm-num cm-bal-amt' }, t('queryFailed'))) : '⚠'))
       }
       const amount = formatCustomBalanceMoney(custom.remaining, config, custom, entry)
       const detail = [customBalanceDetailText(custom, config, t, state, entry), ...clickRefreshTipLines(t, refresh)].join(' · ')
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { 'data-cm-display': 'customBalance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? el(Fragment, null, el('span', { className: 'cm-bal-label', title: label }, label), el('span', { className: 'cm-num cm-bal-amt' }, amount)) : el(WalletIcon, { size: 16 })))
     }
@@ -2068,7 +2086,7 @@
       }
       if (chips.length === 0) return null
       return el('div', { className: 'cm-corner' },
-        chips.map(c => el(Tooltip, { key: c.key, label: c.tip, side: 'top', delayMs: 500 },
+        chips.map(c => el(Tooltip, { portal: true, key: c.key, label: c.tip, side: 'top', delayMs: 500 },
           el('span', { className: 'cm-corner-chip' + (c.key === 'model-top' ? ' cm-model-top' : '') + (c.level === 'ok' ? '' : ' ' + c.level) }, c.text))))
     }
 
@@ -2272,7 +2290,7 @@
       const chipText = view.nextIntoPeak
         ? t('nextPeakIn', { time: countdownText(view, now, t) })
         : t('nextOffPeakIn', { time: countdownText(view, now, t) })
-      return el(Tooltip, { label: t(keys.notice), side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: t(keys.notice), side: 'right', delayMs: 300 },
         el('div', { 'data-cm-display': 'peak', className: 'cm-peak-strip ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off') },
           el('div', { className: 'cm-peak-track' },
             el('div', { className: 'cm-peak-segment cm-peak-high' }),
@@ -2295,7 +2313,7 @@
       const chipText = view.nextIntoPeak
         ? t('nextPeakIn', { time: countdownText(view, now, t) })
         : t('nextOffPeakIn', { time: countdownText(view, now, t) })
-      return el(Tooltip, { label: t(keys.notice), side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: t(keys.notice), side: 'right', delayMs: 300 },
         el('div', { 'data-cm-display': 'peak', className: 'cm-peak-classic ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off') },
           el('div', { className: 'cm-peak-classic-marker', style: { left: view.weekend || view.holiday ? '50%' : view.inPeak ? '25%' : '75%' } }),
           el('div', { className: 'cm-peak-track' },
@@ -2322,7 +2340,7 @@
         ? t('nextPeakIn', { time: countdownText(view, now, t) })
         : t('nextOffPeakIn', { time: countdownText(view, now, t) })
       const detail = [t(keys.notice), chipText]
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { className: 'cm-peak-rail ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off'), 'aria-label': detail.join('; ') },
           el('div', { className: 'cm-peak-rail-track' },
             el('div', { className: 'cm-peak-rail-segment cm-peak-rail-high' }),
@@ -2346,7 +2364,7 @@
         ? t('nextPeakIn', { time: countdownText(view, now, t) })
         : t('nextOffPeakIn', { time: countdownText(view, now, t) })
       const detail = [t(keys.notice), chipText]
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { className: 'cm-peak-rail-classic ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off'), 'aria-label': detail.join('; ') },
           el('div', { className: 'cm-peak-rail-classic-track' },
             el('div', { className: 'cm-peak-rail-classic-segment peak' }),
@@ -2452,7 +2470,7 @@
             : '')),
         t('goQuotaFetchedAt', { time: goQuota.fetchedAt > 0 ? new Date(goQuota.fetchedAt).toLocaleTimeString() : '—' }),
       ].join('; ')
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { 'data-cm-display': 'go', className: 'cm-bbox' + (view.level === 'ok' ? '' : ' ' + view.level) + (wide ? '' : ' rail') },
           wide ? view.body : el('div', { className: 'cm-bbox-rail cm-num' }, view.rail)))
     }
@@ -2559,7 +2577,7 @@
       const rail = el(Fragment, null,
         el('div', { className: 'cm-bbox-rail cm-num' }, fiveView.text),
         el('div', { className: 'cm-bbox-rail cm-num' }, sevenView.text))
-      return el(Tooltip, { label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
           ...hoverProps, 'data-cm-display': 'plan', className: 'cm-bbox cm-mm' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '')
             + (refresh ? ' clickable' + (refresh.busy ? ' busy' : '') : ''),
@@ -2684,7 +2702,7 @@
         el('div', { className: 'cm-mm-title' }, t('codexQuotaTitle')),
         view.row)
       const rail = el('div', { className: 'cm-bbox-rail cm-num' }, view.label === null ? '—' : view.label + '%')
-      return el(Tooltip, { label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
           ...hoverProps, 'data-cm-display': 'codex', className: 'cm-bbox cm-mm clickable' + (view.level === 'ok' ? '' : ' ' + view.level)
             + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''),
@@ -2750,7 +2768,7 @@
       const railText = pcts.length > 0
         ? pcts.slice(0, 2).map(p => simpleBarByDirection(p, planDirection).label + '%').join(' ')
         : (typeof entries[0][1]?.text === 'string' ? entries[0][1].text : '—')
-      return el(Tooltip, { label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', { ...hoverProps, 'data-cm-display': 'plan', className: 'cm-bbox cm-mm clickable' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide === false
             ? el('div', { className: 'cm-bbox-rail cm-num' }, railText)
@@ -2847,7 +2865,7 @@
       const pcts = rows.filter(r => r.view).map(r => r.view.label).filter(p => p !== null)
       const railText = pcts.length > 0 ? pcts.slice(0, 2).map(p => p + '%').join(' ') : (rows[0].text ?? '—')
       const rail = el('div', { className: 'cm-bbox-rail cm-num' }, railText)
-      return el(Tooltip, { label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
           ...hoverProps, className: 'cm-bbox cm-mm clickable' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''),
           ...clickableRefreshProps(refresh.busy, refresh.run),
@@ -3047,7 +3065,7 @@
           if (!busy && api) tipLines.push(t('clickToRefresh'))
           if (busy) tipLines.push(t('refreshing'))
           if (err) tipLines.push('⚠ ' + t('balanceRefreshFailed', { message: err }))
-          return el(Tooltip, { key: c.key, label: tipLines.join('; '), side: 'bottom', delayMs: 400 },
+          return el(Tooltip, { portal: true, key: c.key, label: tipLines.join('; '), side: 'bottom', delayMs: 400 },
             el('span', {
               className: 'cm-qchip' + (api ? ' action' : '') + (c.level === 'ok' ? '' : ' ' + c.level),
               ...(api ? clickableRefreshProps(busy, () => doRefresh(c.key)) : {}),
@@ -3215,12 +3233,12 @@
             total: formatMoneyUsd(displayCostOf(state.total, config), config),
           }),
         ].join('; ')
-        if (props.summary === true) return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+        if (props.summary === true) return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
           el('div', { 'data-cm-display': 'budget', className: 'cm-simple-summary' + (level === 'ok' ? '' : ' ' + level), tabIndex: 0 },
             el('span', null, t('todayBudget', { period: t(PERIOD_KEYS[budget.period] ?? 'periodMonth') })),
             el('span', { className: 'cm-num' }, todayValue + ' / ' + formatMoneyValue(amount, config))))
         const view = budgetBoxBody(state, config, t)
-        return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+        return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
           el('div', { 'data-cm-display': 'budget', className: 'cm-bbox' + (level === 'ok' ? '' : ' ' + level) + (wide ? '' : ' rail') },
             wide ? view.body : el('div', { className: 'cm-bbox-rail cm-num' }, view.rail)))
       }
@@ -3236,7 +3254,7 @@
         t('monthCost', { amount: formatMoneyUsd(displayCostOf(state.month, config), config) }),
         t('totalCost', { amount: formatMoneyUsd(displayCostOf(state.total, config), config) }),
       ].join('; ')
-      return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
+      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el(Fragment, null,
           el('div', { 'data-cm-display': 'today', className: 'cm-foot' + (wide ? '' : ' cm-foot-rail') },
             wide ? el(Fragment, null, t('today'), ' ', el('span', { className: 'cm-num' }, todayValue)) : el(WalletIcon, { size: 16 })),

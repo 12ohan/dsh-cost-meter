@@ -68,6 +68,8 @@ jobs:
           node test/statistics-warmup.mjs
           node test/cost-views-browser.mjs
           node test/pricing-theme-browser.mjs
+          node test/custom-model-prices.mjs
+          node test/price-multiplier.mjs
           node test/billion-context-compatibility-browser.mjs
           node test/cache-write-price-browser.mjs
           node test/model-stats-browser.mjs

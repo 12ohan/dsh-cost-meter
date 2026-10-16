@@ -3,7 +3,7 @@ import { readFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { sanitizeConfig, applyConfigPatch, Ledger } from '../lib/store.js'
-import { providerPriceEntryFor, normalizeCustomPrice, buildPriceCatalog } from '../lib/pricing.js'
+import { providerPriceEntryFor, normalizeCustomPrice, buildPriceCatalog, costOf } from '../lib/pricing.js'
 import { stateSchema } from '../lib/typert.host.js'
 import { pricingConfigAt } from '../lib/billing-history.js'
 
@@ -49,6 +49,18 @@ const free = { ...config, prices: { ...config.prices, custom: { [a]: { cacheMiss
 assert.equal(providerPriceEntryFor('channel-a', 'shared/model', free.prices, { overrides: free.priceOverrides }).priced, true)
 const missing = { ...config, prices: { ...config.prices, custom: {} } }
 assert.equal(providerPriceEntryFor('channel-a', 'shared/model', missing.prices, { overrides: missing.priceOverrides }).priced, false, 'missing quote never falls back to another catalog')
+for (const [settings, expectedInput, expectedOutput] of [[{ multiplier: .8 }, .8, 1.6],
+  [{ multiplier: .8, separateMultipliers: true, multipliers: { 'base.output': .3 } }, .8, .6], [{ multiplier: 0 }, 0, 0]]) {
+  const cfg = { ...config, prices: { ...config.prices, custom: { [a]: { ...usd, ...settings } } } }
+  const server = providerPriceEntryFor('channel-a', 'shared/model', cfg.prices, { overrides: cfg.priceOverrides })
+  const browser = client.resolveClientPrice('channel-a', 'shared/model', cfg)
+  for (const entry of [server.entry, browser.entry]) {
+    assert.equal(entry.cacheMiss, 1, 'original quote is never repeatedly multiplied')
+    assert.equal(costOf({ input: 1e6 }, entry, Date.now()), expectedInput)
+    assert.equal(costOf({ output: 1e6 }, entry, Date.now()), expectedOutput)
+  }
+  assert.equal(stateSchema.shape.config.parse(cfg).prices.custom[a].multiplier, settings.multiplier)
+}
 
 const root = mkdtempSync(join(tmpdir(), 'cm-custom-price-')), file = join(root, 'ledger.json')
 let ledger

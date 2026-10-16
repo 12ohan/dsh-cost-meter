@@ -83,9 +83,9 @@ for (const time of [proAt - 1, proAt]) {
   now = time
   const card = ui.PriceCard({ modelId: 'deepseek-v4-pro', entry: draft.prices.models['deepseek-v4-pro'], draft,
     setDraft: value => { changedDraft = value }, t: ui.makeT('zh') })
-  const inputs = nodes(card).filter(node => node.type === 'input')
-  assert.equal(inputs[1].props.value, time < proAt ? '4.5' : '1', '价格卡显示当前价，不提前显示 Pro 后续价')
-  inputs[1].props.onChange({ target: { value: '12' } })
+  const inputs = nodes(card).filter(node => node.type?.name === 'PriceInput')
+  assert.equal(inputs[1].props.value, time < proAt ? 4.5 : 1, '价格卡显示当前价，不提前显示 Pro 后续价')
+  inputs[1].props.onCommit(12)
   const updated = applyConfigPatch(draft, { prices: changedDraft.prices })
   assert.deepEqual(updated.errors, [])
   assert.equal(updated.config.prices.models['deepseek-v4-pro'].cacheMiss, 12)

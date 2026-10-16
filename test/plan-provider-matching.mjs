@@ -3,7 +3,7 @@ import vm from 'node:vm'
 import { readFileSync, readdirSync, mkdtempSync, mkdirSync, writeFileSync, appendFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { Ledger, sanitizeConfig, applyConfigPatch } from '../lib/store.js'
+import { Ledger, sanitizeConfig, applyConfigPatch, localDayKey } from '../lib/store.js'
 import { billingClassOf, planProviderIdOf, enabledPlanSetOf, buildPlanStats } from '../lib/plan-billing.js'
 import { inferPlanProviderId } from '../lib/plan-provider-match.js'
 import { repairPlanHourBuckets } from '../lib/backfill.js'
@@ -91,18 +91,20 @@ const records = [
 ]
 writeFileSync(log, records.map(record => JSON.stringify(record)).join('\n') + '\n')
 const ledger = new Ledger(sanitizeConfig({ codingPlans: { volcengine: { enabled: true } }, planBilling: { models: { [key]: 'plan' } } }), {}, ledgerPath)
+// Calls can belong to yesterday when this test runs shortly after midnight.
+const usageDay = target => target.copyDay(target.days[localDayKey(at)])
 const stats = () => buildPlanStats({ days: ledger.days, hourBuckets: ledger.planHourBuckets, samples: ledger.planSamples, config: ledger.config, nowMs: now,
   codingPlans: { volcengine: { status: 'ok', windows: { fiveHour: { percent: 10 }, weekly: { percent: 10 }, monthly: { percent: 10 } } } } }).providers.volcengine.windows
 try {
   ledger.account({ input: 1000, output: 200 }, 'example-model', 'example-session', at + 100, 'relay')
   assert.equal(stats().fiveHour.localTokens, 0, 'reproduce the previous unassigned Plan call')
-  const original = ledger.today()
+  const original = usageDay(ledger)
   ledger.config = sanitizeConfig({ ...ledger.config, planBilling: selected })
   ledger.planSamples = { volcengine: { fiveHour: [{ t: at, p: 10, lt: 0, lc: 0 }] }, minimax: { fiveHour: [{ t: at, p: 5, lt: 10, lc: 0 }] } }
   await repairPlanHourBuckets(ledger, logs, { nowMs: now })
   for (const value of Object.values(stats())) assert.equal(value.localTokens, 1200, 'replayed call is counted in its actual windows')
-  assert.equal(ledger.today().calls, original.calls)
-  assert.equal(ledger.today().cost, original.cost)
+  assert.equal(usageDay(ledger).calls, original.calls)
+  assert.equal(usageDay(ledger).cost, original.cost)
   assert.equal(ledger.planSamples.volcengine, undefined, 'incompatible per-1% sample baseline is discarded')
   assert.ok(ledger.planSamples.minimax, 'unrelated sample history remains')
   await repairPlanHourBuckets(ledger, logs, { nowMs: now })
@@ -119,7 +121,7 @@ try {
   await repairPlanHourBuckets(ledger, logs, { nowMs: now })
   assert.equal(stats().fiveHour.localTokens, 1500, 'complete replay still counts both calls once')
   const reopened = Ledger.load(ledgerPath)
-  try { assert.equal(reopened.config.planBilling.modelPlans[key], 'volcengine'); assert.equal(reopened.today().calls, 2) } finally { reopened.close() }
+  try { assert.equal(reopened.config.planBilling.modelPlans[key], 'volcengine'); assert.equal(usageDay(reopened).calls, 2) } finally { reopened.close() }
 
   // A complete replay prepared before another process writes must not replace its call.
   let repairs
@@ -130,11 +132,12 @@ try {
   const other = Ledger.load(ledgerPath)
   try { other.account({ input: 10 }, 'example-model', 'example-session', at + 2000, 'relay'); other.flush() } finally { other.close() }
   commitRepair(repairs)
-  assert.equal(ledger.today().calls, 3, 'concurrent calls are retained under the write lock')
+  assert.equal(usageDay(ledger).calls, 3, 'concurrent calls are retained under the write lock')
   assert.equal(stats().fiveHour.localTokens, 1510, 'stale maintenance operations cannot erase concurrent hourly usage')
 
   let draft = ledger.config
-  const state = { config: draft, today: ledger.today(), month: ledger.today(), total: ledger.today(), history: [ledger.today()], meta: { dayKey: ledger.today().date } }
+  const day = usageDay(ledger)
+  const state = { config: draft, today: day, month: day, total: day, history: [day], meta: { dayKey: day.date } }
   const nodes = tree => tree && typeof tree === 'object' ? [tree, ...(tree.children ?? []).flatMap(nodes)] : []
   const t = ui.makeT('zh')
   hooks = ['today', true]

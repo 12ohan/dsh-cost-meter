@@ -76,44 +76,38 @@ window.__ModuleLoader__.load({
             : el('p', { className: 'cm-hint' }, en ? 'All bundled models are mounted.' : '内置模型均已挂载。')) : null)
     }
 
-    function CustomPriceEditor({ value, label, locale, onChange }) {
+    function CustomPriceEditor({ value, label, locale, onChange, t, priceEditor }) {
       const en = locale === 'en'
-      const [inputs, setInputs] = useState(() => ({ ...value }))
-      const editing = useRef(null)
-      useEffect(() => setInputs(previous => ({ ...value, ...(editing.current ? { [editing.current]: previous[editing.current] } : {}) })), [value])
+      const { PriceInput, priceFactor, setPriceFactor, multiplierOptions } = priceEditor
       const fields = [['cacheMiss', en ? 'Input · cache miss' : '输入 · 未命中缓存'], ['cacheHit', en ? 'Cached input' : '缓存读取'], ['output', en ? 'Output' : '输出'], ['cacheWrite', en ? 'Cache write' : '缓存写入'], ['reasoning', en ? 'Separate reasoning' : '单独推理费用']]
-      const edit = (key, text) => {
-        setInputs(previous => ({ ...previous, [key]: text }))
-        if (text === '' && !['cacheWrite', 'reasoning'].includes(key)) return
-        const number = Number(text)
-        if (!Number.isFinite(number) || number < 0 || !['cacheMiss', 'cacheHit', 'output', 'cacheWrite', 'reasoning'].every(field => Number.isFinite((key === field ? number : value[field] ?? 0) * (key === 'multiplier' ? number : value.multiplier ?? 1)))) return
+      const edit = (key, number, factor) => {
         const next = { ...value }
-        if (text === '') delete next[key]; else next[key] = number
+        if (number === null) delete next[key]; else next[key] = number
+        setPriceFactor(next, 'base.' + key, factor)
         onChange(next)
       }
-      const field = ([key, title], index) => el('label', { key }, title, el('span', { className: 'cm-custom-amount' },
-        el('span', { 'aria-hidden': true }, value.currency === 'CNY' ? '¥' : '$'), el('input', { className: 'cm-input', type: 'number', min: 0, step: 'any', value: inputs[key] ?? '',
-          'aria-label': label + ' · ' + title,
-          placeholder: key === 'cacheWrite' ? (en ? 'Same as input' : '跟随输入价格') : key === 'reasoning' ? (en ? 'Included in output' : '含在输出中') : '0',
-          onFocus: () => { editing.current = key }, onChange: event => edit(key, event.target.value), onBlur: () => { editing.current = null; setInputs({ ...value }) } })))
+      const field = ([key, title]) => el('label', { key }, title, el('span', { className: 'cm-custom-amount' },
+        el('span', { 'aria-hidden': true }, value.currency === 'CNY' ? '¥' : '$'), el(PriceInput, { entry: value, value: value[key] ?? null, path: 'base.' + key, t,
+          emptyMode: ['cacheWrite', 'reasoning'].includes(key) ? 'clear' : 'ignore', label: label + ' · ' + title,
+          placeholder: key === 'cacheWrite' ? (en ? 'Same as cached input' : '跟随缓存读取') : key === 'reasoning' ? (en ? 'Included in output' : '含在输出中') : '0',
+          onCommit: (number, factor) => edit(key, number, factor) })))
       return el('fieldset', { className: 'cm-custom-price', 'aria-label': label + (en ? ' · Custom price' : ' · 自定义价格') },
         el('legend', null, en ? 'Custom price · per 1M tokens' : '自定义价格 · 每百万 Token'),
         el('div', { className: 'cm-custom-head' }, el('span', null, en ? 'Only this channel and model' : '仅用于此渠道的这个模型'),
           el('label', null, en ? 'Currency' : '币种', el('select', { className: 'cm-input', value: value.currency, onChange: event => onChange({ ...value, currency: event.target.value }) },
-            el('option', { value: 'USD' }, en ? 'USD · US dollar' : 'USD · 美元'), el('option', { value: 'CNY' }, en ? 'CNY · Yuan' : 'CNY · 人民币'))),
-          el('label', null, en ? 'Multiplier' : '倍率', el('input', { className: 'cm-input cm-custom-multiplier', type: 'number', min: 0, step: 'any', value: inputs.multiplier ?? 1,
-            'aria-label': label + (en ? ' · Multiplier' : ' · 倍率'), onFocus: () => { editing.current = 'multiplier' }, onChange: event => edit('multiplier', event.target.value), onBlur: () => { editing.current = null; setInputs({ ...value }) } }))),
+            el('option', { value: 'USD' }, en ? 'USD · US dollar' : 'USD · 美元'), el('option', { value: 'CNY' }, en ? 'CNY · Yuan' : 'CNY · 人民币')))),
         el('div', { className: 'cm-custom-grid' }, ...fields.slice(0, 3).map(field)),
+        multiplierOptions(value, t, separate => onChange({ ...value, separateMultipliers: separate, multipliers: {} })),
         el('div', { className: 'cm-custom-effective', role: 'status' }, el('span', null, en ? 'Effective prices' : '实际单价'),
-          el('span', null, (en ? 'Input / Cache / Output' : '输入 / 缓存读取 / 输出') + ' · ' + (value.currency === 'CNY' ? '¥' : '$') + ['cacheMiss', 'cacheHit', 'output'].map(key => Number((value[key] * (value.multiplier ?? 1)).toPrecision(8)).toLocaleString(en ? 'en-US' : 'zh-CN', { maximumFractionDigits: 8 })).join(' / ')),
+          el('span', null, (en ? 'Input / Cache / Output' : '输入 / 缓存读取 / 输出') + ' · ' + (value.currency === 'CNY' ? '¥' : '$') + ['cacheMiss', 'cacheHit', 'output'].map(key => Number((value[key] * priceFactor(value, 'base.' + key)).toPrecision(8)).toLocaleString(en ? 'en-US' : 'zh-CN', { maximumFractionDigits: 8 })).join(' / ')),
           el('small', null, en ? 'Entered price × multiplier' : '填写单价 × 倍率')),
         el('details', { className: 'cm-custom-more' }, el('summary', null, en ? 'More billing fields' : '更多计费项'),
           el('div', { className: 'cm-custom-grid' }, ...fields.slice(3).map(field)),
-          el('p', { className: 'cm-hint' }, en ? 'Leave reasoning blank when it is included in output. Leave cache write blank to use the input rate.' : '推理已包含在输出中时无需另填。缓存写入留空则使用输入价格。')),
-        el('p', { className: 'cm-hint' }, en ? 'Auto-saved. Applies to new calls; catalog and recorded costs stay unchanged. Switching back to automatic matching keeps these values.' : '修改后自动保存，后续调用生效。价格表和历史费用保持原值；切回自动匹配后，已填价格仍会保留。'))
+          el('p', { className: 'cm-hint' }, en ? 'Leave reasoning blank when it is included in output. Leave cache write blank to use the cached input rate.' : '推理已包含在输出中时无需另填。缓存写入留空则使用缓存读取价格。')),
+        el('p', { className: 'cm-hint' }, en ? 'Press Enter or leave the field to save. Applies to new calls; catalog and recorded costs stay unchanged. Automatic matching keeps these values.' : '按回车或离开输入框后自动保存，后续调用生效。价格表和历史费用保持原值；切回自动匹配后，已填价格仍会保留。'))
     }
 
-    function Matching({ state, draft, setDraft, t, locale, resolveClientPrice, prettyProviderKey, setField }) {
+    function Matching({ state, draft, setDraft, t, locale, resolveClientPrice, prettyProviderKey, setField, priceEditor }) {
       const config = state.config
           const overrides = draft?.priceOverrides ?? config.priceOverrides ?? {}
           const dismissed = draft?.priceMatchDismissed ?? config.priceMatchDismissed ?? []
@@ -164,7 +158,7 @@ window.__ModuleLoader__.load({
             else next[key] = value
             if (value === '__custom__' && !pricesNow.custom?.[key]) {
               const split = key.indexOf(':'), resolved = resolveClientPrice(key.slice(0, split), key.slice(split + 1), { ...config, ...draft })
-              const entry = resolved.entry ?? {}, custom = { currency: resolved.currency ?? 'USD', multiplier: 1, billingMode: 'flat',
+              const entry = resolved.entry ?? {}, custom = { currency: resolved.currency ?? 'USD', billingMode: 'flat', ...priceEditor?.priceMultiplierSettings(entry),
                 cacheMiss: entry.cacheMiss ?? entry.input ?? 0, cacheHit: entry.cacheHit ?? entry.cachedInput ?? entry.cacheMiss ?? entry.input ?? 0, output: entry.output ?? 0,
                 ...(entry.cacheWrite !== undefined ? { cacheWrite: entry.cacheWrite } : {}), ...(entry.reasoning !== undefined ? { reasoning: entry.reasoning } : {}) }
               setDraft({ ...draft, priceOverrides: next, prices: { ...pricesNow, custom: { ...pricesNow.custom, [key]: custom } } })
@@ -196,7 +190,7 @@ window.__ModuleLoader__.load({
                     el('span', null, prettyProviderKey(key)),
                     el(SearchPriceSelect, { value: overrides[key] ?? '', options: targetOptions, placeholder: t('matchedKeepAuto'), label: prettyProviderKey(key), locale, onChange: value => setOverride(key, value) }),
                     el('button', { className: 'cm-btn small', title: t('removePriceMatchHint'), onClick: () => dismissMatch(key) }, t('overrideRemove')),
-                    overrides[key] === '__custom__' && pricesNow.custom?.[key] ? el(CustomPriceEditor, { value: pricesNow.custom[key], label: prettyProviderKey(key), locale,
+                    overrides[key] === '__custom__' && pricesNow.custom?.[key] ? el(CustomPriceEditor, { value: pricesNow.custom[key], label: prettyProviderKey(key), locale, t, priceEditor,
                       onChange: entry => setDraft({ ...draft, prices: { ...pricesNow, custom: { ...pricesNow.custom, [key]: entry } } }) }) : null)))
               : el('p', { className: 'cm-hint' }, t('overrideNone')),
             dismissed.length > 0 ? el('button', { className: 'cm-btn small', onClick: () => setField('priceMatchDismissed', []) }, t('restorePriceMatches', { count: dismissed.length })) : null,

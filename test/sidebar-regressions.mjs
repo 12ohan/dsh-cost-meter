@@ -31,6 +31,9 @@ for (const peakStyle of ['compact', 'classic']) for (const go of [false, true]) 
   state.config = sanitizeConfig({ sidebarSimple, hideTodayCost, peakEnabled, peakNotice, peakStyle,
     balance: { display: 'sidebar', showProgressBar: true }, budget: { enabled: budget, amount: 10 }, goQuota: { enabled: go, display: 'sidebar' } })
   const tree = render(ui.SidebarFooter({ wide, useCost: pick => pick({ state }) }))
+  for (const tooltip of nodes(tree).filter(n => n.type === 'tooltip')) {
+    assert.equal(tooltip.props.portal, true, '侧栏提示挂到宿主浮层，避免被相邻插件的层级或裁剪遮住')
+  }
   const peakClasses = ['cm-peak-strip', 'cm-peak-classic', 'cm-peak-rail', 'cm-peak-rail-classic']
   const strips = nodes(tree).filter(n => peakClasses.some(cls => hasClass(n, cls)))
   const expected = peakEnabled && peakNotice && (!wide || budget || !hideTodayCost) ? 1 : 0
