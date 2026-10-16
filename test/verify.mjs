@@ -6825,5 +6825,4 @@ console.log('[ok] 全部验证通过')
 
 await import('./exchange-rates.mjs')
 await import('./custom-model-prices.mjs')
-await import('./price-multiplier.mjs')
 await import('./context-activity.mjs')

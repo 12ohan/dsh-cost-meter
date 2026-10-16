@@ -9,7 +9,10 @@ import { pricingConfigAt } from '../lib/billing-history.js'
 
 const source = readFileSync('src/client/02-validators-helpers-sidebar.js', 'utf8')
 const start = source.indexOf('function priceEntryFor(modelId, table)'), end = source.indexOf('function makeStore(initial,')
-const client = new Function(source.slice(start, end) + '\nreturn { resolveClientPrice }')()
+const client = new Function(source.slice(start, end) + '\nreturn { resolveClientPrice, cnyRateOfLocal }')()
+assert.equal(client.cnyRateOfLocal({ currency: 'USD', exchangeRate: 1, fxRates: { CNY: 7 } }), 7)
+assert.equal(client.cnyRateOfLocal({ currency: 'EUR', exchangeRate: .9, fxRates: { CNY: 7 } }), 7)
+assert.equal(client.cnyRateOfLocal({ currency: 'CNY', exchangeRate: 8, fxRates: { CNY: 7 } }), 8)
 const a = 'channel-a:shared/model', b = 'channel-b:shared/model'
 const usd = { cacheMiss: 1, cacheHit: .1, output: 2, cacheWrite: 1.25, currency: 'USD' }
 const cny = { cacheMiss: 7, cacheHit: .7, output: 14, currency: 'CNY' }

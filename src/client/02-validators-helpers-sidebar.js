@@ -1203,6 +1203,7 @@
      */
     function usageSplit(usage, config) {
       if (!usage || !config) return { total: 0, api: 0 }
+      const cnyRate = cnyRateOfLocal(config)
       const peak = {
         enabled: config.peakEnabled === true,
         effectiveAtMs: Date.parse(config.peakEffectiveAt || ''),
@@ -1220,7 +1221,7 @@
         const resolved = resolveClientPrice(provider, modelId, config)
         if (resolved.priced) {
           const c = costOfBuckets(byModel[providerKey], tierFor(normalizeClientPrice(resolved.entry), now, { ...peak, enabled: ['deepseek-peak', 'utc-peak'].includes(resolved.billingMode) && peak.enabled }))
-          const billed = usdFromCostLocal(c, resolved.currency, config.exchangeRate)
+          const billed = usdFromCostLocal(c, resolved.currency, cnyRate)
           total += billed
           if (billingClassOfLocal(provider, modelId, config) === 'api') api += billed
         }
@@ -1241,10 +1242,15 @@
         reasoning: Math.max(0, (usage.reasoning ?? 0) - modeled.reasoning),
       }
       const leftoverCost = costOfBuckets(leftover, tierFor(priceEntryFor('default', config.prices), now, peak))
-      const leftoverBilled = usdFromCostLocal(leftoverCost, config.prices?.currency === 'CNY' ? 'CNY' : 'USD', config.exchangeRate)
+      const leftoverBilled = usdFromCostLocal(leftoverCost, config.prices?.currency === 'CNY' ? 'CNY' : 'USD', cnyRate)
       total += leftoverBilled
       api += leftoverBilled
       return { total, api }
+    }
+    function cnyRateOfLocal(config) {
+      const valid = value => typeof value === 'number' && Number.isFinite(value) && value > 0 && value < 1e6
+      if (config.currency === 'CNY' && valid(config.exchangeRate)) return config.exchangeRate
+      return valid(config.fxRates?.CNY) ? config.fxRates.CNY : 7.2
     }
     /** 快速判定:投影里是否存在 Plan 类模型(无则徽章/dock 走宿主精确成本快路径)。 */
     function usageHasPlanClass(usage, config) {
