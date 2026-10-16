@@ -220,6 +220,7 @@
         })(),
         prices: {
           models,
+          ...(v.prices?.custom ? { custom: v.prices.custom } : {}),
           default: parsePrice(v.prices?.default ?? { cacheHit: 0, cacheMiss: 0, output: 0 }, path + '.prices.default'),
           providers: v.prices?.providers && typeof v.prices.providers === 'object' ? v.prices.providers : {},
           // 官方价格币种(issue #47):usageSplit 回退计价据此决定 CNY→USD 折算。
@@ -849,7 +850,7 @@
     const OPENDESIGN_PROVIDER_IDS = ['opendesign', 'open-design', 'open-design-api', 'amr-link.open-design.ai']
     const SCOPED_PRICE_PROVIDERS = new Set(['openrouter', 'opencode-zen', 'opencode-go', 'opencode-go-plus', 'zen', 'opencode', ...OPENDESIGN_PROVIDER_IDS])
     const MODEL_VENDOR_PREFIXES = {
-      openai: /^(?:gpt|o\d|codex)/i, anthropic: /^claude/i, google: /^gemini/i,
+      openai: /^(?:gpt|o\d|codex)/i, anthropic: /^claude/i, google: /^gemini/i, stepfun: /^step-/i,
       deepseek: /^deepseek/i, moonshot: /^kimi/i, 'z-ai': /^glm/i, xai: /^grok/i,
       alibaba: /^qwen/i, minimax: /^minimax/i, tencent: /^(?:hunyuan|hy\d)/i,
       xiaomi: /^mimo/i, upstage: /^solar/i, nvidia: /^nemotron/i, mistral: /^mistral/i,
@@ -921,6 +922,11 @@
       let targetProvider = provider
       let targetModel = modelId
       const override = overrides[provider + ':' + modelId]
+      if (override === '__custom__') {
+        const raw = prices.custom?.[provider + ':' + modelId], entry = raw ? { ...raw } : null
+        if (entry) for (const key of ['cacheMiss', 'cacheHit', 'output', 'cacheWrite', 'reasoning']) if (entry[key] !== undefined) entry[key] *= entry.multiplier ?? 1
+        return { entry: entry ?? null, priced: !!entry, billingMode: 'flat', matched: true, currency: entry?.currency ?? 'USD' }
+      }
       // 「本地模型(零消耗)」哨兵(与 pricing.js 同口径):覆盖目标 __local__ →
       // 未定价(token 照记、费用 0),matched=true 表示已人工指定。
       if (override === '__local__') return { entry: null, priced: false, billingMode: 'flat', matched: true }
@@ -1016,6 +1022,7 @@
     }
     function resolveClientPrice(provider, modelId, config) {
       let result = resolveClientPriceRaw(provider, modelId, config)
+      if (result.currency) return result
       if (!result.priced) {
         const normalized = String(provider ?? '').trim().toLowerCase().replace(/^llm-/, '') || 'deepseek'
         result = legacyDeepseekOverride(normalized, config?.priceOverrides?.[normalized + ':' + modelId], config?.prices ?? {}, config?.priceMatch === 'exact' ? 'exact' : 'auto') ?? result
