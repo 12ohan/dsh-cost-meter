@@ -21,7 +21,8 @@ window.__ModuleLoader__.load({
     }
     const bucketSpec = Object.fromEntries(fields.map(key => [key, number]))
     const buckets = object(bucketSpec)
-    const costRow = object({ provider: string, model: string, bucket: string, tokens: number, rate: number, cost: number, priced: boolean, plan: boolean })
+    const costRow = value => ({ ...object({ provider: string, model: string, bucket: string, tokens: number, rate: number, cost: number, priced: boolean, plan: boolean })(value), ...(value.requests === undefined ? {} : { requests: number(value.requests) }) })
+    const requestNames = text => ({ searchRequests: text('搜索请求', 'Search requests'), fetchRequests: text('抓取请求', 'Fetch requests') })
     const sessionId = v => string(v ?? '')
     const meteringRow = object({ source: string, requestId: string, attempt: number, complete: boolean, status: string, upstream: string })
     const callBase = object({ sessionId, logSeq: v => nullableNumber(v ?? null), kind: string, turn: nullableNumber, step: nullableNumber, provider: string, model: string, atMs: number, cost: number, apiCost: number, plan: boolean, priced: boolean, longContext: boolean, rows: array(costRow) })
@@ -721,8 +722,8 @@ window.__ModuleLoader__.load({
 
     function CallDetail({ call, sessionId, api, revision, money, text, names, compact = false }) {
       const [view, setView] = useState('output')
-      const rows = call.rows.filter(row => row.tokens > 0)
-      const chartRows = rows.filter(row => row.bucket !== 'reasoning' || row.cost > 0 || !row.priced).map(row => ({ key: row.bucket, label: names[row.bucket], tokens: row.tokens,
+      const rows = call.rows.filter(row => row.tokens > 0 || row.requests > 0)
+      const chartRows = rows.filter(row => row.bucket !== 'reasoning' || row.cost > 0 || !row.priced).map(row => ({ key: row.bucket, label: names[row.bucket] ?? requestNames(text)[row.bucket], tokens: row.tokens, ...(row.requests ? { meta: row.requests + text(' 次请求', ' requests') } : {}),
         value: row.cost, unpriced: !row.priced, amount: row.priced ? money(row.cost) : text('未定价', 'Unpriced'), color: contextColors[bucketColors[row.bucket] ?? 7] }))
       return el('div', { className: 'cm-call-detail-grid' + (compact ? ' cm-call-compact' : '') }, el('style', null, `
         .cm-call-detail-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:18px;margin-top:12px;align-items:start}
@@ -739,15 +740,15 @@ window.__ModuleLoader__.load({
             + (!call.metering.complete ? text(' · 仅含已收到的用量，未知费用未估补', ' · observed usage only; unknown charges are not inferred') : '')) : null,
           !compact ? el(CostBreakdown, { rows: chartRows, total: call.cost, label: text('本次费用构成', 'This call’s costs'), text, amounts: true, onSelect: row => setView(['output', 'reasoning'].includes(row.key) ? 'output' : 'input') }) : null,
           el('div', { className: 'cm-stat-scroll cm-step-rates' }, el('table', { className: 'cm-stat-table' },
-            el('thead', null, el('tr', null, ...[text('计费项目', 'Component'), 'Tokens', text('单价 / 百万', 'Rate / 1M'), text('金额', 'Cost'), text('占比', 'Share')].map(label => el('th', { key: label }, label)))),
+            el('thead', null, el('tr', null, ...[text('计费项目', 'Component'), text('用量', 'Usage'), rows.some(row => row.requests) ? text('单价 / 次', 'Rate / request') : text('单价 / 百万', 'Rate / 1M'), text('金额', 'Cost'), text('占比', 'Share')].map(label => el('th', { key: label }, label)))),
             el('tbody', null, ...rows.map(row => { const included = row.bucket === 'reasoning' && row.priced && row.rate === 0; return el('tr', { key: row.bucket },
-              el('td', null, names[row.bucket]), el('td', null, row.tokens.toLocaleString()), el('td', null, row.priced ? money(row.rate) : '?'),
+              el('td', null, names[row.bucket] ?? requestNames(text)[row.bucket]), el('td', null, row.requests ? row.requests + text(' 次', ' requests') : row.tokens.toLocaleString() + ' tokens'), el('td', null, row.priced ? money(row.rate) + (row.requests ? text(' / 次', ' / request') : ' / 1M') : '?'),
               el('td', null, included ? text('未单独计费', 'No separate charge') : row.priced ? money(row.cost) : '?'), el('td', null, row.priced && !included ? pct(row.cost, call.cost) : '—')) }))))),
         call.logSeq != null ? el(CallInspection, { api, sessionId: call.sessionId || sessionId, seq: call.logSeq, atMs: call.atMs, revision, text, view, onViewChange: setView })
           : el('p', { className: 'cm-stat-sub' }, text('未保存调用内容', 'Call content not stored')))
     }
 
-    const feeKinds = (text) => ({ read: text('读取文件', 'Read files'), 'local-search': text('本地检索', 'Local search'), write: text('文件修改', 'File changes'), command: text('命令执行', 'Commands'), tool: text('其他工具', 'Other tools'), model: text('模型回复', 'Model responses'), search: text('网页搜索', 'Web search'), compaction: text('上下文压缩', 'Compaction'), coordination: text('代理协作', 'Agent coordination'), 'multi-tool': text('多类工具', 'Mixed tools'), 'other-tools': text('其他工具调用', 'Other tools'), other: text('其他调用', 'Other calls') })
+    const feeKinds = (text) => ({ read: text('读取文件', 'Read files'), 'local-search': text('本地检索', 'Local search'), write: text('文件修改', 'File changes'), command: text('命令执行', 'Commands'), tool: text('其他工具', 'Other tools'), model: text('模型回复', 'Model responses'), search: text('网页搜索', 'Web search'), fetch: text('网页抓取', 'Web fetch'), compaction: text('上下文压缩', 'Compaction'), coordination: text('代理协作', 'Agent coordination'), 'multi-tool': text('多类工具', 'Mixed tools'), 'other-tools': text('其他工具调用', 'Other tools'), other: text('其他调用', 'Other calls') })
     const compactFee = value => value.replace(/(\.\d*?[1-9])0+$/, '$1').replace(/\.0+$/, '')
     const feeShare = (value, total) => value > 0 && total > 0 && value / total < .001 ? '<0.1%' : pct(value, total)
     const feeColorKey = row => row.kind === 'subagent' ? 'agent:' + row.sessionId : 'type:' + row.kind + ':' + row.tools.join('|')
@@ -899,7 +900,7 @@ window.__ModuleLoader__.load({
     function StepFeeInspector({ api, sessionId, basis, revision, row, money, text }) {
       const [selected, setSelected] = useState(0), [retry, setRetry] = useState(0)
       const result = useRequest(api, 'getSessionTrajectory', { sessionId, basis, stepKey: row.key, background: true, generation: String(revision).slice(0, 96) }, revision + ':' + retry)
-      const full = result.value?.steps.find(item => item.key === row.key), names = { input: text('非缓存输入', 'Uncached input'), output: text('输出', 'Output'), cacheRead: text('缓存读取', 'Cache read'), cacheWrite: text('缓存写入', 'Cache write'), reasoning: text('推理', 'Reasoning') }
+      const full = result.value?.steps.find(item => item.key === row.key), names = { input: text('非缓存输入', 'Uncached input'), output: text('输出', 'Output'), cacheRead: text('缓存读取', 'Cache read'), cacheWrite: text('缓存写入', 'Cache write'), reasoning: text('推理', 'Reasoning'), ...requestNames(text) }
       const calls = (full?.callRefs ?? []).filter(call => basis === 'total' || (basis === 'plan' ? call.plan : !call.plan)), call = calls[selected] ?? calls[0]
       return el('section', { className: 'cm-fee-popup-detail', 'aria-label': text('选中步骤费用', 'Selected step cost') },
         result.error ? el(Fragment, null, errorNotice(result.error), button(text('重试', 'Retry'), () => setRetry(n => n + 1))) : null,
@@ -1043,7 +1044,7 @@ window.__ModuleLoader__.load({
       useEffect(() => { setOffset(0); setPages({ key: rankKey, rows: [] }); setLimit(filter.stepKey ? 40 : 20) }, [rankKey])
       useEffect(() => { if (result.value?.offset === offset) setPages(previous => ({ key: rankKey, rows: offset === 0 ? result.value.steps : [...new Map([...(previous.key === rankKey ? previous.rows : []), ...result.value.steps].map(row => [row.key, row])).values()] })) }, [result.value, offset, rankKey])
       const value = result.value ?? (snapshot?.sessionId === sessionId && snapshot.basis === basis && snapshot.revision === revision ? snapshot.value : null), money = n => compactFee(formatMoney(n))
-      const names = { input: text('输入', 'Input'), cacheRead: text('缓存读取', 'Cache read'), cacheWrite: text('缓存写入', 'Cache write'), output: text('输出', 'Output'), reasoning: text('推理', 'Reasoning') }, kinds = feeKinds(text)
+      const names = { input: text('输入', 'Input'), cacheRead: text('缓存读取', 'Cache read'), cacheWrite: text('缓存写入', 'Cache write'), output: text('输出', 'Output'), reasoning: text('推理', 'Reasoning'), ...requestNames(text) }, kinds = feeKinds(text)
       if (!value) return result.error ? el('p', { className: 'cm-stat-sub' }, result.error, button(text('重试', 'Retry'), () => setRetry(n => n + 1))) : el('div', { className: 'cm-fee-placeholder', role: 'status', 'aria-label': text('费用分类正在后台更新', 'Cost categories updating in background') }, el('style', null, feeViewCss), el('i'), el('i'), el('i'))
       const total = amount(value, basis), hierarchy = value.hierarchy ?? [], colors = feeColors({ ...value, hierarchy })
       const agents = [...new Set([...hierarchy.map(row => row.id), ...value.groups.filter(row => row.kind === 'subagent').map(row => row.sessionId)])].filter(id => id !== sessionId).sort()
@@ -1070,7 +1071,7 @@ window.__ModuleLoader__.load({
           el('div', { className: 'cm-fee-view-tabs', role: 'group', 'aria-label': text('费用视图', 'Cost views') }, ...[['types', text('归类占比', 'Categories')], ['blocks', text('矩形分布', 'Treemap')], ['tree', text('父子归属', 'Ownership')], ['grid', text('步骤热力图', 'Step heatmap')]].map(([key, label]) => button(label, () => setView(key), { key, 'aria-pressed': view === key })))),
         view === 'types' ? el(CostBreakdown, { rows, total, label: text('对话总费用', 'Conversation total'), centerValue: money(total) + (rows.some(row => row.unpriced) ? ' + ?' : ''), text, ranked: true, amounts: true, onSelect: row => select(value.operations?.length ? { operation: row.key } : { group: row.key }, row.label) })
           : view === 'blocks' ? el(FeeTreemap, { value: { ...value, hierarchy }, basis, colors, actorName, groupName, money, text, onSelect: select })
-            : view === 'grid' ? el(StepFeeGrid, { api, sessionId, basis, revision, value, colors, actorName, money, text, onInspect: inspect }) : el(FeeOwnershipTree, { value: { ...value, hierarchy }, basis, colors, actorName, groupName, money, text, onSelect: select }), totals)
+            : view === 'grid' ? el(StepFeeGrid, { api, sessionId, basis, revision, value, colors, actorName, money, text, onInspect: inspect }) : el(FeeOwnershipTree, { value: { ...value, hierarchy }, basis, colors, actorName, groupName, money, text, onSelect: select }), totals, categories.some(row => row.kind === 'fetch') ? el('p', { className: 'cm-stat-note' }, text('网页抓取分类包含相关模型步骤；DeepSeek Fetch API 的成功请求另计次数费，本地 HTTP 抓取不另收费。', 'Web fetch includes related model steps. Successful DeepSeek Fetch API requests have a separate request fee; local HTTP fetching has no separate fee.')) : null)
       const binNames = { tiny: '<0.1%', small: '0.1%–1%', medium: '1%–5%', large: '≥5%', free: text('零费用', 'Zero cost'), unpriced: text('含未定价', 'Includes unpriced') }
       const distribution = value.distribution?.length ? el('section', { className: 'cm-fee-distribution', 'aria-label': text('单步费用占比分布', 'Step cost share distribution') },
         el('h3', null, text('单步费用占比分布', 'Step cost share distribution')),
@@ -1117,8 +1118,8 @@ window.__ModuleLoader__.load({
       }, [result.loading, result.value, offset, selected, view])
       const waiting = overview && !result.value, basis = query.basis
       const detail = result.value ?? (overview ? { found: true, rows: [], calls: [], cost: 0, apiCost: 0, totalCalls: 0, recorded: { cost: 0, apiCost: 0, calls: 0 }, agents: [], turns: [], kinds: [], totalTurns: 0, offset: 0, turnOffset: 0, stepShares: {} } : null)
-      const names = { input: text('非缓存输入', 'Uncached input'), output: text('输出', 'Output'), cacheRead: text('缓存读取', 'Cache read'), cacheWrite: text('缓存写入', 'Cache write'), reasoning: text('推理', 'Reasoning') }
-      const kinds = { model: text('模型调用', 'Model call'), compaction: text('上下文压缩', 'Compaction'), search: text('原生搜索', 'Native search') }
+      const names = { input: text('非缓存输入', 'Uncached input'), output: text('输出', 'Output'), cacheRead: text('缓存读取', 'Cache read'), cacheWrite: text('缓存写入', 'Cache write'), reasoning: text('推理', 'Reasoning'), ...requestNames(text) }
+      const kinds = { model: text('模型调用', 'Model call'), compaction: text('上下文压缩', 'Compaction'), search: text('原生搜索', 'Native search'), fetch: text('网页抓取', 'Web fetch') }
       const turnName = turn => turn == null ? text('未标明轮次', 'Turn not recorded') : text('轮次 ', 'Turn ') + turn
       if (showsPlaceholder(result) && !overview) return result.loading
         ? el('p', { className: 'cm-stat-empty', role: 'status' }, text('正在读取本对话的用量明细…', 'Loading this conversation’s usage records…'))
@@ -1137,14 +1138,14 @@ window.__ModuleLoader__.load({
       const visible = row => basis === 'total' || (basis === 'plan' ? row.plan : !row.plan)
       const parts = Object.keys(names).map(bucket => {
         const rows = detail.rows.filter(r => r.bucket === bucket && visible(r))
-        return { bucket, tokens: rows.reduce((n, r) => n + r.tokens, 0), cost: rows.reduce((n, r) => n + r.cost, 0), unpriced: rows.some(r => !r.priced) }
+        return { bucket, tokens: rows.reduce((n, r) => n + r.tokens, 0), requests: rows.reduce((n, r) => n + (r.requests ?? 0), 0), cost: rows.reduce((n, r) => n + r.cost, 0), unpriced: rows.some(r => !r.priced) }
       })
       const cost = amount(detail, basis), recorded = amount(detail.recorded, basis)
       const mismatch = Math.abs(cost - recorded) > Math.max(1e-8, Math.abs(recorded) * 1e-8) || detail.totalCalls !== detail.recorded.calls
       const unknown = parts.some(row => row.unpriced)
       const shareLabel = unknown ? text('已知费用占比', 'Known cost share') : text('费用占比', 'Cost share')
       const selectCall = row => setCallPopup(row)
-      const chartPart = row => ({ key: row.bucket, label: names[row.bucket], tokens: row.tokens, value: row.cost, unpriced: row.unpriced,
+      const chartPart = row => ({ key: row.bucket, label: names[row.bucket] ?? requestNames(text)[row.bucket], tokens: row.tokens, ...(row.requests ? { meta: row.requests + text(' 次请求', ' requests') } : {}), value: row.cost, unpriced: row.unpriced,
         amount: row.unpriced && !row.cost ? text('未定价', 'Unpriced') : money(row.cost) + (row.unpriced ? ' + ?' : ''), color: contextColors[bucketColors[row.bucket] ?? 7] })
       const models = new Map()
       for (const row of detail.rows.filter(visible)) {
@@ -1199,13 +1200,13 @@ window.__ModuleLoader__.load({
         !overview ? el('div', { className: 'cm-plan cm-spend' },
           unknown ? el('p', { className: 'cm-plan-sub' }, text('存在未定价调用', 'Some calls are unpriced')) : null,
           el('div', { className: 'cm-spend-grid' },
-            costCard(text('费用构成', 'Cost composition'), parts.filter(row => row.tokens > 0 && (row.bucket !== 'reasoning' || row.cost > 0 || row.unpriced)).map(chartPart), {}, cacheComparison),
+            costCard(text('费用构成', 'Cost composition'), parts.filter(row => (row.tokens > 0 || row.requests > 0) && (row.bucket !== 'reasoning' || row.cost > 0 || row.unpriced)).map(chartPart), {}, cacheComparison),
             callShareCard,
             modelRows.length > 1 ? costCard(text('模型费用分布', 'Cost by model'), modelRows) : null,
             detail.kinds.length > 1 ? costCard(text('各环节费用占比', 'Cost by activity'), detail.kinds.map((row, i) => ({ key: row.kind, label: kinds[row.kind] ?? row.kind,
               value: amount(row, basis), tokens: tokens(row), meta: row.calls + text(' 次调用', ' calls') + ' · ' + formatTokens(tokens(row)) + ' tok', unpriced: row.unpriced,
               amount: money(amount(row, basis)) + (row.unpriced ? ' + ?' : ''), color: contextColors[i] }))) : null)) : null,
-        overview && view === 'summary' ? el(StepCosts, { api, sessionId: query.sessionId, revision, money, text, basis, composition: waiting ? null : costCard(text('费用构成', 'Cost composition'), parts.filter(row => row.tokens > 0 && (row.bucket !== 'reasoning' || row.cost > 0 || row.unpriced)).map(chartPart)) }) : null,
+        overview && view === 'summary' ? el(StepCosts, { api, sessionId: query.sessionId, revision, money, text, basis, composition: waiting ? null : costCard(text('费用构成', 'Cost composition'), parts.filter(row => (row.tokens > 0 || row.requests > 0) && (row.bucket !== 'reasoning' || row.cost > 0 || row.unpriced)).map(chartPart)) }) : null,
         !waiting && (!overview || view === 'summary') ? el('details', { className: 'cm-call-section', open: !overview || callSectionOpen || selected >= 0, onToggle: e => { if (e.target === e.currentTarget) { setCallSectionOpen(e.currentTarget.open); if (!e.currentTarget.open) setSelected(-1) } } },
         el('summary', { style: { padding: '10px 0', fontSize: 13 } }, text('逐次调用明细', 'Individual calls') + ' · ' + detail.totalCalls),
         overview ? el('div', { className: 'cm-plan cm-spend-grid' }, callShareCard, modelRows.length > 1 ? costCard(text('模型费用分布', 'Cost by model'), modelRows) : cacheComparison) : null,
@@ -1220,7 +1221,7 @@ window.__ModuleLoader__.load({
         el('details', { className: 'cm-stat-help' }, el('summary', null, text('单价与 Token 明细', 'Rates and token details')),
         el('div', { className: 'cm-stat-scroll' }, el('table', { className: 'cm-stat-table' },
           el('thead', null, el('tr', null, ...[text('费用构成', 'Cost component'), 'Tokens', text('费用', 'Cost'), text('费用占比', 'Cost share')].map(v => el('th', { key: v }, v)))),
-          el('tbody', null, parts.map(row => el('tr', { key: row.bucket }, el('td', null, names[row.bucket]), el('td', null, row.tokens.toLocaleString()), el('td', null, money(row.cost) + (row.unpriced ? ' + ?' : '')), el('td', null, pct(row.cost, cost))))))),
+          el('tbody', null, parts.map(row => el('tr', { key: row.bucket }, el('td', null, names[row.bucket]), el('td', null, row.requests ? row.requests + text(' 次', ' requests') : row.tokens.toLocaleString()), el('td', null, money(row.cost) + (row.unpriced ? ' + ?' : '')), el('td', null, pct(row.cost, cost))))))),
         summaryTable(text('按调用类型统计', 'Cost by call type'), detail.kinds, row => kinds[row.kind] ?? row.kind)),
         el('section', { className: 'cm-stat-turns' }, el('div', { className: 'cm-stat-panel-head' }, el('h3', null, text('按轮次统计', 'Cost by turn')), el('span', { className: 'cm-stat-sub' }, text('展开查看输入和工具调用', 'Expand to inspect input and tool calls'))),
           detail.turns.map(row => el('div', { key: turnKey(row), className: 'cm-stat-turn' },

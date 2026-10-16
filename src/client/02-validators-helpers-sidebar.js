@@ -63,7 +63,7 @@
         complete: needBool(v.complete, 'complete'), status: needStr(v.status, 'status'), upstream: needStr(v.upstream, 'upstream') }
     }
     function parseTurnRows(rows) {
-      return (Array.isArray(rows) ? rows : fail('rows', 'array')).map(r => ({ provider: needStr(r.provider, 'provider'), model: needStr(r.model, 'model'), bucket: needStr(r.bucket, 'bucket'), tokens: needNum(r.tokens, 'tokens'), rate: needNum(r.rate, 'rate'), cost: needNum(r.cost, 'cost'), priced: needBool(r.priced, 'priced'), plan: needBool(r.plan, 'plan') }))
+      return (Array.isArray(rows) ? rows : fail('rows', 'array')).map(r => ({ provider: needStr(r.provider, 'provider'), model: needStr(r.model, 'model'), bucket: needStr(r.bucket, 'bucket'), tokens: needNum(r.tokens, 'tokens'), ...(r.requests === undefined ? {} : { requests: needNum(r.requests, 'requests') }), rate: needNum(r.rate, 'rate'), cost: needNum(r.cost, 'cost'), priced: needBool(r.priced, 'priced'), plan: needBool(r.plan, 'plan') }))
     }
     function parseSession(v, path) {
       return {
@@ -1573,9 +1573,9 @@
       const en = resolveLocale(config) === 'en'
       const names = en ? { input: 'Input', output: 'Output', cacheRead: 'Cache read', cacheWrite: 'Cache write', reasoning: 'Reasoning' } : { input: '输入', output: '输出', cacheRead: '缓存读取', cacheWrite: '缓存写入', reasoning: '推理' }
       const money = n => formatMoneyUsd(n, { ...config, decimals: Math.max(8, config.decimals ?? 2) })
-      const kinds = en ? { model: 'Model call', compaction: 'Context compaction', search: 'Native search' } : { model: '模型调用', compaction: '上下文压缩', search: '原生搜索' }
+      const kinds = en ? { model: 'Model call', compaction: 'Context compaction', search: 'Native search', fetch: 'Web fetch' } : { model: '模型调用', compaction: '上下文压缩', search: '原生搜索', fetch: '网页抓取' }
       const rowView = (row, i) => el('div', { key: i, style: { marginBottom: 4, overflowWrap: 'anywhere' } },
-        row.provider + ':' + row.model + ' · ' + names[row.bucket] + (row.plan ? ' (Plan)' : '') + ': ' + row.tokens.toLocaleString() + ' × ' + (row.priced ? money(row.rate) : '?') + ' / 1,000,000 ≈ ' + (row.priced ? money(row.cost) : '?'),
+        row.provider + ':' + row.model + ' · ' + (names[row.bucket] || (row.bucket === 'fetchRequests' ? (en ? 'Fetch requests' : '抓取请求') : (en ? 'Search requests' : '搜索请求'))) + (row.plan ? ' (Plan)' : '') + ': ' + (row.requests ? row.requests + (en ? ' requests' : ' 次') : row.tokens.toLocaleString()) + ' × ' + (row.priced ? money(row.rate) : '?') + (row.requests ? ' ≈ ' : ' / 1,000,000 ≈ ') + (row.priced ? money(row.cost) : '?'),
         !row.priced ? (en ? ' (price unavailable)' : '（未配置价格）') : row.bucket === 'reasoning' && row.rate === 0 ? (en ? ' (no separate charge)' : '（不单独收费）') : '')
       return el('details', { className: 'cm-note', style: { fontSize: 12, marginTop: 6 } },
         el('summary', { style: { cursor: 'pointer' }, title: en ? 'Log estimate at configured prices; session cost uses recorded ledger amounts.' : '本轮按日志和配置价格估算，本会话按账本已入账金额汇总。' }, en ? 'Turn cost' : '本轮费用', value?.found ? ' ≈ ' + money(displayCostOf(value, config)) + (value.rows.some(r => !r.priced) ? (en ? ' + unpriced usage' : ' + 未定价用量') : '') : value?.inherited ? (en ? ' · inherited history' : ' · 继承历史') : error ? ' ⚠' : ''),

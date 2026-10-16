@@ -2298,6 +2298,7 @@
       let lastPoll = Date.now()
       let reloading = false
       let active = true, retrySeconds = 1
+      let configRevision = 0, savingConfig = 0
       // 宿主在价格表版本未变时省略 config.prices(占轮询载荷 56%):此时沿用上一份,
       // 保证 config.prices 在客户端始终存在(渲染与改价逻辑都按它非空处理)。
       // 版本号相同即价格表逐字节相同,因此沿用上一份与用新下发的那份等价;
@@ -2309,7 +2310,9 @@
         return { ...next, config: { ...next.config, prices: carried } }
       }
       const reload = async () => {
-        if (!active || reloading) return // 并发防抖:轮询/手动刷新/重连不叠加 getState,避免乱序覆盖
+        if (!active || reloading || savingConfig) return // 保存期间不启动会读到旧配置的轮询。
+        const revision = configRevision
+        const current = () => active && revision === configRevision && savingConfig === 0
         reloading = true
         lastPoll = Date.now()
         const prev = store.getSnapshot()
@@ -2319,16 +2322,16 @@
           // 56%)。首屏(getLocalState)不发,保证拿到的第一份必定完整。
           const knownRev = prev.state?.pricesRev
           const state = await call(prev.state === null ? 'getLocalState' : typeof knownRev === 'string' ? 'getStateSince' : 'getState', typeof knownRev === 'string' ? [knownRev] : [])
-          if (!active) return
+          if (!current()) return
           retrySeconds = 1
           store.set({ status: 'ready', error: null, state: withCarriedPrices(state, prev.state) })
           if (prev.state === null) {
             const fresh = await call('getState')
-            if (active) store.set({ status: 'ready', error: null, state: withCarriedPrices(fresh, state) })
+            if (current()) store.set({ status: 'ready', error: null, state: withCarriedPrices(fresh, state) })
           }
           // activeLocale 只属于本客户端快照,持久化配置始终保留 auto。
         } catch (error) {
-          if (!active) return
+          if (!current()) return
           if (prev.state === null) lastPoll = Date.now()
           retrySeconds = Math.min(retrySeconds * 2, 60)
           store.set({ status: 'error', error: error?.message ?? String(error), state: store.getSnapshot().state ?? prev.state })
@@ -2384,10 +2387,14 @@
         reload,
         updateConfig: async patch => {
           const { activeLocale: _local, ...savedPatch } = patch
-          const state = await call('updateConfig', [savedPatch])
-          store.set({ status: 'ready', error: null, state })
-          if (patch.planBilling) setTimeout(() => { void reload() }, 1500)
-          return state
+          // 使保存前发出的旧查询失效，避免套餐开关或工作区回退。
+          configRevision++; savingConfig++
+          try {
+            const state = await call('updateConfig', [savedPatch])
+            store.set({ status: 'ready', error: null, state })
+            if (patch.planBilling) setTimeout(() => { void reload() }, 1500)
+            return state
+          } finally { savingConfig--; configRevision++ }
         },
         fetchPrices: async () => receive(costMeter.fetchPrices()),
         // 交回自动同步(OpenRouter 手改价):成功即刷新本地快照,失败抛出带原因的错误。
