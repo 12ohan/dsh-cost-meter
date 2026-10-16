@@ -345,6 +345,10 @@ window.__ModuleLoader__.load({
         el('div', { className: 'cm-context-current' }, el('p', { className: 'cm-plan-sub' }, data.provider + ' / ' + data.model),
         el('div', { className: 'cm-plan-summary' }, el('div', null, el('div', { className: 'cm-plan-sub' }, text('当前上下文', 'Current context')), el('div', { className: 'cm-plan-amount' }, '≈ ' + countText(data.contextTokens) + ' tokens')),
           el('div', null, el('div', { className: 'cm-plan-sub' }, data.basis === 'plan' ? text('Plan 输入等值', 'Plan input equivalent') : text('非缓存输入估算', 'Uncached input estimate')), el('div', { className: 'cm-plan-amount' }, costText(breakdown.cost)))),
+        el('p', { className: 'cm-plan-note' }, text('按当前上下文全部作为非缓存输入发送一次估算，不含缓存折扣和输出费用，也不是本会话累计费用。', 'Estimates one send of the current context as uncached input, excluding cache discounts and output costs. This is not the session total.')),
+        el('p', { className: 'cm-plan-sub' }, data.source === 'usage'
+          ? text('总量按提供商最近用量及后续上下文变化校准；各部分 Token 和费用按组成比例估算，不代表压缩后的逐段实际用量。', 'The total follows reported usage plus subsequent context changes. Component tokens and costs are proportional estimates, not measured post-compression usage for each part.')
+          : text('总量及各部分均为本地估算，尚无可用的提供商用量校准。', 'The total and components are local estimates without an available provider-usage anchor.')),
         el(CostBreakdown, { rows: breakdown.parts.filter(row => row.tokens > 0).map(row => ({ key: row.key, label: names[contextKeys.indexOf(row.key)], tokens: Math.round(row.tokens), value: priced ? row.cost : row.tokens, amount: costText(row.cost), color: contextColors[contextKeys.indexOf(row.key)] })), total: priced ? breakdown.cost : data.contextTokens, label: priced ? text('参考费用占比', 'Reference cost share') : text('Token 占比', 'Token share'), text }),
         el('details', { className: 'cm-cost-table', open: expanded }, el('summary', null, text('各部分计费', 'Component costs')), el('ul', { className: 'cm-plan-parts' }, ...breakdown.parts.filter(row => row.tokens > 0).map(row => {
           const index = contextKeys.indexOf(row.key)
@@ -373,8 +377,8 @@ window.__ModuleLoader__.load({
         return function ContextCostBridge(props) {
           if (localeStore) React.useSyncExternalStore(localeStore.subscribe, getLocale)
           const container = useRef(null), [target, setTarget] = useState(null)
-          const composition = props.useProjection?.('contextBreakdown'), usage = props.useProjection?.('tokenUsage')
-          const revision = JSON.stringify([composition, usage])
+          const composition = props.useProjection?.('contextBreakdown'), usage = props.useProjection?.('tokenUsage'), pressure = props.useProjection?.('contextPressure')
+          const revision = JSON.stringify([composition, usage, pressure])
           useEffect(() => {
             const scope = Original ? container.current : container.current?.closest('[data-conversation-session]')
             if (!scope || (!Original && scope.dataset.conversationSession !== props.sessionId) || typeof MutationObserver !== 'function') return
