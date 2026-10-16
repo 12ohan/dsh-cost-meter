@@ -656,6 +656,7 @@
         if (!b || typeof b !== 'object') return
         const row = out[key] ?? (out[key] = Object.fromEntries([...fields, 'apiCost'].map(k => [k, 0])))
         for (const k of fields) row[k] += num(b[k])
+        for (const k of frozenMoneyFields) if (Number.isFinite(b[k])) row[k] = (row[k] ?? 0) + b[k]
         const sep = key.indexOf(':')
         row.apiCost += num(b.apiCost ?? (billingClassOfLocal(sep > 0 ? key.slice(0, sep) : 'deepseek', sep > 0 ? key.slice(sep + 1) : key, config) === 'plan' ? 0 : b.cost))
       }
@@ -1860,6 +1861,8 @@
       // 本轮草稿的 diff 基点(冻结基线):草稿存在期间不随轮询推进,
       // 保证防抖 diff 始终对照「草稿创建那一刻」的基线,只提交真正改动的键。
       const draftBaseRef = React.useRef(null)
+      const saveQueue = React.useRef(Promise.resolve()), saveGeneration = React.useRef(0), flushSave = React.useRef(null)
+      useEffect(() => () => { flushSave.current?.() }, [])
 
       useEffect(() => {
         if (state !== null) {
@@ -1887,13 +1890,15 @@
         }
       }, [draft])
 
-      // 配置改动 600ms 防抖后即时保存(无需点击保存按钮)。
+      // Short debounce plus a single write queue; stale responses cannot mark a newer draft saved.
       useEffect(() => {
+        const generation = ++saveGeneration.current
         if (draft === null || api === undefined) return
         const json = JSON.stringify(draft)
-        if (json === savedRef.current) return
+        if (json === savedRef.current) { flushSave.current = null; return }
         setSaveState(prev => (prev.status === 'saving' ? prev : { ...prev, status: 'saving' }))
-        const timer = setTimeout(() => {
+        const enqueue = () => { saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
+          if (generation !== saveGeneration.current) return
           // 只提交发生变化的顶层键(diff 补丁):多窗口同开时,旧窗口的草稿
           // 不再整份覆盖其它窗口已保存的改动(否则会互相回弹)。
           // diff 基点取草稿创建时冻结的 draftBaseRef:期间到达的新 state 只推进
@@ -1911,16 +1916,19 @@
             setSaveState({ status: 'saved', at: Date.now(), error: null })
             return
           }
-          api.updateConfig(patch).then(() => {
+          try {
+            await api.updateConfig(patch)
             savedRef.current = json
             // 保存成功后把 diff 基点推进到「基线 + 已提交补丁」的新配置,
             // 与服务端实际状态对齐,下一轮 diff 从这里算起。
             if (base !== null && typeof base === 'object') draftBaseRef.current = { ...base, ...patch }
-            setSaveState({ status: 'saved', at: Date.now(), error: null })
-          }, error => {
-            setSaveState({ status: 'error', at: 0, error: error?.message ?? String(error) })
-          })
-        }, 600)
+            if (generation === saveGeneration.current) setSaveState({ status: 'saved', at: Date.now(), error: null })
+          } catch (error) {
+            if (generation === saveGeneration.current) setSaveState({ status: 'error', at: 0, error: error?.message ?? String(error) })
+          }
+        }) }
+        flushSave.current = enqueue
+        const timer = setTimeout(enqueue, 120)
         return () => { clearTimeout(timer) }
       }, [draft, api])
 
@@ -2149,289 +2157,26 @@
         : null,
         // ── 显示:界面语言、徽章/侧边栏位置、图框开关等 ──
         tab === 'display' ? el(Fragment, { key: 'display' },
-          el(ModelSidebarSettings, { draft, setDraft, t }),
         // 存量明文密钥未迁出提示(v1.6.8):仅在确有密钥无法自动导入凭据库时出现。
         state?.secretMigration?.pending?.length > 0
           ? el(SecretMigrationNotice, { pending: state.secretMigration.pending, t })
           : null,
-        // 顶栏:界面语言
-        el('div', { className: 'cm-toolbar' },
-          el('div', { className: 'cm-field' },
-            el('label', null, t('languageLabel')),
-            el('select', {
-              className: 'cm-input',
-              value: draft?.locale ?? 'auto',
-              onChange: event => setField('locale', event.target.value),
-            },
-              el('option', { value: 'auto' }, t('localeAuto')),
-              el('option', { value: 'zh' }, t('localeZh')),
-              el('option', { value: 'en' }, t('localeEn'))))),
-        // 显示设置
-        el('div', null,
-          el('h3', { className: 'cm-h' }, t('displaySettings')),
-          el('div', { className: 'cm-grid' },
-            el('div', { className: 'cm-grid-group' }, t('groupGeneral')),
-            ...['includeSubagentCost', 'codexQuotaEnabled', 'codexQuotaSidebar'].map(key => el('label', { key, className: 'cm-check' },
-              el('input', { type: 'checkbox', checked: draft?.[key] === true, onChange: event => setField(key, event.target.checked) }),
-              el('span', null, t(key)))),
-            USAGE_POSITION_SWITCHABLE
-              ? el('div', { className: 'cm-field' },
-                  el('label', null, t('usagePositionLabel')),
-                  el('select', {
-                    className: 'cm-input',
-                    value: draft?.usage?.position ?? 'cost',
-                    onChange: event => {
-                      if (draft === null) return
-                      setDraft({ ...draft, usage: { ...(draft.usage ?? { position: 'cost' }), position: event.target.value } })
-                    },
-                  },
-                    el('option', { value: 'cost' }, t('usagePositionCost')),
-                    el('option', { value: 'general' }, t('usagePositionGeneral')),
-                    el('option', { value: 'section' }, t('usagePositionSection'))))
-              : null,
-            el('div', { className: 'cm-field' },
-              el('label', null, t('positionLabel')),
-              el('select', {
-                className: 'cm-input',
-                value: draft?.position ?? 'dock',
-                onChange: event => setField('position', event.target.value),
-              },
-                el('option', { value: 'dock' }, t('positionDock')),
-                el('option', { value: 'header' }, t('positionHeader')),
-                el('option', { value: 'off' }, t('off')))),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('sidebarLabel')),
-              el('select', {
-                className: 'cm-input',
-                value: draft?.sidebar === false ? 'off' : 'on',
-                onChange: event => setField('sidebar', event.target.value === 'on'),
-              },
-                el('option', { value: 'on' }, t('sidebarOn')),
-                el('option', { value: 'off' }, t('off')))),
-            el('label', { className: 'cm-check' },
-              el('input', {
-                type: 'checkbox',
-                checked: draft?.showSessionId === true,
-                onChange: event => setField('showSessionId', event.target.checked),
-              }),
-              el('span', null, t('showSessionIdLabel'))),
-            ...['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'sessionCostCompact'].map(key => el('label', { key, className: 'cm-check' },
-              el('input', { type: 'checkbox', checked: draft?.[key] === true, onChange: event => setField(key, event.target.checked) }),
-              el('span', null, t(key)))),
-            el('div', { className: 'cm-grid-group' }, t('groupMoney')),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('currencyLabel')),
-              el('select', {
-                className: 'cm-input',
-                value: draft?.currency ?? 'CNY',
-                onChange: event => {
-                  const preset = CURRENCY_PRESETS[event.target.value]
-                  if (preset !== undefined && draft !== null) {
-                    setDraft({ ...draft, currency: event.target.value, ...preset })
-                  }
-                },
-              },
-                el('option', { value: 'CNY' }, t('currencyCny')),
-                el('option', { value: 'USD' }, t('currencyUsd')),
-                el('option', { value: 'EUR' }, t('currencyEur')))),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('symbolLabel')),
-              el('input', {
-                className: 'cm-input narrow', type: 'text',
-                value: draft?.symbol ?? '',
-                onChange: event => setField('symbol', event.target.value),
-              })),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('rateLabel')),
-              // 清空不提交:汇率 0 会被服务端校验拒绝并整包报错,保留原值更友好。
-              numInput({ value: draft?.exchangeRate ?? 1, emptyMode: 'ignore' }, v => setField('exchangeRate', v))),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('decimalsLabel')),
-              numInput({ value: draft?.decimals ?? 2 }, v => setField('decimals', Math.min(10, Math.floor(v))))),
-            // UI 隐藏开关(issues #45/#46):开启后官方余额/今日消耗金额的对应区块整体不渲染。
-            el('label', { className: 'cm-check' },
-              el('input', {
-                type: 'checkbox',
-                checked: draft?.hideOfficialBalance === true,
-                onChange: event => setField('hideOfficialBalance', event.target.checked),
-              }),
-              el('span', null, t('hideOfficialBalanceLabel'))),
-            el('label', { className: 'cm-check' },
-              el('input', {
-                type: 'checkbox',
-                checked: draft?.hideTodayCost === true,
-                onChange: event => setField('hideTodayCost', event.target.checked),
-              }),
-              el('span', null, t('hideTodayCostLabel'))),
-            el('div', { className: 'cm-grid-group' }, t('groupSidebar')),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('sidebarTodayMetric')),
-              el('select', { className: 'cm-input', value: draft?.sidebarTodayMetric ?? 'cost',
-                onChange: event => setField('sidebarTodayMetric', event.target.value) },
-                el('option', { value: 'cost' }, t('sidebarTodayCost')),
-                el('option', { value: 'tokens' }, t('sidebarTodayTokens')))),
-            el('label', { className: 'cm-check' },
-              el('input', { type: 'checkbox', checked: draft?.sidebarSimple === true,
-                onChange: event => { if (draft) setDraft({ ...draft, sidebarSimple: event.target.checked, sidebarSimplePromptSeen: true }) } }),
-              el('span', null, t('sidebarSimple'))),
-            el('div', { className: 'cm-field' }, el('span', { className: 'cm-hint' }, t('sidebarSimpleNote'))),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('sidebarStyleLabel')),
-              el('select', {
-                className: 'cm-input',
-                value: draft?.sidebarStyle ?? 'standard',
-                disabled: draft?.sidebarSimple === true,
-                onChange: event => setField('sidebarStyle', event.target.value),
-              },
-                el('option', { value: 'standard' }, t('sidebarStyleStandard')),
-                el('option', { value: 'compact' }, t('sidebarStyleCompact')))),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('balanceDisplayLabel')),
-              el('select', {
-                className: 'cm-input',
-                value: draft?.balance?.display ?? 'both',
-                onChange: event => {
-                  if (draft === null) return
-                  setDraft({ ...draft, balance: { ...(draft.balance ?? { display: 'both', refreshMinutes: 5 }), display: event.target.value } })
-                },
-              },
-                ...displayOptions(t))),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('refreshIntervalLabel')),
-              numInput({ value: draft?.balance?.refreshMinutes ?? 5 }, v => {
-                if (draft === null) return
-                setDraft({ ...draft, balance: { ...(draft.balance ?? { display: 'both', refreshMinutes: 5, showProgressBar: false, budgetCap: null }), refreshMinutes: Math.min(1440, Math.max(1, Math.floor(v))) } })
-              })),
-            el('div', { className: 'cm-field' },
-              el('label', { className: 'cm-check' },
-                el('input', {
-                  type: 'checkbox',
-                  checked: draft?.balance?.showProgressBar === true,
-                  onChange: event => {
-                    if (draft === null) return
-                    setDraft({ ...draft, balance: { ...(draft.balance ?? { display: 'both', refreshMinutes: 5, showProgressBar: false, budgetCap: null }), showProgressBar: event.target.checked } })
-                  },
-                }),
-                el('span', null, t('balanceShowProgressBar')))),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('balanceBudgetCapLabel')),
-              numInput({ value: draft?.balance?.budgetCap ?? '' }, v => {
-                if (draft === null) return
-                setDraft({ ...draft, balance: { ...(draft.balance ?? { display: 'both', refreshMinutes: 5, showProgressBar: false, budgetCap: null }), budgetCap: v > 0 ? v : null } })
-              }),
-              el('span', { className: 'cm-hint' }, t('balanceBudgetCapHint'))),
-            // 进度条方向(issue #67):四组条独立选择剩余/已用方向,默认保持各自原设计。
-            el('div', { className: 'cm-field' },
-              el('label', null, t('barDirectionsTitle')),
-              ['balance', 'budget', 'go', 'plan'].map(kind => el('div', { className: 'cm-dir-row', key: kind },
-                el('span', { className: 'cm-dir-label' }, t('barDirection_' + kind)),
-                el('select', {
-                  className: 'cm-input',
-                  value: draft?.barDirections?.[kind] ?? (kind === 'balance' ? 'remaining' : 'used'),
-                  onChange: event => {
-                    if (draft === null) return
-                    const fallback = { balance: 'remaining', budget: 'used', go: 'used', plan: 'used' }
-                    setDraft({ ...draft, barDirections: { ...(draft.barDirections ?? fallback), [kind]: event.target.value } })
-                  },
-                },
-                el('option', { value: 'remaining' }, t('barDirectionRemaining')),
-                el('option', { value: 'used' }, t('barDirectionUsed'))))),
-              el('span', { className: 'cm-hint' }, t('barDirectionsHint'))),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('customBalanceDisplayLabel')),
-              el('select', {
-                className: 'cm-input',
-                value: draft?.customBalance?.display ?? config.customBalance?.display ?? 'both',
-                onChange: event => {
-                  if (draft === null) return
-                  setDraft({ ...draft, customBalance: { ...(draft.customBalance ?? config.customBalance ?? {}), display: event.target.value } })
-                },
-              },
-                ...displayOptions(t))),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('customBalanceRefreshInterval')),
-              numInput({ value: draft?.customBalance?.refreshMinutes ?? config.customBalance?.refreshMinutes ?? 15 }, v => {
-                if (draft === null) return
-                setDraft({ ...draft, customBalance: { ...(draft.customBalance ?? config.customBalance ?? {}), refreshMinutes: Math.min(1440, Math.max(1, Math.floor(v))) } })
-              })),
-            el(GoQuotaSettings, { config, draft, setDraft, t, api }),
-            el('div', { className: 'cm-grid-group' }, t('quotaStripGroup')),
-            el('div', { className: 'cm-field' },
-              el('label', { className: 'cm-check' },
-                el('input', {
-                  type: 'checkbox',
-                  checked: draft?.quotaStrip?.enabled === true,
-                  onChange: event => {
-                    if (draft === null) return
-                    setDraft({ ...draft, quotaStrip: { ...(draft.quotaStrip ?? { enabled: false, budget: true, go: true, plans: true }), enabled: event.target.checked, promptSeen: true } })
-                  },
-                }),
-                el('span', null, t('quotaStripEnable')))),
-            draft?.quotaStrip?.enabled === true
-              ? [['budget', 'quotaStripShowBudget'], ['go', 'quotaStripShowGo'], ['plans', 'quotaStripShowPlans']].map(([key, labelKey]) =>
-                  el('label', { key, className: 'cm-check' },
-                    el('input', {
-                      type: 'checkbox',
-                      checked: draft.quotaStrip[key] !== false,
-                      onChange: event => {
-                        if (draft === null) return
-                        setDraft({ ...draft, quotaStrip: { ...draft.quotaStrip, [key]: event.target.checked } })
-                      },
-                    }),
-                    el('span', null, t(labelKey))))
-              : null,
-            el('div', { className: 'cm-field' },
-              el('span', { className: 'cm-hint' }, t('quotaStripNote'))),
-            el('div', { className: 'cm-grid-group' }, t('groupCorner')),
-            el('div', { className: 'cm-field' },
-              el('label', null, t('cornerLabel')),
-              el('label', { className: 'cm-check' },
-                el('input', {
-                  type: 'checkbox',
-                  checked: draft?.corner?.enabled === true,
-                  onChange: event => {
-                    if (draft === null) return
-                    setDraft({ ...draft, corner: { ...(draft.corner ?? { enabled: false, goRolling: true, goWeekly: true, goMonthly: true, budget: true }), enabled: event.target.checked } })
-                  },
-                }),
-                el('span', null, t('cornerEnabledLabel'))),
-              draft?.corner?.enabled === true
-                ? [['goRolling', 'cornerGoRolling'], ['goWeekly', 'cornerGoWeekly'], ['goMonthly', 'cornerGoMonthly'], ['budget', 'cornerBudget']].map(([key, labelKey]) =>
-                  el('label', { key, className: 'cm-check' },
-                    el('input', {
-                      type: 'checkbox',
-                      checked: draft.corner[key] !== false,
-                      onChange: event => {
-                        if (draft === null) return
-                        setDraft({ ...draft, corner: { ...draft.corner, [key]: event.target.checked } })
-                      },
-                    }),
-                    el('span', null, t(labelKey))))
-                : null),
-            el('div', { className: 'cm-grid-group' }, t('groupDetail')),
-            el('div', { className: 'cm-field' },
-              el('label', { className: 'cm-check' },
-                el('input', {
-                  type: 'checkbox',
-                  checked: draft?.goQuota?.detail !== false,
-                  onChange: event => {
-                    if (draft === null) return
-                    setDraft({ ...draft, goQuota: { ...(draft.goQuota ?? { display: 'both', refreshMinutes: 15, apiKey: '', main: 'rolling', detail: true }), detail: event.target.checked } })
-                  },
-                }),
-                el('span', null, t('goDetailLabel')))),
-            el('div', { className: 'cm-field' },
-              el('label', { className: 'cm-check' },
-                el('input', {
-                  type: 'checkbox',
-                  checked: draft?.budget?.detail !== false,
-                  onChange: event => {
-                    if (draft === null) return
-                    setDraft({ ...draft, budget: { ...(draft.budget ?? { enabled: false, amount: 100, period: 'month', customStart: null, customEnd: null, detail: true }), detail: event.target.checked } })
-                  },
-                }),
-                el('span', null, t('budgetDetailLabel'))))),
-          el('p', { className: 'cm-note' }, t('badgeNote'))))
+        // 显示设置：独立加载的交互预览，共用草稿与自动保存。
+        el(BillingStatistics, { state, api, load: api.loadDisplay, draft, setDraft, t, locale,
+          numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, formatMoneyUsd, onNavigate: setTab,
+          renderSidebar: (preview, data = state) => renderSidebarFooter({ ...data, config: preview }, true, undefined, true),
+          renderStyleSample: (preview, data = state, examples = true) => {
+            if (!examples) return renderSidebarFooter({ ...data, config: preview }, true, undefined, true)
+            const simple = preview.sidebarSimple === true
+            const sampleConfig = { ...preview, peakNotice: false, hideBudget: false, hideTodayCost: false,
+              budget: { ...preview.budget, enabled: true, amount: Number(preview.budget?.amount) > 0 ? preview.budget.amount : 100 } }
+            const sampleState = { ...data, config: sampleConfig }
+            const windows = miniMaxWindowsOf(data.codingPlans?.minimax?.windows ?? {})
+            return el('div', { className: 'cm-footer-stack' + (simple ? ' simple' : preview.sidebarStyle === 'compact' ? ' compact' : '') },
+              el(BudgetBoxContent, { state: sampleState, wide: true, summary: simple }),
+              el(MiniMaxPlanCard, { five: windows.five ?? { percent: 24 }, seven: windows.seven ?? { percent: 18 }, fetchedAt: 0, t, wide: true, direction: barDirectionOf(preview, 'plan') }))
+          },
+          renderModelsSettings: () => el(ModelSidebarSettings, { draft, setDraft, t }) }))
         : null,
         // ── 价格:峰谷计价、价格表、模型名匹配、官方价格同步、OpenRouter 公开报价 ──
         tab === 'pricing' ? el(Fragment, { key: 'pricing' },
@@ -2650,6 +2395,7 @@
         loadOpenRouter: () => loadPage('openrouter'),
         loadCommunity: () => loadPage('community'),
         loadPricing: () => loadPage('pricing'),
+        loadDisplay: () => loadPage('display'),
         reload,
         updateConfig: async patch => {
           const { activeLocale: _local, ...savedPatch } = patch
@@ -2683,7 +2429,7 @@
         getDaySessions: async date => call('getDaySessions', [date]),
         // 跨全部日期的会话排行(issue #22 不分日期视角):支持费用/时间升降序与实时顺序。
         getSessionCost: async id => call('getSessionCost', [id]),
-        getTurnCost: async (id, start, end) => call('getTurnCost', [id, start, end]),
+        getTurnCost: async (id, start, end) => call('getTurnCost', [id, start, end, store.getSnapshot().state?.config?.currency]),
         getTopSessions: async (limit, sort, dir) => call('getTopSessions', [limit, sort, dir]),
         refreshBalance: async () => receive(costMeter.refreshBalance(), 'rpcBalanceFailed'),
         refreshGoQuota: async () => receive(costMeter.refreshGoQuota()),
@@ -2824,6 +2570,8 @@
         const balanceDisplay = state?.config?.balance?.display ?? 'both'
         const showBalance = (balanceDisplay === 'sidebar' || balanceDisplay === 'both') && state?.config?.hideOfficialBalance !== true
         const footer = showToday || showBalance || state?.config?.codexQuotaEnabled === true || state?.config?.sidebarModels?.enabled === true
+          || (state?.config?.budget?.enabled === true && state?.config?.hideBudget !== true)
+          || (state?.config?.goQuota?.enabled === true && ['sidebar', 'both'].includes(state.config.goQuota.display))
         const cornerEnabled = state?.config?.corner?.enabled === true || state?.config?.sidebarModels?.dock === true
         const sectionLocale = resolveLocale(state?.config || { activeLocale: store.getSnapshot().locale })
         const usagePosition = state?.config?.usage?.position ?? 'cost'

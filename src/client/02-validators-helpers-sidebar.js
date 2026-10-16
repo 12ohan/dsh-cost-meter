@@ -35,6 +35,7 @@
           if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) continue
           const num = x => (typeof x === 'number' && Number.isFinite(x) && x >= 0 ? x : 0)
           out[key] = {
+            ...parseFrozenMoney(raw),
             ...mapFields(raw, ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'cost'], num),
             // API 渠道金额(issue #64):缺席 = 旧数据按 cost 全额 API 口径。
             apiCost: raw.apiCost === undefined ? num(raw.cost) : num(raw.apiCost),
@@ -43,9 +44,12 @@
       }
       return out
     }
+    const frozenMoneyFields = ['costCny', 'apiCostCny', 'costEur', 'apiCostEur']
+    const parseFrozenMoney = row => Object.fromEntries(frozenMoneyFields.filter(key => Number.isFinite(row?.[key])).map(key => [key, row[key]]))
     function parseUsageFields(v, path) {
       needObject(v, path)
       const out = {
+        ...parseFrozenMoney(v),
         reasoning: v.reasoning === undefined ? 0 : needNum(v.reasoning, path + '.reasoning'),
         apiCost: v.apiCost === undefined ? undefined : needNum(v.apiCost, path + '.apiCost'),
         byModel: aggregateModelMap(v.byModel, path + '.byModel'),
@@ -133,6 +137,7 @@
         // 会话列表附显 ID 自上线以来实际从未生效(v1.5.38 起一并修复)。
         showSessionId: v.showSessionId === true,
         hideOfficialBalance: v.hideOfficialBalance === true,
+        hideBudget: v.hideBudget === true,
         hideTodayCost: v.hideTodayCost === true,
         ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost'], value => value === true),
         sessionCostCompact: v.sessionCostCompact === true,
@@ -155,6 +160,8 @@
         symbol: typeof v.symbol === 'string' ? v.symbol : '¥',
         decimals: needNum(v.decimals, path + '.decimals'),
         exchangeRate: needNum(v.exchangeRate, path + '.exchangeRate'),
+        exchangeRateAuto: v.exchangeRateAuto !== false,
+        fxRates: v.fxRates, exchangeRateDate: v.exchangeRateDate ?? '', exchangeRateCheckedAt: v.exchangeRateCheckedAt ?? 0,
         peakEnabled: v.peakEnabled === true,
         peakEffectiveAt: typeof v.peakEffectiveAt === 'string' ? v.peakEffectiveAt : '',
         peakWindows: Array.isArray(v.peakWindows)
@@ -587,8 +594,8 @@
         },
         {
           id: 'dsh-cost-meter#costMeter/getTurnCost', service: 'costMeter', namespace: 'costMeter', method: 'getTurnCost', invocation: { kind: 'direct' },
-          parameters: [rpcParam('sessionId', 'SessionId', codecOf(v => needStr(v, 'sessionId'))), ...['startSeq', 'endSeq'].map(name => rpcParam(name, 'TurnSeq', codecOf(v => { if (!Number.isSafeInteger(v) || v < 0) fail(name, 'nonnegative integer'); return v })))],
-          result: strictCodec('TurnCost', codecOf(v => ({ found: needBool(v.found, 'found'), ...(v.inherited === undefined ? {} : { inherited: needBool(v.inherited, 'inherited') }), cost: needNum(v.cost, 'cost'), apiCost: needNum(v.apiCost, 'apiCost'), rows: parseTurnRows(v.rows),
+          parameters: [rpcParam('sessionId', 'SessionId', codecOf(v => needStr(v, 'sessionId'))), ...['startSeq', 'endSeq'].map(name => rpcParam(name, 'TurnSeq', codecOf(v => { if (!Number.isSafeInteger(v) || v < 0) fail(name, 'nonnegative integer'); return v }))), { ...rpcParam('displayCurrency', 'DisplayCurrency', codecOf(v => { if (v !== undefined && !['USD', 'CNY', 'EUR'].includes(v)) fail('displayCurrency', 'currency'); return v })), acceptsUndefined: true }],
+          result: strictCodec('TurnCost', codecOf(v => ({ ...parseFrozenMoney(v), found: needBool(v.found, 'found'), ...(v.inherited === undefined ? {} : { inherited: needBool(v.inherited, 'inherited') }), cost: needNum(v.cost, 'cost'), apiCost: needNum(v.apiCost, 'apiCost'), rows: parseTurnRows(v.rows),
             calls: (Array.isArray(v.calls) ? v.calls : fail('calls', 'array')).map(c => ({ kind: needStr(c.kind, 'kind'), provider: needStr(c.provider, 'provider'), model: needStr(c.model, 'model'), atMs: needNum(c.atMs, 'atMs'), cost: needNum(c.cost, 'cost'), apiCost: needNum(c.apiCost, 'apiCost'), plan: needBool(c.plan, 'plan'), priced: needBool(c.priced, 'priced'), longContext: needBool(c.longContext, 'longContext'), rows: parseTurnRows(c.rows), ...(c.metering ? { metering: parseMetering(c.metering) } : {}) })) }))),
         },
         {
@@ -1054,6 +1061,9 @@
      * 预算/卡片/徽章/表格等全部金额展示统一走这里,保证同一开关下口径一致。
      */
     function displayCostOf(entry, config) {
+      const suffix = { CNY: 'Cny', EUR: 'Eur' }[config?.currency]
+      const saved = suffix && entry?.[(config?.showTotalWithPlan ? 'cost' : 'apiCost') + suffix]
+      if (Number.isFinite(saved)) return saved / (config.exchangeRate || 1)
       if (config !== null && typeof config === 'object' && config.showTotalWithPlan === true) {
         return Number(entry?.cost) || 0
       }
@@ -1435,14 +1445,14 @@
       const base = snapshot ? snapshot.own : projection
       if (!include || !snapshot?.subagentCount) return base
       const extra = snapshot.subagents, out = { ...base }
-      for (const key of ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'calls', 'cost']) out[key] = (base?.[key] ?? 0) + (extra?.[key] ?? 0)
+      for (const key of ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'calls', 'cost', ...frozenMoneyFields]) out[key] = (base?.[key] ?? 0) + (extra?.[key] ?? 0)
       out.apiCost = recordedApiCost(base, config) + moneyCostOf(extra)
       for (const key of ['byModel', 'byProviderModel']) {
         out[key] = { ...base?.[key] }
         for (const [id, row] of Object.entries(extra?.[key] ?? {})) {
           const combined = { ...out[key][id] }
           combined.apiCost = moneyCostOf(combined) + moneyCostOf(row)
-          for (const field of ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'calls', 'cost']) combined[field] = (combined[field] ?? 0) + (row[field] ?? 0)
+          for (const field of ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'calls', 'cost', ...frozenMoneyFields]) combined[field] = (combined[field] ?? 0) + (row[field] ?? 0)
           out[key][id] = combined
         }
       }
@@ -1487,6 +1497,10 @@
     }
 
     function sessionCostParts(usage, config) {
+      if (Number.isFinite(usage?.costCny) || Number.isFinite(usage?.costEur)) {
+        const total = displayCostOf(usage, { ...config, showTotalWithPlan: true }), api = displayCostOf(usage, { ...config, showTotalWithPlan: false })
+        return { cost: config.showTotalWithPlan ? total : api, planPart: config.showTotalWithPlan ? 0 : Math.max(0, total - api) }
+      }
       // Plan/API 双轨(issue #64):会话内存在 Plan 类模型时,徽章显示真金白银
       // (API)金额并在悬停明细中单列 Plan 等值;「含 Plan 总额」开启时回到
       // 单一总额口径(v1.6.0);无 Plan 用量时保持宿主精确成本快路径。
@@ -1502,7 +1516,7 @@
 
     function modelCostDetail(usage, config) {
       return Object.entries(usage?.byProviderModel ?? {}).filter(([, row]) => row.input || row.output || row.cacheRead || row.cacheWrite || row.reasoning)
-        .map(([id, row]) => id + ' ' + formatMoneyUsd(row.cost, config)).join('; ')
+        .map(([id, row]) => id + ' ' + formatMoneyUsd(displayCostOf(row, { ...config, showTotalWithPlan: true }), config)).join('; ')
     }
 
     function TurnCost(props) {
@@ -1528,10 +1542,10 @@
         row.provider + ':' + row.model + ' · ' + names[row.bucket] + (row.plan ? ' (Plan)' : '') + ': ' + row.tokens.toLocaleString() + ' × ' + (row.priced ? money(row.rate) : '?') + ' / 1,000,000 ≈ ' + (row.priced ? money(row.cost) : '?'),
         !row.priced ? (en ? ' (price unavailable)' : '（未配置价格）') : row.bucket === 'reasoning' && row.rate === 0 ? (en ? ' (no separate charge)' : '（不单独收费）') : '')
       return el('details', { className: 'cm-note', style: { fontSize: 12, marginTop: 6 } },
-        el('summary', { style: { cursor: 'pointer' }, title: en ? 'Log estimate at configured prices; session cost uses recorded ledger amounts.' : '本轮按日志和配置价格估算，本会话按账本已入账金额汇总。' }, en ? 'Turn cost' : '本轮费用', value?.found ? ' ≈ ' + money(config.showTotalWithPlan ? value.cost : value.apiCost) + (value.rows.some(r => !r.priced) ? (en ? ' + unpriced usage' : ' + 未定价用量') : '') : value?.inherited ? (en ? ' · inherited history' : ' · 继承历史') : error ? ' ⚠' : ''),
+        el('summary', { style: { cursor: 'pointer' }, title: en ? 'Log estimate at configured prices; session cost uses recorded ledger amounts.' : '本轮按日志和配置价格估算，本会话按账本已入账金额汇总。' }, en ? 'Turn cost' : '本轮费用', value?.found ? ' ≈ ' + money(displayCostOf(value, config)) + (value.rows.some(r => !r.priced) ? (en ? ' + unpriced usage' : ' + 未定价用量') : '') : value?.inherited ? (en ? ' · inherited history' : ' · 继承历史') : error ? ' ⚠' : ''),
         error ? el('div', { role: 'alert' }, error) : !value ? (en ? 'Loading…' : '加载中…') : !value.found ? value.inherited ? (en ? 'Inherited usage is not billed again in this conversation.' : '继承的历史用量不在本会话重复计费。') : (en ? 'Complete usage records unavailable' : '没有完整用量记录') :
           el(Fragment, null, el('p', null, en ? 'Estimated from recorded usage and configured prices; rates per 1M tokens.' : '按已记录用量和配置价格估算；单价单位为每百万 Token。'),
-            el('p', null, 'API ≈ ' + money(value.apiCost) + ' · Plan ≈ ' + money(value.cost - value.apiCost) + (en ? ' (equivalent)' : '（等值）')),
+            el('p', null, 'API ≈ ' + money(displayCostOf(value, { ...config, showTotalWithPlan: false })) + ' · Plan ≈ ' + money(displayCostOf(value, { ...config, showTotalWithPlan: true }) - displayCostOf(value, { ...config, showTotalWithPlan: false })) + (en ? ' (equivalent)' : '（等值）')),
             value.rows.map(rowView),
             el('details', null, el('summary', { style: { cursor: 'pointer' } }, (en ? 'Individual calls' : '逐次调用明细') + ' (' + value.calls.length + ')'),
               value.calls.map((call, i) => el('details', { key: i, style: { margin: '6px 0' } },
@@ -1773,7 +1787,7 @@
       if (!balance || balance.status === 'off') return null
       if (balance.status === 'error') {
         return el(Tooltip, { label: [t('balanceQueryFailed', { message: balance.message || t('unknownError') }), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
-          el('div', { className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
+          el('div', { 'data-cm-display': 'balance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
             wide ? el(Fragment, null, t('balance'), ' ', el('span', { className: 'cm-num' }, t('queryFailed'))) : '⚠'))
       }
       const detail = [
@@ -1788,7 +1802,7 @@
         ...clickRefreshTipLines(t, refresh),
       ].join('; ')
       return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
-        el('div', { className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
+        el('div', { 'data-cm-display': 'balance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? el(Fragment, null, el('span', { className: 'cm-balance-name' }, t('balance'), rechargeLinkEl(t)), el('span', { className: 'cm-num cm-bal-amt' }, formatBalanceMoney(balance.totalBalance, state.config, balance.currency)), state.reconcile?.ok === false ? ' ⚠' : '') : el(WalletIcon, { size: 16 })))
     }
 
@@ -1819,7 +1833,7 @@
           el('span', { className: 'cm-bbox-pct cm-num cm-bal-amt' }, remaining)),
         el(BalanceBar, { segments, direction: barDirectionOf(config, 'balance') }))
       return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
-        el('div', { className: 'cm-bbox clickable' + (wide ? '' : ' rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
+        el('div', { 'data-cm-display': 'balance', className: 'cm-bbox clickable' + (wide ? '' : ' rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? body : el('div', { className: 'cm-bbox-rail cm-num' }, Math.round(segments.remainingPct) + '%')))
     }
 
@@ -1941,7 +1955,7 @@
       const view = customBalanceBoxBody(state, config, t, snapshot, entry)
       const detail = [customBalanceDetailText(snapshot, config, t, state, entry), ...clickRefreshTipLines(t, refresh)].join(' · ')
       return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
-        el('div', { className: 'cm-bbox clickable' + (view.level === 'ok' ? '' : ' ' + view.level) + (wide ? '' : ' rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
+        el('div', { 'data-cm-display': 'customBalance', className: 'cm-bbox clickable' + (view.level === 'ok' ? '' : ' ' + view.level) + (wide ? '' : ' rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? view.body : el('div', { className: 'cm-bbox-rail cm-num' }, view.rail)))
     }
 
@@ -1964,13 +1978,13 @@
       const label = resolveCustomBalanceLabel(entry ?? config.customBalance ?? {}, resolveLocale(config))
       if (custom.status === 'error') {
         return el(Tooltip, { label: [custom.message || t('unknownError'), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
-          el('div', { className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
+          el('div', { 'data-cm-display': 'customBalance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
             wide ? el(Fragment, null, el('span', { className: 'cm-bal-label', title: label }, label), el('span', { className: 'cm-num cm-bal-amt' }, t('queryFailed'))) : '⚠'))
       }
       const amount = formatCustomBalanceMoney(custom.remaining, config, custom, entry)
       const detail = [customBalanceDetailText(custom, config, t, state, entry), ...clickRefreshTipLines(t, refresh)].join(' · ')
       return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
-        el('div', { className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
+        el('div', { 'data-cm-display': 'customBalance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide ? el(Fragment, null, el('span', { className: 'cm-bal-label', title: label }, label), el('span', { className: 'cm-num cm-bal-amt' }, amount)) : el(WalletIcon, { size: 16 })))
     }
 
@@ -2247,7 +2261,7 @@
         ? t('nextPeakIn', { time: countdownText(view, now, t) })
         : t('nextOffPeakIn', { time: countdownText(view, now, t) })
       return el(Tooltip, { label: t(keys.notice), side: 'right', delayMs: 300 },
-        el('div', { className: 'cm-peak-strip ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off') },
+        el('div', { 'data-cm-display': 'peak', className: 'cm-peak-strip ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off') },
           el('div', { className: 'cm-peak-track' },
             el('div', { className: 'cm-peak-segment cm-peak-high' }),
             el('div', { className: 'cm-peak-segment cm-peak-low' }),
@@ -2270,7 +2284,7 @@
         ? t('nextPeakIn', { time: countdownText(view, now, t) })
         : t('nextOffPeakIn', { time: countdownText(view, now, t) })
       return el(Tooltip, { label: t(keys.notice), side: 'right', delayMs: 300 },
-        el('div', { className: 'cm-peak-classic ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off') },
+        el('div', { 'data-cm-display': 'peak', className: 'cm-peak-classic ' + (view.weekend || view.holiday ? 'weekend' : view.inPeak ? 'peak' : 'off') },
           el('div', { className: 'cm-peak-classic-marker', style: { left: view.weekend || view.holiday ? '50%' : view.inPeak ? '25%' : '75%' } }),
           el('div', { className: 'cm-peak-track' },
             el('div', { className: 'cm-peak-segment cm-peak-high' }),
@@ -2361,7 +2375,7 @@
           detail
             ? el(Fragment, null,
               // 今日金额行受 hideTodayCost 门控(issue #46);金额为真金白银口径(issue #64)。
-              config.hideTodayCost === true ? null : el('div', { className: 'cm-bbox-line cm-num' },
+              config.hideTodayCost === true ? null : el('div', { 'data-cm-display': 'today', className: 'cm-bbox-line cm-num' },
                 config.sidebarTodayMetric === 'tokens'
                   ? t('today') + ' ' + sidebarTodayValue(today, config, t)
                   : t('todayShare', {
@@ -2427,7 +2441,7 @@
         t('goQuotaFetchedAt', { time: goQuota.fetchedAt > 0 ? new Date(goQuota.fetchedAt).toLocaleTimeString() : '—' }),
       ].join('; ')
       return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
-        el('div', { className: 'cm-bbox' + (view.level === 'ok' ? '' : ' ' + view.level) + (wide ? '' : ' rail') },
+        el('div', { 'data-cm-display': 'go', className: 'cm-bbox' + (view.level === 'ok' ? '' : ' ' + view.level) + (wide ? '' : ' rail') },
           wide ? view.body : el('div', { className: 'cm-bbox-rail cm-num' }, view.rail)))
     }
 
@@ -2535,7 +2549,7 @@
         el('div', { className: 'cm-bbox-rail cm-num' }, sevenView.text))
       return el(Tooltip, { label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
-          ...hoverProps, className: 'cm-bbox cm-mm' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '')
+          ...hoverProps, 'data-cm-display': 'plan', className: 'cm-bbox cm-mm' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '')
             + (refresh ? ' clickable' + (refresh.busy ? ' busy' : '') : ''),
           ...(refresh ? clickableRefreshProps(refresh.busy, refresh.run) : {}),
         },
@@ -2639,8 +2653,9 @@
       const { state, wide } = props
       const t = makeT(resolveLocale(state.config))
       const enabled = state.config?.codexQuotaEnabled === true && state.config?.codexQuotaSidebar !== false
-      const snap = useCodexQuota(enabled)
-      const refresh = useClickRefresh(() => fetchCodexQuota(true, enabled))
+      const cached = useCodexQuota(enabled && !props.preview)
+      const snap = props.preview && state.displayPreviewCodex ? state.displayPreviewCodex : cached
+      const refresh = useClickRefresh(props.preview ? null : () => fetchCodexQuota(true, enabled))
       if (!enabled || snap.status !== 'ok') return null
       const win = snap.windows.weekly ?? null
       if (win === null) return null
@@ -2659,7 +2674,7 @@
       const rail = el('div', { className: 'cm-bbox-rail cm-num' }, view.label === null ? '—' : view.label + '%')
       return el(Tooltip, { label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
-          ...hoverProps, className: 'cm-bbox cm-mm clickable' + (view.level === 'ok' ? '' : ' ' + view.level)
+          ...hoverProps, 'data-cm-display': 'codex', className: 'cm-bbox cm-mm clickable' + (view.level === 'ok' ? '' : ' ' + view.level)
             + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''),
           ...clickableRefreshProps(refresh.busy, refresh.run),
         },
@@ -2724,7 +2739,7 @@
         ? pcts.slice(0, 2).map(p => simpleBarByDirection(p, planDirection).label + '%').join(' ')
         : (typeof entries[0][1]?.text === 'string' ? entries[0][1].text : '—')
       return el(Tooltip, { label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
-        el('div', { ...hoverProps, className: 'cm-bbox cm-mm clickable' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
+        el('div', { ...hoverProps, 'data-cm-display': 'plan', className: 'cm-bbox cm-mm clickable' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide === false
             ? el('div', { className: 'cm-bbox-rail cm-num' }, railText)
             : el(Fragment, null,
@@ -3170,7 +3185,7 @@
       const pct = amount > 0 ? Math.min(999, used / amount * 100) : null
       const level = pct === null ? 'ok' : pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok'
 
-      if (budget.enabled === true) {
+      if (budget.enabled === true && config.hideBudget !== true) {
         // 预算圆角方形图框(渲染在设置按钮上方、余额行下方)。
         const todayApi = displayCostOf(today, config)
         const todayUsed = todayApi * (Number.isFinite(rate) && rate > 0 ? rate : 1)
@@ -3189,12 +3204,12 @@
           }),
         ].join('; ')
         if (props.summary === true) return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
-          el('div', { className: 'cm-simple-summary' + (level === 'ok' ? '' : ' ' + level), tabIndex: 0 },
+          el('div', { 'data-cm-display': 'budget', className: 'cm-simple-summary' + (level === 'ok' ? '' : ' ' + level), tabIndex: 0 },
             el('span', null, t('todayBudget', { period: t(PERIOD_KEYS[budget.period] ?? 'periodMonth') })),
             el('span', { className: 'cm-num' }, todayValue + ' / ' + formatMoneyValue(amount, config))))
         const view = budgetBoxBody(state, config, t)
         return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
-          el('div', { className: 'cm-bbox' + (level === 'ok' ? '' : ' ' + level) + (wide ? '' : ' rail') },
+          el('div', { 'data-cm-display': 'budget', className: 'cm-bbox' + (level === 'ok' ? '' : ' ' + level) + (wide ? '' : ' rail') },
             wide ? view.body : el('div', { className: 'cm-bbox-rail cm-num' }, view.rail)))
       }
 
@@ -3211,7 +3226,7 @@
       ].join('; ')
       return el(Tooltip, { label: detail, side: 'right', delayMs: 300 },
         el(Fragment, null,
-          el('div', { className: 'cm-foot' + (wide ? '' : ' cm-foot-rail') },
+          el('div', { 'data-cm-display': 'today', className: 'cm-foot' + (wide ? '' : ' cm-foot-rail') },
             wide ? el(Fragment, null, t('today'), ' ', el('span', { className: 'cm-num' }, todayValue)) : el(WalletIcon, { size: 16 })),
           wide ? peakNoticeEl(state, config, t) : null))
     }
@@ -3227,8 +3242,11 @@
       }
       useProjectionRefresh(props, projectionUsage)
       const state = costStore?.state
-      const wide = !!props.wide
-      if (!state) return null
+      return state ? renderSidebarFooter(state, !!props.wide, props.api) : null
+    }
+
+    // Shared presentation only: no store, projection or quota subscription.
+    function renderSidebarFooter(state, wide, api, preview = false) {
       const config = state.config
       const t = makeT(resolveLocale(config))
       const showBalance = (config.balance?.display === 'sidebar' || config.balance?.display === 'both')
@@ -3258,12 +3276,13 @@
         })
       const plansOn = sidebarPlanIds.length > 0
       // 网关额度侧边栏卡片(issue #96):按来源 display 门控,卡片本体见 GatewayQuotaBox。
-      const gatewayNodes = gatewaySidebarCards(state, config, wide, props.api)
+      const gatewayNodes = gatewaySidebarCards(state, config, wide, api)
       // Codex 周额度(issue #59):客户端探测 dsh-codex-connect,ok 时并入侧边栏;
       // 其余显示全关时也要为它保留渲染入口(模块装载即有被动探测,快照同步读)。
-      const codexOn = config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false && codexQuotaCache.status === 'ok'
-        && codexQuotaCache.windows.weekly !== null
-      const budgetOn = (config.budget ?? {}).enabled === true
+      const codexSnapshot = preview && state.displayPreviewCodex ? state.displayPreviewCodex : codexQuotaCache
+      const codexOn = config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false && codexSnapshot.status === 'ok'
+        && codexSnapshot.windows.weekly !== null
+      const budgetOn = (config.budget ?? {}).enabled === true && config.hideBudget !== true
       const showToday = config.sidebar !== false && config.hideTodayCost !== true
       const modelsOn = config.sidebarModels?.enabled === true
       if (!modelsOn && !showBalance && !showCustomBalance && !goOk && !plansOn && !codexOn && !budgetOn && !showToday && gatewayNodes.length === 0) return null
@@ -3274,18 +3293,18 @@
       const mergedBudget = simple && wide && showToday && budgetOn
       const nodes = []
       if (mergedBudget) nodes.push(el(BudgetBoxContent, { state, wide, summary: true }))
-      else if (simple && wide && showToday) nodes.push(el('div', { className: 'cm-simple-summary' },
+      else if (simple && wide && showToday) nodes.push(el('div', { 'data-cm-display': 'today', className: 'cm-simple-summary' },
         el('span', null, t('today')), el('span', { className: 'cm-num' }, sidebarTodayValue(state.today, config, t))))
-      if (showBalanceBar) nodes.push(el(BalanceBox, { state, wide, api: props.api }))
-      else if (showBalance) nodes.push(el(BalanceRowContent, { state, wide, api: props.api }))
-      if (showCustomBalanceBar) nodes.push(el(CustomBalanceBox, { state, wide, api: props.api }))
-      else if (showCustomBalance) nodes.push(el(CustomBalanceRowContent, { state, wide, api: props.api }))
+      if (showBalanceBar) nodes.push(el(BalanceBox, { state, wide, api: api }))
+      else if (showBalance) nodes.push(el(BalanceRowContent, { state, wide, api: api }))
+      if (showCustomBalanceBar) nodes.push(el(CustomBalanceBox, { state, wide, api: api }))
+      else if (showCustomBalance) nodes.push(el(CustomBalanceRowContent, { state, wide, api: api }))
       const afterBalance = nodes.length
       if (plansOn) nodes.push(...sidebarPlanIds.map(id => id === 'minimax'
-        ? el(MiniMaxPlanBox, { state, wide, api: props.api })
-        : el(CodingPlanBox, { id, state, wide, api: props.api })))
+        ? el(MiniMaxPlanBox, { state, wide, api: api })
+        : el(CodingPlanBox, { id, state, wide, api: api })))
       nodes.push(...gatewayNodes)
-      if (codexOn) nodes.push(el(CodexPlanBox, { state, wide, api: props.api }))
+      if (codexOn) nodes.push(el(CodexPlanBox, { state, wide, api, preview }))
       if (goOk && budgetOn && wide && !simple) {
         // 同时出现:合并为一张卡片(Go 在上、预算在下,细分隔线),各自保留预警色与自己的详细信息开关。
         const goView = goBoxBody(state, config, t)
@@ -3293,9 +3312,9 @@
         const level = goView.level === 'over' || budgetView.level === 'over' ? 'over'
           : goView.level === 'warn' || budgetView.level === 'warn' ? 'warn' : 'ok'
         nodes.push(el('div', { className: 'cm-bbox cm-bbox-pair' + (level === 'ok' ? '' : ' ' + level) },
-          el('div', { className: 'cm-bbox-section' + (goView.level === 'ok' ? '' : ' ' + goView.level) }, goView.body),
+          el('div', { 'data-cm-display': 'go', className: 'cm-bbox-section' + (goView.level === 'ok' ? '' : ' ' + goView.level) }, goView.body),
           el('div', { className: 'cm-bbox-divider' }),
-          el('div', { className: 'cm-bbox-section' + (budgetView.level === 'ok' ? '' : ' ' + budgetView.level) }, budgetView.body)))
+          el('div', { 'data-cm-display': 'budget', className: 'cm-bbox-section' + (budgetView.level === 'ok' ? '' : ' ' + budgetView.level) }, budgetView.body)))
       } else {
         if (goOk) nodes.push(el(GoQuotaBox, { state, wide }))
         if (budgetOn && !mergedBudget) nodes.push(el(BudgetBoxContent, { state, wide }))
@@ -3306,6 +3325,6 @@
       // 收起(rail)态:无论预算/Go 额度开关状态,统一在图框下方追加竖向峰谷进度条(受 peakNotice 等门控,内部自行返回 null)。
       if (!wide) nodes.push(peakNoticeRailEl(state, config, t))
       if (modelsOn) nodes.splice(config.sidebarModels.position === 'first' ? 0 : config.sidebarModels.position === 'afterBalance' ? afterBalance : nodes.length, 0,
-        el(SidebarModelCosts, { key: 'models', state, wide }))
+        el(SidebarModelCosts, { key: 'models', state, wide, preview }))
       return el('div', { ...(simple ? { tabIndex: 0, role: 'region', 'aria-label': t('sidebarSimple') } : {}), className: 'cm-footer-stack' + (wide ? '' : ' rail') + (compactWide ? ' compact' : '') + (simple ? ' simple' : '') }, ...nodes)
     }

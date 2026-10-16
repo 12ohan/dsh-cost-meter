@@ -397,7 +397,7 @@ window.__ModuleLoader__.load({
         cost: '费用 {amount}',
         sessionLine: '本会话 {amount} · 命中 {hitRate} · 输入 {input} · 缓存 {cache} · 输出 {output}',
         sessionLineCompact: '本会话 {amount}',
-        sessionCostCompact: '输入区下方只显示金额(悬停可见完整分项)',
+        sessionCostCompact: '仅显示金额',
         quotaUnlimited: '无限制',
         pricingCnyHint: '当前人民币金额来自美元价格 × 汇率 {rate}。对照官方人民币账单，请选择 CNY，再同步价格；同步仅影响后续调用。',
         // 余额行
@@ -932,7 +932,7 @@ window.__ModuleLoader__.load({
         cost: 'Cost {amount}',
         sessionLine: 'This session {amount} · Hit {hitRate} · Input {input} · Cache {cache} · Output {output}',
         sessionLineCompact: 'This session {amount}',
-        sessionCostCompact: 'Amount only below the composer (full split on hover)',
+        sessionCostCompact: 'Show amount only',
         quotaUnlimited: 'Unlimited',
         pricingCnyHint: 'CNY totals use USD prices × {rate}. To compare official CNY bills, select CNY, then sync prices; syncing affects only new calls.',
         balanceQueryFailed: 'Balance query failed: {message}',

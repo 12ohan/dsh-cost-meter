@@ -131,12 +131,13 @@ function readClientSource() {
   assert.ok(parts.length > 0, 'src/client/ 源码片段缺失')
   return parts.map(name => readFileSync(new URL(name, dir), 'utf8').replace(/\r\n/g, '\n')).join('')
 }
+const displaySource = readFileSync(new URL('../src/display/index.js', import.meta.url), 'utf8')
 
 // 浏览器端 bundle 语法门禁(v1.5.23 教训):client.js 只在浏览器经 <script> 执行,
 // classic script 语法错误不触发 error 事件、宿主只报「loaded without registering」,
 // 而本套件此前只做字符串断言、从不解析该文件——语法错误一路溜到线上。
 // 这里用 vm.Script 整份编译(只编译不执行,window 引用无碍),任何语法错误当场失败。
-for (const browserBundle of ['../lib/client.js', '../lib/client.statistics.js', '../lib/client.openrouter.js', '../lib/client.community.js', '../lib/client.pricing.js']) {
+for (const browserBundle of ['../lib/client.js', '../lib/client.statistics.js', '../lib/client.openrouter.js', '../lib/client.community.js', '../lib/client.pricing.js', '../lib/client.display.js']) {
   const src = readFileSync(new URL(browserBundle, import.meta.url), 'utf8')
   new vm.Script(src, { filename: browserBundle })
 }
@@ -233,7 +234,7 @@ console.log('[ok] 浏览器端 bundle 语法门禁(client.js vm 编译)通过')
   // 挂载:SidebarFooter 早退条件与节点插入都包含网关卡片(此前整条路径无 gateway 分支)。
   assert.ok(src96.includes('!showToday && gatewayNodes.length === 0) return null'), 'issue #96:SidebarFooter 早退条件纳入网关卡片')
   assert.ok(src96.includes('nodes.push(...gatewayNodes)'), 'issue #96:SidebarFooter 节点序列插入网关卡片(计划卡之后、Codex 之前)')
-  assert.ok(src96.indexOf('nodes.push(...gatewayNodes)') > src96.indexOf('MiniMaxPlanBox, { state, wide, api: props.api }') && src96.indexOf('nodes.push(...gatewayNodes)') < src96.indexOf('el(CodexPlanBox'), 'issue #96:网关卡片排序在计划卡之后、Codex 探测卡之前')
+  assert.ok(src96.indexOf('nodes.push(...gatewayNodes)') > src96.indexOf('MiniMaxPlanBox, { state, wide, api: api }') && src96.indexOf('nodes.push(...gatewayNodes)') < src96.indexOf('el(CodexPlanBox'), 'issue #96:网关卡片排序在计划卡之后、Codex 探测卡之前')
   // 行渲染:复用 MiniMax 行(已用口径/告警阈值一致),Provider 前缀与 credits 兜底都在。
   assert.ok(/function GatewayQuotaBox[\s\S]*miniMaxRow\(name, win, direction, t\)/.test(src96), 'issue #96:网关卡片行渲染复用 miniMaxRow(与计划卡同口径)')
   assert.ok(/function GatewayQuotaBox[\s\S]*GATEWAY_PROVIDER_LABELS\[account\.provider\]/.test(src96), 'issue #96:多账号时行标签带 Provider 前缀')
@@ -1296,6 +1297,13 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   const base = sanitizeConfig({})
   assert.equal(base.hideOfficialBalance, false, '隐藏官方余额默认关闭')
   assert.equal(base.hideTodayCost, false, '隐藏今日消耗默认关闭')
+  assert.equal(base.hideBudget, false, '旧配置默认显示预算卡片')
+  const hiddenBudget = applyConfigPatch(sanitizeConfig({ budget: { enabled: true, amount: 75 } }), { hideBudget: true })
+  assert.deepEqual(hiddenBudget.errors, [])
+  assert.equal(hiddenBudget.config.budget.enabled, true, '隐藏预算不关闭预算统计')
+  assert.equal(hiddenBudget.config.budget.amount, 75)
+  assert.equal(stateSchema.shape.config.parse(hiddenBudget.config).hideBudget, true)
+  assert.ok(applyConfigPatch(base, { hideBudget: 'yes' }).errors.length > 0)
   assert.equal(base.sidebarTodayMetric, 'cost', '侧边栏默认显示费用')
   assert.equal(applyConfigPatch(base, { sidebarTodayMetric: 'tokens' }).config.sidebarTodayMetric, 'tokens', '可切换显示 Token')
   assert.ok(applyConfigPatch(base, { sidebarTodayMetric: 'unknown' }).errors.length > 0, '未知显示方式被拒绝')
@@ -1319,15 +1327,15 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   // 概览卡片 / BalancePanel / 预算明细今日行。
   assert.ok(clientSource.includes('config.hideTodayCost === true ? null : el(Card,'), '概览今日卡片可整体隐藏')
   assert.ok(clientSource.includes("&& config.hideOfficialBalance !== true\n          ? el(BalancePanel"), '设置页官方余额面板可整体隐藏')
-  assert.ok(clientSource.includes('config.hideTodayCost === true ? null : el(\'div\', { className: \'cm-bbox-line cm-num\' }'), '预算盒明细今日金额行可隐藏')
+  assert.ok(clientSource.includes('config.hideTodayCost === true ? null : el(\'div\', { \'data-cm-display\': \'today\', className: \'cm-bbox-line cm-num\' }'), '预算盒明细今日金额行可隐藏')
   assert.ok(clientSource.includes("...(config.hideTodayCost === true ? [] : [config.sidebarTodayMetric === 'tokens'"), '预算 tooltip 今日金额行可隐藏')
   // 设置开关与读侧白名单。
-  assert.ok(clientSource.includes("setField('hideOfficialBalance'"), '设置 UI 含隐藏官方余额开关')
-  assert.ok(clientSource.includes("setField('hideTodayCost'"), '设置 UI 含隐藏今日消耗开关')
+  assert.ok(displaySource.includes("setField('hideOfficialBalance'"), '独立显示页含隐藏官方余额开关')
+  assert.ok(displaySource.includes("setField('hideTodayCost'"), '独立显示页含隐藏今日消耗开关')
   assert.ok(clientSource.includes('hideOfficialBalanceLabel') && clientSource.includes('hideTodayCostLabel'), '开关文案存在(zh/en)')
   assert.ok(clientSource.includes('hideOfficialBalance: v.hideOfficialBalance === true'), 'parseConfig 白名单含 hideOfficialBalance(读侧不剥离)')
   assert.ok(clientSource.includes('hideTodayCost: v.hideTodayCost === true'), 'parseConfig 白名单含 hideTodayCost(读侧不剥离)')
-  assert.ok(clientSource.includes("sidebarTodayMetric: v.sidebarTodayMetric === 'tokens'") && clientSource.includes("setField('sidebarTodayMetric'"), '今日指标双端接线')
+  assert.ok(clientSource.includes("sidebarTodayMetric: v.sidebarTodayMetric === 'tokens'") && displaySource.includes("setField('sidebarTodayMetric'"), '今日指标双端接线')
   assert.ok(clientSource.includes('showSessionId: v.showSessionId === true'), 'parseConfig 白名单补齐 showSessionId(既有缺陷修复)')
   // v1.5.38 的隐私模式遮罩已整体移除。
   assert.ok(!clientSource.includes('hideAmounts'), '客户端不再含 hideAmounts 隐私遮罩')
@@ -1411,8 +1419,9 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   assert.equal((clientSource.match(/useClickRefresh\(api \? \(\) => api\.refreshCustomBalance\(index\) : null\)/g) ?? []).length, 2, '自定义余额框/行均接 refreshCustomBalance(多配置形态按条目 index 刷新,issue #79)')
   assert.ok(clientSource.includes("useClickRefresh(api ? () => api.refreshCodingPlan(id) : null)"), '通用 Coding Plan 图框接 refreshCodingPlan(id)')
   assert.ok(clientSource.includes("useClickRefresh(api ? () => api.refreshCodingPlan('minimax') : null)"), 'MiniMax 图框接 refreshCodingPlan(minimax)')
-  const footerSource = clientSource.match(/function SidebarFooter\(props\) \{([\s\S]*?)\n    \}/)?.[0] ?? ''
-  assert.equal((footerSource.match(/api: props\.api/g) ?? []).length, 7, 'SidebarFooter 七处渲染均透传 api(六类图框 + Codex 卡片)')
+  const footerSource = clientSource.match(/function renderSidebarFooter\(state, wide, api, preview = false\) \{([\s\S]*?)\n    \}/)?.[0] ?? ''
+  assert.equal((footerSource.match(/api: api/g) ?? []).length, 6, '共享侧栏六类图框透传 api')
+  assert.ok(footerSource.includes('el(CodexPlanBox, { state, wide, api, preview })') && clientSource.includes('renderSidebarFooter(state, !!props.wide, props.api)'), '实际侧栏传入 api，预览显式禁用查询')
   // 可点击语义与视觉反馈:a11y(role/tabIndex/aria-busy/键盘)、CSS(cursor/hover/busy 呼吸)。
   assert.ok(clientSource.includes('const clickableRefreshProps = (busy, run) => ({'), '可点击属性 helper 存在')
   assert.ok(clientSource.includes("role: 'button'") && clientSource.includes("tabIndex: 0") && clientSource.includes("'aria-busy': busy ? 'true' : 'false'"), 'role=button + tabIndex + aria-busy')
@@ -3751,9 +3760,9 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   between("t('historyDataTitle')", branch.usage, branch.display, '历史数据操作分组在用量标签')
   between("t('clearAllHistory')", branch.usage, branch.display, '清除全部历史按钮在用量标签')
   // 显示:语言 + 显示设置分组。
-  between("t('languageLabel')", branch.display, branch.pricing, '语言选择在显示标签')
-  between("t('displaySettings')", branch.display, branch.pricing, '显示设置分组在显示标签')
-  // 价格:峰谷 + 价格表 + 匹配 + 官方同步 + OpenRouter 公开报价。
+  assert.ok(readFileSync(new URL('../src/display/controls.js', import.meta.url), 'utf8').includes("t('languageLabel')"), '语言选择在显示预览的右侧面板')
+  between('load: api.loadDisplay', branch.display, branch.pricing, '交互预览在显示标签按需加载')
+  // 价格:峰谷 + 价格表 + 匹配 + 拓展目录 + 官方同步。
   between('el(PeakPanel, { state, draft, setDraft, t })', branch.pricing, tabsSrc.length, '峰谷计价面板在价格标签')
   between("t('priceTableTitle')", branch.pricing, tabsSrc.length, '价格表在价格标签')
   between("t('dataSync')", branch.pricing, tabsSrc.length, '官方价格同步在价格标签')
@@ -3778,8 +3787,8 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   // 侧边栏:按 display 门控的循环 + MiniMax 专用卡片 + 通用 CodingPlanBox。
   assert.ok(planSrc.includes('const sidebarPlanIds = CODING_PLAN_ROWS'), '侧边栏按 CODING_PLAN_ROWS 遍历厂商')
   assert.ok(planSrc.includes("entry.display !== 'sidebar' && entry.display !== 'both'"), '侧边栏门控 display=sidebar/both')
-  assert.ok(planSrc.includes('el(MiniMaxPlanBox, { state, wide, api: props.api })'), 'MiniMax 沿用专用 5h/7d 卡片(issue #37 起透传 api 支持点击刷新)')
-  assert.ok(planSrc.includes('el(CodingPlanBox, { id, state, wide, api: props.api })'), '其余厂商走通用 CodingPlanBox')
+  assert.ok(planSrc.includes('el(MiniMaxPlanBox, { state, wide, api: api })'), 'MiniMax 沿用专用 5h/7d 卡片(issue #37 起透传 api 支持点击刷新)')
+  assert.ok(planSrc.includes('el(CodingPlanBox, { id, state, wide, api: api })'), '其余厂商走通用 CodingPlanBox')
   assert.ok(planSrc.includes('function CodingPlanBox(props)'), '通用卡片组件定义存在')
   assert.ok(planSrc.includes('function codingPlanWindowLabel(name, t)'), '窗口名本地化(fiveHour/weekly/monthly)')
   // 通用卡片样式:宽标签与文本窗口行的 CSS。
@@ -4344,7 +4353,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   const indexSrc = readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8')
   assert.ok(indexSrc.includes("includes('plan-autodetect-v1')"), 'plan-autodetect-v1 迁移标记接线')
   assert.ok(indexSrc.includes('suggestPlanAutoClasses'), '宿主调用归类建议函数')
-  assert.ok(/patch\.planBilling !== undefined \|\| patch\.codingPlans !== undefined \|\| patch\.goQuota !== undefined/.test(indexSrc), 'updateConfig 触碰分类相关键即重算 apiCost')
+  assert.ok(indexSrc.includes('JSON.stringify([before.planBilling, [...enabledPlanSetOf(before)]])') && indexSrc.includes('splitLedgerApiCost(ledger)'), '仅分类或启用套餐实际改变时重算 apiCost，显示修改不重算')
   // Go 目录精确别名(zen 路由真实 id 不再依赖宽泛包含)。
   const { DEFAULT_PROVIDER_PRICE_TABLE: TABLE_NOW } = await import('../lib/pricing.js')
   const geminiEntry = TABLE_NOW.google.models['gemini-3.1-pro']
@@ -6812,3 +6821,6 @@ await import('./billion-context-receipts.mjs')
 await import('./opendesign.mjs')
 await import('./prices-revision.mjs')
 console.log('[ok] 全部验证通过')
+
+await import('./exchange-rates.mjs')
+await import('./context-activity.mjs')

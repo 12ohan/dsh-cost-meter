@@ -156,7 +156,7 @@ try {
     const query = { from: '2026-09-30', to: '2026-09-30', provider: '', model: '', sessionId: 'selected', basis: 'total', offset: 0, turnOffset: 0 }
     assert.equal((await api.getBillingStatistics(query)).totals.calls, 0)
     assert.equal((await api.getSessionBilling(query)).found, false)
-    assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/getSessionBilling', { query }])
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/getSessionBilling', { query: { ...query, displayCurrency: 'CNY' } }])
     const count = calls.length
     await assert.rejects(api.getBillingStatistics({ ...query, turnOffset: -1 }), /Invalid statistics query/)
     assert.equal(calls.length, count, 'strict input validation runs before transport')

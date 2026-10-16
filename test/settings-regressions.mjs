@@ -11,10 +11,13 @@ import { stateSchema } from '../lib/typert.host.js'
 const dir = new URL('../src/client/', import.meta.url)
 const source = readdirSync(dir).filter(name => name.endsWith('.js')).sort().map(name => readFileSync(new URL(name, dir), 'utf8')).join('')
 const code = source.replace('exports.apply = apply', 'exports.test = { PlanQuotaCard, CostSection, parseConfig, makeT, codingPlanWindowLabel }; exports.apply = apply')
-let active, pricing
+let active, pricing, display
 const react = {
+  Component: class {},
+  useMemo: fn => fn(),
   createElement: (type, props, ...children) => type?.name === 'BillingStatistics' && props?.mode === 'matching'
-    ? pricing.Matching(props) : ({ type, props: props ?? {}, children: children.flat(Infinity) }),
+    ? pricing.Matching(props) : type?.name === 'BillingStatistics' && props?.displayOptions
+      ? display.DetailedSettings(props) : ({ type, props: props ?? {}, children: children.flat(Infinity) }),
   Fragment: 'fragment',
   useState: initial => {
     const runner = active, i = runner.cursor++
@@ -45,10 +48,15 @@ vm.runInNewContext(code, {
   setTimeout: fn => { timers.set(++timerId, fn); return timerId }, clearTimeout: id => timers.delete(id),
 })
 const ui = factory(name => name === 'react' ? react : {}).test
-vm.runInNewContext(readFileSync(new URL('../src/pricing/index.js', import.meta.url), 'utf8').replace('return { mount, CONTRIBUTION }', 'return { Matching, RestorePrices }'), {
+vm.runInNewContext(readFileSync(new URL('../src/pricing/index.js', import.meta.url), 'utf8').replace('return { mount, CONTRIBUTION }', 'return { Matching, RestorePrices, SearchPriceSelect }'), {
   window: { __ModuleLoader__: { load: value => { factory = value.factory } } },
 })
 pricing = factory(name => name === 'react' ? react : {})
+const displaySource = readFileSync(new URL('../src/display/index.js', import.meta.url), 'utf8')
+  .replace('/* DISPLAY_NATIVE_SOURCE */', readFileSync(new URL('../src/display/native.js', import.meta.url), 'utf8'))
+  .replace('return { mount, DisplaySettings }', 'return { DetailedSettings }')
+vm.runInNewContext(displaySource, { window: { __ModuleLoader__: { load: value => { factory = value.factory } } } })
+display = factory(name => name === 'react' ? react : {})
 function renderer(component, props) {
   const runner = { slots: [], cursor: 0, effects: [], dirty: false }
   return () => {
@@ -216,7 +224,7 @@ for (const locale of ['zh', 'en']) {
   section()
   for (const fn of [...timers.values()]) fn()
   timers.clear()
-  await Promise.resolve(); await Promise.resolve()
+  for(let tick=0;tick<8;tick++) await Promise.resolve()
   section()
   assert.equal(current.config.codexQuotaSidebar, false, 'checkbox auto-save persists in both locales')
   assert.equal(codexSidebarInput().props.checked, false)
@@ -226,7 +234,7 @@ for (const locale of ['zh', 'en']) {
       checkbox().props.onChange({ target: { checked } }); section()
       for (const fn of [...timers.values()]) fn()
       timers.clear()
-      await Promise.resolve(); await Promise.resolve(); section()
+      for(let tick=0;tick<8;tick++) await Promise.resolve(); section()
       assert.equal(current.config[key], checked, `${locale}: ${key} auto-save`)
       assert.equal(checkbox().props.checked, checked)
     }
@@ -240,7 +248,7 @@ for (const locale of ['zh', 'en']) {
   assert.equal(rowFor(tree, 'unknown-model'), undefined, '删除映射后账本不会立即重新生成该行(#104)')
   for (const fn of [...timers.values()]) fn()
   timers.clear()
-  await Promise.resolve(); await Promise.resolve()
+  for(let tick=0;tick<8;tick++) await Promise.resolve()
   tree = section()
   assert.equal(rowFor(tree, 'unknown-model'), undefined, '自动保存回读后仍隐藏')
   assert.equal(current.config.priceMatchDismissed[0], key)
@@ -277,7 +285,7 @@ for (const locale of ['zh', 'en']) {
   section()
   for (const fn of [...timers.values()]) fn()
   timers.clear()
-  await Promise.resolve(); await Promise.resolve()
+  for(let tick=0;tick<8;tick++) await Promise.resolve()
   assert.equal(patches.length, 1)
   assert.equal(JSON.stringify(patches[0]), JSON.stringify({ pricingCurrency: 'CNY' }))
   assert.equal(current.config.exchangeRate, 7.2)
@@ -333,3 +341,37 @@ console.log('[ok] 设置交互：千问空费率/自动保存回读/模型移除
   button(tree, '收起恢复入口').props.onClick(); restore()
 }
 console.log('[ok] #275: hidden price editors, on-demand catalog and model restore')
+// #282 concerns the channel-price selector for an unknown model, not catalog text search.
+{
+ const options = Array.from({ length: 10000 }, (_, i) => ({ value: `vendor-${i % 7}:model-${i}`, label: `Vendor ${i % 7} / Model ${i}` }))
+ const writes = [], select = renderer(pricing.SearchPriceSelect, () => ({ options, value: options[9999].value, label: '匹配渠道模型价格', placeholder: '选择价格模型', locale: 'zh', onChange: value => writes.push(value) }))
+ let tree = select(), list = () => nodes(tree).find(n => n.type === 'select'), search = () => nodes(tree).find(n => n.type === 'input')
+ assert.ok(nodes(list()).filter(n => n.type === 'option').length <= 82, 'bounded native options for 10k models')
+ assert.ok(nodes(list()).some(n => n.props.value === options[9999].value), 'selected model stays mounted')
+ search().props.onChange({ target: { value: 'VENDOR-2 model-100' } }); tree = select()
+ assert.ok(nodes(list()).filter(n => n.type === 'option' && n.props.value && n.props.value !== options[9999].value).every(n => n.props.value.includes('vendor-2') && n.props.value.includes('model-100')))
+ assert.deepEqual(writes, [], 'filtering does not change a saved mapping')
+ search().props.onChange({ target: { value: 'does-not-exist' } }); tree = select(); assert.ok(textOf(tree).includes('没有匹配的模型'))
+ assert.equal(list().props.value, options[9999].value)
+ search().props.onKeyDown({ key: 'Escape', stopPropagation() {} }); tree = select(); assert.equal(search().props.value, '')
+ list().props.onChange({ target: { value: options[2].value } }); assert.deepEqual(writes, [options[2].value])
+}
+// A slow first write must not overtake or erase the next setting.
+{
+ timers.clear()
+ let current = { config: roundTrip({ locale: 'zh' }), today: zeroDay('2026-10-16'), month: zeroDay('2026-10'), total: zeroDay(''), history: [] }
+ const writes = [], releases = []; let inFlight = 0, maximum = 0
+ const api = { updateConfig: patch => { writes.push(patch); maximum = Math.max(maximum, ++inFlight); return new Promise(resolve => releases.push(() => { current = { ...current, config: roundTrip(applyConfigPatch(current.config, patch).config) }; inFlight--; resolve() })) } }
+ const section = renderer(ui.CostSection, () => ({ useCost: () => ({ state: current, status: 'ready' }), api }))
+ let tree = section()
+ const change = decimals => { const node = nodes(tree).find(n => n.props.draft && n.props.setDraft); assert.ok(node); node.props.setDraft({ ...node.props.draft, decimals }); tree = section(); for (const fn of [...timers.values()]) fn(); timers.clear() }
+ change(3); for(let i=0;i<8;i++) await Promise.resolve(); assert.equal(writes.length, 1)
+ change(5); for(let i=0;i<8;i++) await Promise.resolve(); assert.equal(writes.length, 1)
+ releases.shift()(); for(let i=0;i<12;i++) await Promise.resolve(); tree = section()
+ // Store notifications can restart the debounce while the second draft remains dirty.
+ for(const fn of [...timers.values()]) fn(); timers.clear(); for(let i=0;i<12;i++) await Promise.resolve()
+ assert.equal(writes.length, 2); assert.equal(writes[1].decimals, 5); assert.equal(maximum, 1)
+ releases.shift()(); for(let i=0;i<12;i++) await Promise.resolve(); tree = section(); assert.equal(current.config.decimals, 5)
+ timers.clear()
+}
+console.log('[ok] #282 channel-price filtering and serialized autosave races')

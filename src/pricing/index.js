@@ -2,7 +2,7 @@
 window.__ModuleLoader__.load({
   id: 'dsh-cost-meter', chunk: 'client.pricing.js',
   factory: require => {
-    const { createElement: el, Fragment, useState, useEffect } = require('react')
+    const { createElement: el, Fragment, useState, useEffect, useMemo, useRef } = require('react')
     const runFields = ['at', 'before', 'after', 'days', 'sessions', 'skipped']
     const historySchema = { parse: value => {
       if (!Array.isArray(value) || !value.every(row => runFields.every(key => Number.isFinite(row?.[key]) && row[key] >= 0))) throw new Error('Invalid recalculation history')
@@ -26,16 +26,19 @@ window.__ModuleLoader__.load({
 
     function SearchPriceSelect({ options, value, placeholder, label, locale, onChange }) {
       const [query, setQuery] = useState('')
+      const selectRef = useRef(null)
       const en = locale === 'en', words = query.toLowerCase().trim().split(/\s+/).filter(Boolean)
-      const matches = options.filter(option => words.every(word => (option.label + ' ' + option.value).toLowerCase().includes(word)))
+      const indexed = useMemo(() => options.map(option => ({ option, search: (option.label + ' ' + option.value).toLowerCase() })), [options])
+      const matches = indexed.filter(row => words.every(word => row.search.includes(word))).map(row => row.option)
       const selected = options.find(option => option.value === value)
-      const shown = selected && !matches.includes(selected) ? [selected, ...matches] : matches
+      const limited = matches.slice(0, 80)
+      const shown = selected && !limited.includes(selected) ? [selected, ...limited] : limited
       return el('div', { className: 'cm-price-search' },
         el('input', { type: 'search', className: 'cm-input', value: query, placeholder: en ? 'Search model or provider' : '搜索模型或提供商',
-          'aria-label': label + (en ? ' · Search prices' : ' · 搜索价格'), onChange: event => setQuery(event.target.value), onKeyDown: event => { if (event.key === 'Escape') { setQuery(''); event.stopPropagation() } } }),
-        el('select', { className: 'cm-input', value, 'aria-label': label + (en ? ' · Price model' : ' · 价格模型'), onChange: event => onChange(event.target.value) },
+          'aria-label': label + (en ? ' · Search prices' : ' · 搜索价格'), onChange: event => setQuery(event.target.value), onKeyDown: event => { if (event.key === 'Escape') { setQuery(''); event.stopPropagation() } else if (event.key === 'ArrowDown') { event.preventDefault(); selectRef.current?.focus() } } }),
+        el('select', { ref: selectRef, className: 'cm-input', value, 'aria-label': label + (en ? ' · Price model' : ' · 价格模型'), onChange: event => onChange(event.target.value) },
           el('option', { value: '' }, placeholder), ...shown.map(option => el('option', { key: option.value, value: option.value }, option.label))),
-        query ? el('small', { role: 'status' }, matches.length ? (en ? `${matches.length} matches` : `${matches.length} 个结果`) : (en ? 'No matches' : '没有匹配的模型')) : null)
+        el('small', { role: 'status' }, matches.length > 80 ? (en ? `${matches.length} models · Showing the first 80. Type to filter.` : `${matches.length} 个模型 · 先显示 80 个，输入关键词筛选`) : matches.length ? (en ? `${matches.length} matches` : `${matches.length} 个结果`) : (en ? 'No matches' : '没有匹配的模型')))
     }
 
     function RestorePrices({ state, draft, setDraft, locale, rpc }) {

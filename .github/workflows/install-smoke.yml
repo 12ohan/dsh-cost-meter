@@ -72,6 +72,7 @@ jobs:
           node test/cache-write-price-browser.mjs
           node test/model-stats-browser.mjs
           node test/factory-quota-browser.mjs
+          node test/display-settings-browser.mjs
       - name: Save context regression browser evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -79,6 +80,7 @@ jobs:
           name: context-costs-browser-evidence
           path: |
             .tmp-context-regression-browser/*.png
+            .tmp-display-review/*
             .tmp-context-regression-browser/report.json
             .tmp-pricing-theme-browser/*.png
             .tmp-pricing-theme-browser/report.json

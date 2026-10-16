@@ -34,7 +34,7 @@ window.__ModuleLoader__.load({
       days: array(object({ ...bucketSpec, date: string })), models: array(object({ ...bucketSpec, key: string, provider: string, model: string, priced: boolean })),
       sessions: array(object({ ...bucketSpec, id: string, title: string })), providers: array(string), modelOptions: array(string),
       sessionCount: number, offset: number, unassignedCost: number, unmodeledCost: number })
-    const parseDetail = object({ refreshing: v => boolean(v ?? false), generatedAt: v => number(v ?? 0), refreshFailed: v => boolean(v ?? false), found: boolean, cost: number, apiCost: number, rows: array(costRow), calls: array(callRow), totalCalls: number, offset: number, recorded: buckets, agents: v => array(object({ ...bucketSpec, id: string, title: string }))(v ?? []),
+    const parseDetailBase = object({ refreshing: v => boolean(v ?? false), generatedAt: v => number(v ?? 0), refreshFailed: v => boolean(v ?? false), found: boolean, cost: number, apiCost: number, rows: array(costRow), calls: array(callRow), totalCalls: number, offset: number, recorded: buckets, agents: v => array(object({ ...bucketSpec, id: string, title: string }))(v ?? []),
       callShares: v => array(object({ index: number, cost: number, apiCost: number, tokens: number, calls: number, other: boolean, unpriced: boolean, call: v => v == null ? null : callRow(v) }))(v ?? []),
       kinds: array(object({ ...bucketSpec, kind: string, unpriced: boolean })), turns: array(object({ ...bucketSpec, sessionId, turn: nullableNumber, unpriced: boolean })), totalTurns: number, turnOffset: number,
       stepShares: object(Object.fromEntries(['cost', 'calls'].map(key => [key, array(object({ ...bucketSpec, sessionId, turn: nullableNumber, step: nullableNumber, other: boolean, unpriced: boolean }))]))) })
@@ -43,6 +43,7 @@ window.__ModuleLoader__.load({
     const parseCallInspection = v => ({ ...object({ found: boolean, kind: string, input: string, injected: string, skills: string, precedingTools: string, output: string, reasoning: string, truncated: boolean, totalTools: number, offset: number })(v), tools: parseInspection({ ...v, turn: 0, inputTruncated: false }).tools.map((tool, i) => ({ ...tool, durationMs: nullableNumber(v.tools[i].durationMs ?? null) })) })
     const contextKeys = ['system', 'tools', 'user', 'inject', 'skill', 'assistant', 'tool', 'other']
     const nonnegative = v => { if (number(v) < 0) throw new Error('Invalid context costs amount'); return v }
+    const parseDetail = v => ({ ...parseDetailBase(v), ...Object.fromEntries(['costCny', 'apiCostCny', 'costEur', 'apiCostEur'].filter(key => v[key] !== undefined).map(key => [key, number(v[key])])) })
     const contextRates = object(Object.fromEntries(['input', 'cacheRead', 'cacheWrite', 'output', 'reasoning'].map(key => [key, nonnegative])))
     const optionalRates = v => v === null ? null : contextRates(v)
     const parseContextCosts = object({ status: string, sessionId: string, generatedAt: number, revision: number, provider: string, model: string, basis: string,
@@ -70,6 +71,7 @@ window.__ModuleLoader__.load({
       Object.assign(q, { operation: string(v.operation ?? ''), operationGroup: string(v.operationGroup ?? ''), stepKey: string(v.stepKey ?? ''), detail: string(v.detail ?? 'full'), ownOnly: boolean(v.ownOnly ?? false) })
       if (q.operation.length > 80 || q.operationGroup.length > 4096 || q.stepKey.length > 2048 || !['full', 'map'].includes(q.detail)) throw new Error('Invalid step category query')
       if (!['api', 'plan', 'total'].includes(q.basis) || !['cost', 'time'].includes(q.order) || q.group.length > 1024 || q.agent.length > 512 || q.generation.length > 96 || !Number.isSafeInteger(q.offset) || q.offset < 0 || q.offset > 1e7) throw new Error('Invalid step billing query')
+      if (v.displayCurrency != null) { if (!['USD', 'CNY', 'EUR'].includes(v.displayCurrency)) throw Error('Invalid display currency'); q.displayCurrency = v.displayCurrency }
       return q
     }
     const parseInspectionQuery = value => {
@@ -83,11 +85,13 @@ window.__ModuleLoader__.load({
       if (v.background != null) q.background = boolean(v.background)
       if (v.generation != null) q.generation = string(v.generation)
       if (!['api', 'plan', 'total'].includes(q.basis) || ![q.offset, q.turnOffset].every(n => Number.isSafeInteger(n) && n >= 0 && n <= 1e7)) throw new Error('Invalid statistics query')
+      if (v.displayCurrency != null) { if (!['USD', 'CNY', 'EUR'].includes(v.displayCurrency)) throw Error('Invalid display currency'); q.displayCurrency = v.displayCurrency }
       return q
     }
     const parseCallInspectionQuery = v => {
       const q = { ...parseContextCostsQuery(v), seq: number(v.seq), atMs: number(v.atMs), offset: number(v.offset ?? 0) }
       if (![q.seq, q.offset].every(n => Number.isSafeInteger(n) && n >= 0) || q.offset > 1e7 || q.atMs <= 0) throw new Error('Invalid call inspection query')
+      if (v.displayCurrency != null) { if (!['USD', 'CNY', 'EUR'].includes(v.displayCurrency)) throw Error('Invalid display currency'); q.displayCurrency = v.displayCurrency }
       return q
     }
     const codec = (name, parse) => { const schema = { parse }; return { mode: 'strict', typeSymbol: 'dsh-cost-meter#' + name, schema, create: () => schema } }
@@ -327,6 +331,7 @@ window.__ModuleLoader__.load({
         result.error ? el('p', { role: 'alert', className: 'cm-plan-error' }, result.error) : null, content)
       if (!data || data.status !== 'ready') return wrap(el('p', { className: 'cm-plan-note' }, !data
         ? result.error ? text('点击刷新重试。', 'Select Refresh to retry.') : text('正在读取当前上下文…', 'Reading current context…')
+        : data.status === 'busy' ? text('正在生成或摘要，完成后自动更新上下文费用。', 'Generation or compaction is running. Context costs refresh after it finishes.')
         : data.status === 'route-unavailable' ? text('完成一次请求后，可显示该模型的上下文费用。', 'Complete a request to see context costs at that model’s rates.')
           : data.status === 'session-unavailable' ? text('打开此会话后可读取当前上下文。', 'Open this conversation to read its current context.')
             : text('当前宿主未提供上下文测量；已发生费用仍可在费用明细中查看。', 'Context measurement is unavailable on this host. Recorded costs remain available in billing details.')))
@@ -1356,7 +1361,9 @@ window.__ModuleLoader__.load({
       ctx.effect(() => () => unmount(), 'cost-meter: statistics contribution')
       const remote = ctx.get('remote.costMeter')
       const api = Object.fromEntries(['getBillingStatistics', 'getSessionBilling', 'getTurnInspection', 'getCallInspection', 'getContextCosts', 'getSessionTrajectory'].map(method => [method, async query => {
-        const result = await remote[method]((method === 'getSessionTrajectory' ? parseTrajectoryQuery : method === 'getContextCosts' ? parseContextCostsQuery : method === 'getCallInspection' ? parseCallInspectionQuery : method === 'getTurnInspection' ? parseInspectionQuery : parseQuery)(query))
+        const displayCurrency = source?.getSnapshot?.()?.state?.config?.currency
+        const parsed = (method === 'getSessionTrajectory' ? parseTrajectoryQuery : method === 'getContextCosts' ? parseContextCostsQuery : method === 'getCallInspection' ? parseCallInspectionQuery : method === 'getTurnInspection' ? parseInspectionQuery : parseQuery)(query)
+        const result = await remote[method]({ ...parsed, ...(['getBillingStatistics', 'getSessionBilling', 'getSessionTrajectory'].includes(method) && ['CNY', 'EUR', 'USD'].includes(displayCurrency) ? { displayCurrency } : {}) })
         if (!result?.ok) throw new Error(result?.error?.message || 'Statistics request failed')
         return ({ getBillingStatistics: parseStatistics, getSessionBilling: parseDetail, getTurnInspection: parseInspection, getCallInspection: parseCallInspection, getContextCosts: parseContextCosts, getSessionTrajectory: parseTrajectory }[method])(result.value)
       }]))
