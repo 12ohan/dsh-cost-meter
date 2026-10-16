@@ -105,9 +105,9 @@ try {
   const before=await page.evaluate(()=>window.refreshes)
   await card.getByRole('button',{name:'刷新',exact:true}).click()
   await page.waitForFunction(count=>window.refreshes>count,before)
-  await page.getByRole('tab',{name:'显示',exact:true}).click()
-  await page.locator('select.cm-input').filter({has:page.locator('option[value="en"]')}).selectOption('en')
-  await page.waitForFunction(()=>window.patches.some(p=>p.locale==='en'))
+  // Factory's mounted identity and saved pool must survive a host locale update.
+  // The display editor has its own full browser regression.
+  await page.evaluate(()=>window.changeLocale('en'))
   await page.getByRole('tab',{name:'Quotas',exact:true}).click()
   if(!await card.getByRole('combobox',{name:'Quota pool'}).count()) await card.getByRole('button',{name:'Factory (Droid)',exact:true}).click()
   assert.equal(await card.getByRole('combobox',{name:'Quota pool'}).inputValue(),'core')
