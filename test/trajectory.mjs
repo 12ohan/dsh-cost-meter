@@ -114,7 +114,8 @@ assert.ok(distribution.find(row => row.key === 'tiny').steps >= 850)
 // Purpose attribution uses only tool names, and never splits a mixed model call twice.
 for (const [tools, kind] of [
   [['tools.read_file', 'stat'], 'read'], [['functions.read_file', 'mcp__filesystem__list_directory'], 'read'],
-  [['grep', 'glob'], 'local-search'], [['web_search', 'web_fetch'], 'search'],
+  [['grep', 'glob'], 'local-search'], [['web_search'], 'search'], [['web_fetch', 'functions.web_fetch', 'mcp__web__web_fetch'], 'fetch'],
+  [['web_search', 'web_fetch'], 'multi-tool'],
   [['apply_patch', 'edit_file'], 'write'], [['functions.exec_command', 'bash'], 'command'],
   [['spawn_agent', 'wait_agent'], 'coordination'], [['read_file', 'write_file'], 'multi-tool'],
   [['mcp__example__read_all_accounts'], 'tool'], [[], 'model'],
