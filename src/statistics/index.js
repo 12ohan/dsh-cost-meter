@@ -497,7 +497,7 @@ window.__ModuleLoader__.load({
       }
       disposers.push(store.subscribe(reconcile))
       if (supported) for (const [name] of contextTargets) disposers.push(slots.subscribe(name, () => void check()))
-      const visible = () => { if (!document.hidden) void check(true) }
+      const onVisibility = () => { if (!document.hidden) void check(true) }
       document.addEventListener('visibilitychange', onVisibility)
       const storage = event => { if (event.key === introKey && event.newValue === '1' && !shown) { shown = true; emit({ prompt: false }); reconcile() } }
       window.addEventListener('storage', storage)
