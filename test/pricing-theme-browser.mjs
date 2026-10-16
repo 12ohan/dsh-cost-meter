@@ -34,7 +34,8 @@ const initialState = { config: sanitizeConfig({ locale: 'zh' }), today: day, mon
 const code = `
 import React from ${literal(req.resolve('react'))};
 import {createRoot} from ${literal(req.resolve('react-dom/client'))};
-window.__ModuleLoader__={load:mod=>{const value=mod.factory(name=>name==='react'?React:{Tooltip:({children})=>children});if(mod.chunk==='client.pricing.js')window.priceUI=value;else window.costUI=value}};
+import {createPortal} from ${literal(req.resolve('react-dom'))};
+window.__ModuleLoader__={load:mod=>{const value=mod.factory(name=>name==='react'?React:name==='react-dom'?{createPortal}:{Tooltip:({children})=>children});if(mod.chunk==='client.pricing.js')window.priceUI=value;else window.costUI=value}};
 ${client}
 ${readSource('src/pricing/index.js')}
 const {CostSection,parseConfig}=window.costUI.preview;
@@ -85,7 +86,7 @@ try {
   await unknown.getByRole('button', { name: 'fixture:unknown · 设置价格', exact: true }).click()
   await unknown.getByRole('button', { name: '价格表', exact: true }).click()
   assert.equal(await page.evaluate(() => window.patches.length), 0, 'opening a model and preparing a catalog choice do not change pricing')
-  assert.equal(await page.locator('.cm-match-row select').count(), 1, 'only the selected model mounts a price selector')
+  assert.equal(await page.locator('.cm-match-row [role=combobox]').count(), 1, 'only the selected model mounts a price selector')
   for (const [theme, tokens, scheme] of [['midnight-light-host', midnight, 'light'], ['host-dark', dark, 'dark'], ['host-light', light, 'light']]) {
     await page.emulateMedia({ colorScheme: scheme })
     await page.evaluate(({ tokens, scheme }) => {
@@ -93,29 +94,20 @@ try {
       for (const [key, value] of Object.entries(tokens)) document.documentElement.style.setProperty(key, value)
     }, { tokens, scheme })
     await page.mouse.move(0, 0)
-    const colors = await page.locator('select.cm-input').evaluateAll(selects => selects.map(select => ({
-      color: getComputedStyle(select).color, background: getComputedStyle(select).backgroundColor,
-      options: [...select.options].map(option => ({ color: getComputedStyle(option).color, background: getComputedStyle(option).backgroundColor })),
-    })))
-    assert.ok(colors.length === 2 && colors.every(select => select.options.length > 1), 'pricing choices are present')
-    for (const select of colors) for (const option of select.options) {
-      assert.equal(option.background, select.background, `${theme}: every unhovered native option has the theme background`)
-      assert.equal(option.color, select.color, `${theme}: every unhovered native option has the theme text color`)
-      const values = [luminance(option.color), luminance(option.background)].sort((a, b) => a - b)
-      assert.ok((values[1] + .05) / (values[0] + .05) >= 4.5, `${theme}: option text stays readable`)
-    }
-    const model = page.locator('.cm-match-row select').first()
-    const before = await model.evaluate(select => [...select.options].map(option => getComputedStyle(option).backgroundColor))
-    await model.hover(); await page.mouse.move(0, 0)
-    assert.deepEqual(await model.evaluate(select => [...select.options].map(option => getComputedStyle(option).backgroundColor)), before, 'leaving hover preserves readable option colors')
-    assert.equal(await page.locator('#host-control option').first().evaluate(option => getComputedStyle(option).backgroundColor), 'rgba(0, 0, 0, 0)', 'the fix leaves host and other plugins outside cm-input untouched')
-    if (theme === 'midnight-light-host') {
-      await model.click()
-      await page.screenshot({ path: join(output, 'midnight-popup.png') })
-      await page.keyboard.press('Escape')
-    }
+    const field = unknown.getByRole('combobox')
+    await field.click()
+    const panel = page.locator('.cm-combo-panel')
+    await panel.waitFor()
+    const colors = await panel.evaluate(node => ({color:getComputedStyle(node).color,background:getComputedStyle(node).backgroundColor,parent:node.parentElement.tagName,options:[...node.querySelectorAll('[role=option]')].map(option=>({color:getComputedStyle(option).color,height:option.getBoundingClientRect().height}))}))
+    assert.equal(colors.parent,'BODY','picker panel escapes the settings scroll container')
+    assert.ok(colors.options.length>80,'the complete catalog is reachable')
+    for(const option of colors.options){const values=[luminance(option.color),luminance(colors.background)].sort((a,b)=>a-b);assert.ok((values[1]+.05)/(values[0]+.05)>=4.5,theme+' candidate text stays readable');assert.ok(option.height>=24,'candidate rows keep readable height')}
+    assert.equal(await page.locator('#host-control option').first().evaluate(option=>getComputedStyle(option).backgroundColor),'rgba(0, 0, 0, 0)','host controls stay untouched')
+    if(theme==='midnight-light-host')await page.screenshot({path:join(output,'midnight-popup.png')})
+    await field.press('Escape')
+    await panel.waitFor({state:'detached'})
     await page.screenshot({ path: join(output, theme + '.png'), fullPage: true })
-    checks.push({ theme, selectors: colors.length, options: colors.reduce((sum, select) => sum + select.options.length, 0) })
+    checks.push({theme,options:colors.options.length,portaled:true})
   }
   assert.equal(await page.locator('.cm-price-card').count(), 0, 'catalog cards stay unmounted on model pricing');
   assert.equal(await page.evaluate(() => window.historyReads), 0, 'model pricing does not load historical pricing');
@@ -123,27 +115,42 @@ try {
   await modelFilter.fill('fixture'); assert.equal(await page.locator('.cm-match-row').count(), 1);
   await modelFilter.press('Escape'); assert.equal(await page.locator('.cm-match-row').count(), 2);
   assert.equal(await page.evaluate(() => window.patches.length), 0, 'model filtering does not save configuration');
-  const model = page.locator('.cm-match-row select').first()
-  const search = page.locator('.cm-match-row input[type=search]').first()
-  await search.fill('opencode gpt')
-  const filtered = await model.locator('option').allTextContents()
-  assert.ok(filtered.length > 1 && filtered.slice(1).every(label => /opencode/i.test(label) && /gpt/i.test(label)))
-  assert.equal(await page.evaluate(() => window.patches.length), 0, 'searching never saves a mapping')
-  await search.fill('no-model-matches-this-query')
-  await page.getByRole('status').filter({ hasText: '没有匹配的模型' }).waitFor()
-  assert.equal(await model.inputValue(), '', 'empty results do not change the selected mapping')
-  await search.press('Escape')
-  assert.equal(await search.inputValue(), '')
-  await model.selectOption('openai:gpt-6-astra')
-  await page.waitForFunction(() => window.patches.length === 1)
-  assert.deepEqual(await page.evaluate(() => window.patches[0]), { priceOverrides: { 'fixture:unknown': 'openai:gpt-6-astra' } })
-  await search.fill('claude')
-  assert.equal(await model.inputValue(), 'openai:gpt-6-astra', 'filtering retains an existing price selection')
-  await search.press('Escape')
+  const field = unknown.getByRole('combobox')
+  const candidates = page.locator('.cm-combo-panel [role=option]')
+  await field.click(); await field.fill('opencode gpt')
+  const filtered = await candidates.allTextContents()
+  assert.ok(filtered.length>1&&filtered.every(label=>/opencode/i.test(label)&&/gpt/i.test(label)))
+  await page.waitForTimeout(160)
+  assert.equal(await page.evaluate(()=>window.patches.length),0,'filtering does not save configuration')
+  await field.fill('no-model-matches-this-query')
+  await page.getByRole('status').filter({hasText:'没有匹配的模型'}).waitFor()
+  assert.equal(await candidates.count(),0)
+  await field.press('Escape');assert.equal(await field.inputValue(),'')
+  await field.click();await field.fill('openai gpt-6-astra')
+  await page.getByRole('option',{name:'openai · gpt-6-astra',exact:true}).click()
+  await page.waitForFunction(()=>window.patches.length===1)
+  assert.deepEqual(await page.evaluate(()=>window.patches[0]),{priceOverrides:{'fixture:unknown':'openai:gpt-6-astra'}})
+  // #287 P2: the retained old choice must not steal Enter from real search matches.
+  await field.click();await field.fill('deepseek-v4-flash')
+  assert.equal(await page.locator('.cm-combo-option.active').textContent(),'DeepSeek · deepseek-v4-flash')
+  await field.press('Enter')
+  await page.waitForFunction(()=>window.patches.some(p=>p.priceOverrides?.['fixture:unknown']==='deepseek:deepseek-v4-flash'))
+  // #287 P2: position and constrain the panel before scrolling a far-away selection.
+  await field.click();const last=await candidates.last().textContent();await candidates.last().click()
+  await page.waitForTimeout(160);await field.click()
+  assert.equal(await page.locator('.cm-combo-option[aria-selected=true]').textContent(),last)
+  await page.waitForFunction(()=>{const list=document.querySelector('.cm-combo-list'),row=list?.querySelector('[data-active=true]');if(!row)return false;const a=list.getBoundingClientRect(),b=row.getBoundingClientRect();return b.top>=a.top-1&&b.bottom<=a.bottom+1})
+  // A new query can keep index zero; its active option must still become visible.
+  await page.locator('.cm-combo-list').evaluate(node=>node.scrollTop=1000)
+  await field.fill('DeepSeek')
+  await page.waitForFunction(()=>{const list=document.querySelector('.cm-combo-list'),row=list?.querySelector('[data-active=true]');if(!row)return false;const a=list.getBoundingClientRect(),b=row.getBoundingClientRect();return b.top>=a.top-1&&b.bottom<=a.bottom+1})
+  await field.press('Escape')
+  for(const height of [320,200,140]){await page.setViewportSize({width:1100,height});await field.click();const rect=await page.locator('.cm-combo-panel').evaluate(node=>node.getBoundingClientRect().toJSON());assert.ok(rect.top>=0&&rect.bottom<=height+1,'candidate panel fits short viewport');await field.press('Escape')}
+  await page.setViewportSize({width:1100,height:950})
   await unknown.getByRole('button', { name: '本地', exact: true }).click()
   await page.waitForFunction(() => window.patches.some(p => p.priceOverrides?.['fixture:unknown'] === '__local__'))
   assert.deepEqual(await unknown.locator('.cm-model-current .cm-rate-item strong').allTextContents(), ['$0', '$0', '$0'])
-  assert.equal(await unknown.locator('select').count(), 0, 'local mode does not keep catalog controls mounted')
+  assert.equal(await unknown.getByRole('combobox').count(), 0, 'local mode does not keep catalog controls mounted')
   await unknown.getByRole('button', { name: '自定义', exact: true }).click()
   const custom = page.getByRole('group', { name: /fixture:unknown.*自定义价格/ })
   await custom.waitFor()

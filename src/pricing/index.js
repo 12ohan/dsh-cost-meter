@@ -2,7 +2,12 @@
 window.__ModuleLoader__.load({
   id: 'dsh-cost-meter', chunk: 'client.pricing.js',
   factory: require => {
-    const { createElement: el, Fragment, useState, useEffect, useMemo, useRef } = require('react')
+    const { createElement: el, Fragment, useState, useEffect, useLayoutEffect, useMemo, useRef, useId } = require('react')
+    // 候选面板 portal 到 body:设置面板是宿主 overlay 里 role=dialog 的 div(不是 <dialog>
+    // 元素),它带 overflow 与自己的层叠上下文;挂到 body 才既不被裁、也不被压在下层。
+    // 宿主未提供 react-dom 时退回就地渲染(测试桩与老宿主)。
+    let createPortal = null
+    try { createPortal = require('react-dom')?.createPortal ?? null } catch {}
     const runFields = ['at', 'before', 'after', 'days', 'sessions', 'skipped']
     const historySchema = { parse: value => {
       if (!Array.isArray(value) || !value.every(row => runFields.every(key => Number.isFinite(row?.[key]) && row[key] >= 0))) throw new Error('Invalid recalculation history')
@@ -24,21 +29,161 @@ window.__ModuleLoader__.load({
       { id: 'dsh-cost-meter#costMeter/repriceHistory', service: 'costMeter', namespace: 'costMeter', method: 'repriceHistory', invocation: { kind: 'direct' }, parameters: [{ name: 'confirmed', wire: 'confirmed', source: 'json', codec: codec('RepricingConfirmation', boolSchema) }], result: codec('FetchPricesResult', resultSchema) },
     ] }
 
+    const comboText = option => (option.label + ' ' + option.value).toLowerCase()
     function SearchPriceSelect({ options, value, placeholder, label, locale, onChange }) {
-      const [query, setQuery] = useState('')
-      const selectRef = useRef(null)
-      const en = locale === 'en', words = query.toLowerCase().trim().split(/\s+/).filter(Boolean)
-      const indexed = useMemo(() => options.map(option => ({ option, search: (option.label + ' ' + option.value).toLowerCase() })), [options])
-      const matches = indexed.filter(row => words.every(word => row.search.includes(word))).map(row => row.option)
+      const en = locale === 'en'
+      // 稳定且互不相同的 id:aria-controls / aria-activedescendant 要按 id 引用被 portal
+      // 出输入框子树的候选表。用 React 的 useId(与 statistics 用 useSyncExternalStore
+      // 一样,仓库已按 React 18 宿主写),不在渲染期改模块级变量。
+      const uid = useId()
+      const listId = uid + '-list'
+      const [query, setQuery] = useState(''), [open, setOpen] = useState(false), [active, setActive] = useState(0)
+      const [box, setBox] = useState(null)
+      const rootRef = useRef(null), inputRef = useRef(null), panelRef = useRef(null)
       const selected = options.find(option => option.value === value)
-      const limited = matches.slice(0, 80)
-      const shown = selected && !limited.includes(selected) ? [selected, ...limited] : limited
-      return el('div', { className: 'cm-price-search' },
-        el('input', { type: 'search', className: 'cm-input', value: query, placeholder: en ? 'Search model or provider' : '搜索模型或提供商',
-          'aria-label': label + (en ? ' · Search prices' : ' · 搜索价格'), onChange: event => setQuery(event.target.value), onKeyDown: event => { if (event.key === 'Escape') { setQuery(''); event.stopPropagation() } else if (event.key === 'ArrowDown') { event.preventDefault(); selectRef.current?.focus() } } }),
-        el('select', { ref: selectRef, className: 'cm-input', value, 'aria-label': label + (en ? ' · Price model' : ' · 价格模型'), onChange: event => onChange(event.target.value) },
-          el('option', { value: '' }, placeholder), ...shown.map(option => el('option', { key: option.value, value: option.value }, option.label))),
-        query ? el('small', { role: 'status' }, matches.length > 80 ? (en ? `${matches.length} models · Showing the first 80. Type to filter.` : `${matches.length} 个模型 · 先显示 80 个，输入关键词筛选`) : matches.length ? (en ? `${matches.length} matches` : `${matches.length} 个结果`) : (en ? 'No matches' : '没有匹配的模型')) : null)
+      const words = query.toLowerCase().trim().split(/\s+/).filter(Boolean)
+      // 候选文本只在 options 变化时小写化一次:打字时状态在子组件里,父组件不重渲染,
+      // options 引用稳定,memo 命中(实测连打 5 个字符 0 次重算);父组件真重渲染时
+      // options 是新数组,那时确实该重算。
+      const indexed = useMemo(() => options.map(option => ({ option, search: comboText(option) })), [options])
+      const matchesFor = text => { const terms = text.toLowerCase().trim().split(/\s+/).filter(Boolean); return terms.length ? indexed.filter(row => terms.every(word => row.search.includes(word))).map(row => row.option) : options }
+      const matched = matchesFor(query)
+      // 已选项始终留在列表里(旧版原生下拉一直显示当前值):筛选词不匹配时也不能让用户
+      // 看不出自己选了什么、点不回它。
+      const shown = selected && !matched.includes(selected) ? [selected, ...matched] : matched
+      const index = Math.max(0, Math.min(active, shown.length - 1))
+      // 关闭一律丢弃未提交的筛选词:输入框回到「显示已选值」,不会把半截关键词当成值。
+      const closeList = () => { setOpen(false); setQuery('') }
+      const openList = () => {
+        if (open) return
+        // 清掉上次的坐标:否则重新打开时面板会先按旧位置画一帧再跳到新位置。
+        setBox(null); setQuery('')
+        // 关闭态下 query 必为空,故 shown 就是即将渲染的全量列表:直接复用它定位已选项。
+        setActive(Math.max(0, shown.findIndex(option => option.value === value)))
+        setOpen(true)
+      }
+      const choose = option => {
+        if (!option) return
+        // 同值不重复提交:旧原生 select 只在值真的改变时才触发 change。
+        if (option.value !== value) onChange(option.value)
+        closeList()
+      }
+      // 有筛选词时先清词(列表回到全部候选);否则清掉已选值,交回「未手动指定」。
+      const clear = () => { if (open && query) { setQuery(''); setActive(0); return } if (value) onChange(''); closeList() }
+      useEffect(() => {
+        if (!open || typeof document === 'undefined') return
+        const node = inputRef.current, browser = typeof window === 'undefined' ? null : window
+        // 面板恒挂到 body:设置面板是宿主 overlay 里 role=dialog 的 div(不是 <dialog> 元素),
+        // 它带 overflow 与自己的层叠上下文;portal 到 body 才既不被裁、也不被压在下层。
+        // 贴着输入框展开;下方空间不足时翻到上方,并按可用空间限高,避免超出窗口。
+        // 上下都不足时(窗口很矮)取较大的一侧,再把顶边夹回视口内——否则 top 会是负数,
+        // 面板被画到屏幕外。120 只是「宁可矮也不画出去」的下限,不能反过来撑出视口。
+        const place = () => {
+          const rect = node?.getBoundingClientRect?.()
+          if (!rect || !browser) return
+          const viewport = browser.innerHeight, margin = 12
+          const below = viewport - rect.bottom - margin, above = rect.top - margin
+          const flip = below < 180 && above > below
+          const available = Math.max(60, flip ? above : below)
+          const maxHeight = Math.min(280, available)
+          const top = Math.max(margin, Math.min(flip ? rect.top - maxHeight - 6 : rect.bottom + 6, viewport - maxHeight - margin))
+          // 坐标没变就保留原对象:监听挂在 window 的 capture 上,滚动设置页里任意容器
+          // 都会命中,否则每帧都要把整个候选面板重渲染一遍。
+          setBox(prev => prev && prev.left === rect.left && prev.top === top && prev.width === rect.width && prev.maxHeight === maxHeight
+            ? prev : { left: rect.left, top, width: rect.width, maxHeight })
+        }
+        place()
+        if (typeof browser?.addEventListener !== 'function') return
+        browser.addEventListener('scroll', place, true); browser.addEventListener('resize', place)
+        return () => { browser.removeEventListener('scroll', place, true); browser.removeEventListener('resize', place) }
+      }, [open])
+      useEffect(() => {
+        if (!open || typeof document === 'undefined' || typeof document.addEventListener !== 'function') return
+        const dismiss = event => {
+          if (rootRef.current?.contains?.(event.target) || panelRef.current?.contains?.(event.target)) return
+          // 点空白关闭即丢弃未提交的筛选词,避免输入框里留着一段不是所选值的文字。
+          closeList()
+        }
+        document.addEventListener('pointerdown', dismiss, true)
+        return () => document.removeEventListener('pointerdown', dismiss, true)
+      }, [open])
+      // 定位和限高生效后再滚动；首次隐藏渲染时列表尚无限高，不能提前定位。
+      // 搜索词改变时，即使高亮索引相同，也要让新的匹配项回到可视区。
+      useLayoutEffect(() => {
+        if (!open || !box) return
+        panelRef.current?.querySelector?.('[data-active="true"]')?.scrollIntoView?.({ block: 'nearest' })
+      }, [open, index, box, query])
+      const optionId = i => uid + '-opt-' + i
+      // 结果数按真实匹配数给:被补进列表的已选项并不匹配筛选词,不能算进「结果」。
+      // 已选项被补进列表时列表非空,就不能再报「没有匹配的模型」——否则列表里明明有
+      // 一行、提示却说没有,自相矛盾。此时改为说明「无匹配,下面是当前选择」。
+      const note = !words.length ? null
+        : matched.length ? (en ? `${matched.length} matches` : `${matched.length} 个结果`)
+          : shown.length ? (en ? 'No matches · showing the current choice' : '没有匹配的模型 · 下面是当前选择')
+            : (en ? 'No matches' : '没有匹配的模型')
+      // 面板直接建在 portal 目标里,不做「先就地渲染再搬家」:否则首帧会白建一整份候选。
+      const panel = open ? el('div', { ref: panelRef, className: 'cm-combo-panel', style: box ?? { visibility: 'hidden' } },
+        shown.length ? el('div', { className: 'cm-combo-list', id: listId, role: 'listbox', 'aria-label': label },
+          shown.map((option, i) => el('button', {
+            key: option.value, id: optionId(i), type: 'button', role: 'option',
+            className: 'cm-combo-option' + (i === index ? ' active' : ''),
+            'data-active': String(i === index), 'aria-selected': String(option.value === value),
+            onMouseEnter: () => setActive(i), onMouseDown: event => event.preventDefault(), onClick: () => choose(option),
+          }, option.label))) : null,
+        note ? el('p', { className: 'cm-combo-note', role: 'status' }, note) : null) : null
+      return el('div', { ref: rootRef, className: 'cm-price-search cm-combo' },
+        el('div', { className: 'cm-combo-control' },
+          el('input', {
+            ref: inputRef, type: 'search', className: 'cm-input cm-combo-input', autoComplete: 'off',
+            value: open ? query : selected?.label ?? '', role: 'combobox', 'aria-expanded': String(open), 'aria-autocomplete': 'list',
+            'aria-controls': open && shown.length ? listId : undefined,
+            // 候选表被 portal 出输入框子树,读屏靠 activedescendant 才知道高亮项。
+            'aria-activedescendant': open && shown.length ? optionId(index) : undefined,
+            'aria-label': label + (en ? ' · Price model' : ' · 价格模型'),
+            placeholder: open && selected ? selected.label : placeholder,
+            onFocus: openList, onClick: () => { if (!open) openList() },
+            onChange: event => {
+              // 关闭态输入框显示的是已选标签(不是查询词):用户点选后直接打字时,浏览器会把
+              // 字符插在标签后面,若整串当查询词就会得到「标签+字」这种永不匹配的关键词。
+              // 这里剥掉标签前缀,只把新输入的部分当查询词。
+              const raw = event.target.value
+              const next = !open && selected && raw.startsWith(selected.label) ? raw.slice(selected.label.length) : raw
+              const candidates = matchesFor(next)
+              setQuery(next); setOpen(true)
+              // 当前值仍可见，但默认高亮真实匹配项；Enter 应选择搜索结果。
+              setActive(selected && candidates.length > 0 && !candidates.includes(selected) ? 1 : 0)
+            },
+            onKeyDown: event => {
+              // 输入法正在选词(中文/日文):Enter 是确认候选词,不能当成选中模型。
+              // React 的合成事件不带 isComposing,必须读 nativeEvent。
+              if (event.nativeEvent?.isComposing) return
+              // Escape:type=search 的原生输入框会自己清空并派发 input 事件。必须一律
+              // preventDefault,否则关闭态下(输入框显示已选标签)也会被 onChange 当成查询词、
+              // 把面板重新打开。只在真的关掉候选列表时才阻断冒泡,以免拦住宿主设置面板
+              // 自己的 document 级 Esc 关闭逻辑。
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                if (!open) return
+                closeList(); event.stopPropagation(); return
+              }
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault()
+                if (!open) { openList(); return }
+                setActive(Math.max(0, Math.min(shown.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1))))
+                return
+              }
+              if (event.key === 'Enter' && open && shown[index]) { event.preventDefault(); choose(shown[index]); return }
+              if (event.key === 'Tab') closeList()
+            },
+          }),
+          // 有筛选词时也能清(隐藏了原生 ×,这是唯一的鼠标入口);有选中值时可清回未指定。
+          value || query ? el('button', { type: 'button', className: 'cm-combo-clear', 'aria-label': (en ? 'Clear ' : '清空 ') + label, onMouseDown: event => event.preventDefault(), onClick: clear }, '×') : null,
+          el('button', {
+            type: 'button', className: 'cm-combo-caret', tabIndex: -1, 'aria-hidden': 'true',
+            onMouseDown: event => event.preventDefault(),
+            onClick: () => { if (open) closeList(); else { inputRef.current?.focus?.(); openList() } },
+          }, '▾')),
+        panel && createPortal ? createPortal(panel, document.body) : panel)
     }
 
     function RestorePrices({ state, draft, setDraft, locale, rpc }) {
@@ -205,7 +350,7 @@ window.__ModuleLoader__.load({
                   ...[['auto', '自动匹配', 'Automatic'], ['catalog', '价格表', 'Price table'], ['custom', '自定义', 'Custom'], ['local', '本地', 'Local']].map(([id, zh, english]) => el('button', { key: id, type: 'button', className: 'cm-source-choice' + (mode === id ? ' active' : ''), 'aria-pressed': mode === id, onClick: () => choose(id) }, en ? english : zh))),
                 mode === 'catalog' ? el('div', { className: 'cm-model-source' },
                   el('span', null, en ? 'Select a reference model' : '选择参考模型'),
-                  el(SearchPriceSelect, { value: source && !source.startsWith('__') ? source : '', options: targetOptions, placeholder: en ? 'Choose a price table entry' : '选择价格表条目', label, locale, onChange: value => { if (value) setOverride(key, value) } }),
+                  el(SearchPriceSelect, { value: source && !source.startsWith('__') ? source : '', options: targetOptions, placeholder: en ? 'Choose a price table entry' : '选择价格表条目', label, locale, onChange: value => { if (value) setOverride(key, value); else choose('auto') } }),
                   !source || source.startsWith('__') ? el('p', { className: 'cm-note' }, en ? 'Current pricing stays in effect until you choose an entry.' : '选定条目后生效，选择前仍使用原价格。') : null) : null,
                 mode === 'custom' && source === '__custom__' && pricesNow.custom?.[key] ? el(CustomPriceEditor, { value: pricesNow.custom[key], label, locale, t, priceEditor,
                   onChange: entry => setDraft({ ...draft, prices: { ...pricesNow, custom: { ...pricesNow.custom, [key]: entry } } }) }) : null,
@@ -228,6 +373,10 @@ window.__ModuleLoader__.load({
             el('details', { className: 'cm-pricing-rules' }, el('summary', null, en ? 'Automatic matching rules' : '自动匹配规则'),
               el('label', { className: 'cm-field' }, el('span', null, t('priceMatchLabel')), el('select', { className: 'cm-input', value: draft?.priceMatch === 'exact' ? 'exact' : 'auto', onChange: event => setField('priceMatch', event.target.value) }, el('option', { value: 'auto' }, t('priceMatchAuto')), el('option', { value: 'exact' }, t('priceMatchExact')))),
               el('p', { className: 'cm-note' }, t('priceMatchNote'))))
+    }
+
+    function Chevron({ open, className }) {
+      return el('svg', { className: 'cm-pricing-chevron ' + className + (open ? ' is-open' : ''), width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }, el('path', { d: 'm9 5 7 7-7 7' }))
     }
 
     function Catalog({ state, draft, setDraft, t, locale, rpc, renderEditor, vendorLabels, priceEditor }) {
@@ -257,7 +406,7 @@ window.__ModuleLoader__.load({
           const currency = id === 'deepseek' ? prices.currency ?? 'USD' : 'USD', limit = limits[id] ?? 16
           return el('section', { key: id, className: 'cm-catalog-group' },
             el('button', { type: 'button', className: 'cm-catalog-vendor cm-vendor-toggle', 'aria-expanded': expanded, onClick: () => setOpen(value => ({ ...value, [id]: !expanded })) },
-              el('span', null, el('span', { className: 'cm-catalog-caret', 'aria-hidden': true }, expanded ? '⌄' : '›'), vendorLabels[id] ?? id, el('small', null, ids.length)),
+              el('span', null, el(Chevron, { className: 'cm-catalog-caret', open: expanded }), vendorLabels[id] ?? id, el('small', null, ids.length)),
               el('span', { className: 'cm-catalog-unit' }, currency + (en ? ' / 1M tokens' : ' / 百万 Token'))),
             expanded ? el('div', { className: 'cm-catalog-list' },
               el('div', { className: 'cm-catalog-columns', 'aria-hidden': true }, ...[en ? 'Model' : '模型', en ? 'Input' : '输入', en ? 'Cached input' : '缓存读取', en ? 'Output' : '输出', ''].map((text, i) => el('span', { key: i }, text))),
@@ -268,7 +417,7 @@ window.__ModuleLoader__.load({
                 return el('div', { key, className: 'cm-catalog-entry' + (active ? ' editing' : '') },
                   el('button', { type: 'button', className: 'cm-catalog-model', 'aria-label': name + (en ? ' · Edit price' : ' · 编辑价格'), 'aria-expanded': active, onClick: () => setEditing(active ? null : key) },
                     el('span', { className: 'cm-catalog-model-name' }, el('strong', null, name), variants ? el('small', null, variants) : null),
-                    el(RateSummary, { entry, currency, priceEditor, locale }), el('span', { className: 'cm-catalog-edit-caret', 'aria-hidden': true }, active ? '⌄' : '›')),
+                    el(RateSummary, { entry, currency, priceEditor, locale }), el(Chevron, { className: 'cm-catalog-edit-caret', open: active })),
                   active ? el('div', { className: 'cm-catalog-editor' }, renderEditor(id, model, entry)) : null)
               }),
               ids.length > limit ? el('button', { type: 'button', className: 'cm-catalog-more', onClick: () => setLimits(value => ({ ...value, [id]: limit + 16 })) }, en ? `Show more · ${ids.length - limit} remaining` : `显示更多 · 还有 ${ids.length - limit} 个`) : null) : null)
@@ -325,7 +474,7 @@ window.__ModuleLoader__.load({
         return (method === 'getPriceCatalog' ? catalogSchema : method === 'getRepricingHistory' ? historySchema : resultSchema).parse(result.value)
       }
       const style = document.createElement('style')
-      style.textContent = '.cm-price-search{display:grid;gap:6px;min-width:0}.cm-price-search small{color:var(--dsw-alias-label-tertiary)}.cm-price-search select,.cm-price-search input{width:100%;min-width:0}.cm-repricing-warning{padding:12px;border:1px solid var(--dsw-alias-state-warning-primary,#c58a25);border-radius:10px;background:var(--dsw-alias-bg-layer-1)}.cm-repricing-warning p{margin:8px 0 12px;line-height:1.6}.cm-repricing-history{margin-top:12px}.cm-repricing-history table{width:100%;text-align:left;font-variant-numeric:tabular-nums}.cm-repricing-history td,.cm-repricing-history th{padding:8px;border-bottom:1px solid var(--dsw-alias-border-l1)}'
+      style.textContent = '.cm-price-search{display:grid;gap:6px;min-width:0}.cm-price-search small{color:var(--dsw-alias-label-tertiary)}.cm-price-search select,.cm-price-search input{width:100%;min-width:0}.cm-repricing-warning{padding:12px;border:1px solid var(--dsw-alias-state-warn-primary,#c58a25);border-radius:10px;background:var(--dsw-alias-bg-layer-1)}.cm-repricing-warning p{margin:8px 0 12px;line-height:1.6}.cm-repricing-history{margin-top:12px}.cm-repricing-history table{width:100%;text-align:left;font-variant-numeric:tabular-nums}.cm-repricing-history td,.cm-repricing-history th{padding:8px;border-bottom:1px solid var(--dsw-alias-border-l1)}'
       style.textContent += '.cm-custom-price{grid-column:1/-1;display:grid;gap:14px;margin:4px 0 12px;padding:16px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-lg,12px);background:var(--dsw-alias-bg-layer-1);min-width:0}.cm-custom-price legend{padding:0 6px;font-weight:500;font-size:13px}.cm-custom-price label{display:grid;gap:7px;font-size:12px;min-width:0;color:var(--dsw-alias-label-secondary)}.cm-custom-price .cm-input{width:100%;min-width:0}.cm-custom-head{display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--dsw-alias-label-secondary);font-size:12px}.cm-custom-head label{display:flex;align-items:center;gap:8px}.cm-custom-head select{width:auto!important}.cm-custom-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.cm-custom-amount{position:relative;display:block}.cm-custom-amount>span{position:absolute;inset-inline-start:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--dsw-alias-label-tertiary)}.cm-custom-amount input{padding-inline-start:28px}.cm-custom-more summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label-secondary)}.cm-custom-more .cm-custom-grid{grid-template-columns:repeat(2,minmax(0,1fr));margin:12px 0 8px}.cm-custom-price p{margin:0;line-height:1.6}@media(max-width:700px){.cm-custom-grid{grid-template-columns:1fr}.cm-custom-head{flex-wrap:wrap}}'
       document.head.appendChild(style)
       style.textContent += `
@@ -349,13 +498,36 @@ window.__ModuleLoader__.load({
         .cm-rate-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;min-width:0;font-variant-numeric:tabular-nums}.cm-rate-item{display:grid;gap:4px;min-width:0}.cm-rate-item>span{font-size:11px;color:var(--dsw-alias-label-tertiary)}.cm-rate-item>strong{font-size:14px;font-weight:500;color:var(--dsw-alias-label-primary);overflow-wrap:anywhere}
         .cm-model-editor{display:grid;gap:14px;padding-top:14px;border-top:1px solid var(--dsw-alias-border-l1);min-width:0}.cm-source-choices{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.cm-source-choice{font:inherit;font-size:12px;padding:9px 4px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-secondary);cursor:pointer}.cm-source-choice.active{color:var(--dsw-alias-state-business-primary);border-color:var(--dsw-alias-state-business-primary);font-weight:600}.cm-source-choice:focus-visible,.cm-model-edit:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.cm-source-explanation{font-size:12px;line-height:1.7;margin:0;color:var(--dsw-alias-label-secondary)}.cm-model-dismiss{justify-self:start;font:inherit;font-size:11px;border:0;padding:0;background:none;color:var(--dsw-alias-label-tertiary);cursor:pointer}.cm-model-dismiss:hover{color:var(--dsw-alias-state-danger-primary,#cf4e4e)}
         .cm-reference-prices{display:grid;gap:16px;min-width:0}.cm-reference-prices>.cm-note{line-height:1.7}.cm-catalog-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.cm-catalog-toolbar>.cm-input{min-width:0;box-sizing:border-box;padding:8px 10px}.cm-catalog-toolbar>input{flex:1 1 220px}.cm-catalog-toolbar>select{flex:0 1 180px;max-width:100%}.cm-catalog-toolbar>.cm-note{white-space:nowrap;margin-inline-start:auto}
-        .cm-catalog-group{border:1px solid var(--dsw-alias-border-l1);border-radius:12px;overflow:hidden;min-width:0;container:cm-price-list / inline-size}.cm-reference-prices .cm-catalog-vendor{width:100%;margin:0;border:0;border-radius:0;padding:13px 16px;font:inherit;font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);box-sizing:border-box;text-align:start}.cm-catalog-vendor>span:first-child{display:flex;align-items:center;gap:9px;min-width:0}.cm-catalog-vendor small{font-size:11px;color:var(--dsw-alias-label-tertiary);font-weight:400}.cm-catalog-caret{font-size:17px;line-height:16px;color:var(--dsw-alias-label-tertiary)}.cm-catalog-unit{font-size:11px;font-weight:400;color:var(--dsw-alias-label-tertiary);white-space:nowrap}.cm-catalog-list{border-top:1px solid var(--dsw-alias-border-l1)}
-        .cm-catalog-columns,.cm-catalog-model{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,minmax(74px,.35fr)) 14px;gap:14px;align-items:center;padding:12px 16px;box-sizing:border-box;min-width:0}.cm-catalog-columns{font-size:11px;color:var(--dsw-alias-label-tertiary);background:var(--dsw-alias-bg-base)}.cm-catalog-model{position:relative;width:100%;font:inherit;text-align:start;border:0;background:transparent;color:var(--dsw-alias-label-primary);cursor:pointer}.cm-catalog-entry{border-top:1px solid var(--dsw-alias-border-l1)}.cm-catalog-model:hover{background:var(--dsw-alias-bg-hover,var(--dsw-alias-bg-layer-1))}.cm-catalog-model:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:-2px}.cm-catalog-entry.editing{background:var(--dsw-alias-bg-layer-1)}.cm-catalog-model-name{display:grid;gap:4px;min-width:0}.cm-catalog-model-name>strong{font-size:13px;font-weight:500;line-height:1.6;overflow-wrap:anywhere}.cm-catalog-model-name>small{font-size:11px;color:var(--dsw-alias-label-tertiary)}.cm-catalog-model .cm-rate-summary{display:contents}.cm-catalog-model .cm-rate-item>span{display:none}.cm-catalog-model .cm-rate-item>strong{font-size:13px}.cm-catalog-edit-caret{font-size:17px;color:var(--dsw-alias-label-tertiary)}.cm-catalog-editor{padding:0 14px 14px}.cm-catalog-more{font:inherit;font-size:12px;color:var(--dsw-alias-state-business-primary);cursor:pointer;width:100%;padding:12px;border:0;border-top:1px solid var(--dsw-alias-border-l1);background:none}
+        .cm-catalog-group{border:1px solid var(--dsw-alias-border-l1);border-radius:12px;overflow:hidden;min-width:0;container:cm-price-list / inline-size}.cm-reference-prices .cm-catalog-vendor{width:100%;margin:0;border:0;border-radius:0;padding:13px 16px;font:inherit;font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);box-sizing:border-box;text-align:start}.cm-catalog-vendor>span:first-child{display:flex;align-items:center;gap:9px;min-width:0}.cm-catalog-vendor small{font-size:11px;color:var(--dsw-alias-label-tertiary);font-weight:400}.cm-pricing-chevron{display:block;flex:none;color:var(--dsw-alias-label-tertiary);transition:transform .15s ease}.cm-pricing-chevron.is-open{transform:rotate(90deg)}@media(prefers-reduced-motion:reduce){.cm-pricing-chevron{transition:none}}.cm-catalog-unit{font-size:11px;font-weight:400;color:var(--dsw-alias-label-tertiary);white-space:nowrap}.cm-catalog-list{border-top:1px solid var(--dsw-alias-border-l1)}
+        .cm-catalog-columns,.cm-catalog-model{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,minmax(74px,.35fr)) 14px;gap:14px;align-items:center;padding:12px 16px;box-sizing:border-box;min-width:0}.cm-catalog-columns{font-size:11px;color:var(--dsw-alias-label-tertiary);background:var(--dsw-alias-bg-base)}.cm-catalog-model{position:relative;width:100%;font:inherit;text-align:start;border:0;background:transparent;color:var(--dsw-alias-label-primary);cursor:pointer}.cm-catalog-entry{border-top:1px solid var(--dsw-alias-border-l1)}.cm-catalog-model:hover{background:var(--dsw-alias-bg-hover,var(--dsw-alias-bg-layer-1))}.cm-catalog-model:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:-2px}.cm-catalog-entry.editing{background:var(--dsw-alias-bg-layer-1)}.cm-catalog-model-name{display:grid;gap:4px;min-width:0}.cm-catalog-model-name>strong{font-size:13px;font-weight:500;line-height:1.6;overflow-wrap:anywhere}.cm-catalog-model-name>small{font-size:11px;color:var(--dsw-alias-label-tertiary)}.cm-catalog-model .cm-rate-summary{display:contents}.cm-catalog-model .cm-rate-item>span{display:none}.cm-catalog-model .cm-rate-item>strong{font-size:13px}.cm-catalog-editor{padding:0 14px 14px}.cm-catalog-more{font:inherit;font-size:12px;color:var(--dsw-alias-state-business-primary);cursor:pointer;width:100%;padding:12px;border:0;border-top:1px solid var(--dsw-alias-border-l1);background:none}
         .cm-catalog-manage{border-top:1px solid var(--dsw-alias-border-l1);padding-top:16px;font-size:12px;color:var(--dsw-alias-label-secondary)}.cm-catalog-manage>summary{cursor:pointer}.cm-catalog-add{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.cm-catalog-add>.cm-input{flex:1;min-width:160px}.cm-price-unit{font-size:11px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}.cm-price-cell{display:grid;gap:6px;min-width:0}.cm-price-cell>.cm-price-cell-label{display:none}.cm-catalog-editor .cm-price-card{background:var(--dsw-alias-bg-base)}.cm-pricing-page .cm-price-row input{padding:8px;line-height:1.5}
         @container cm-price-list (max-width:560px){.cm-catalog-columns{display:none}.cm-catalog-model{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.cm-catalog-model-name{grid-column:1/-1;padding-inline-end:20px}.cm-catalog-model .cm-rate-item>span{display:block}.cm-catalog-edit-caret{position:absolute;inset-inline-end:16px;top:12px}.cm-catalog-unit{font-size:10px}.cm-catalog-editor{padding:0 10px 10px}}
         @container cm-price-editor (max-width:520px){.cm-price-row.cm-price-columns{display:none}.cm-price-row:not(.cm-price-columns){grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:10px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px}.cm-price-row>span:first-child{grid-column:1/-1;font-weight:600;color:var(--dsw-alias-label-secondary)}.cm-price-cell>.cm-price-cell-label{display:block;font-size:11px;line-height:1.5}}
         @media(max-width:480px){.cm-source-choices{grid-template-columns:repeat(2,minmax(0,1fr))}.cm-catalog-toolbar>select{flex:1 1 140px}}
       `
+      style.textContent += [
+        '.cm-price-search{display:block;min-width:0}',
+        '.cm-combo-control{position:relative;display:flex;align-items:center;min-width:0}',
+        '.cm-combo .cm-input{width:100%;min-width:0;padding-right:46px;text-overflow:ellipsis}',
+        // 自带清空按钮,隐藏 WebKit 的原生 ×,避免同一位置出现两个清除入口。
+        '.cm-combo .cm-combo-input::-webkit-search-cancel-button{display:none}',
+        // 清空与箭头是同一颗小图标按钮,只差位置与字号。
+        '.cm-combo-clear,.cm-combo-caret{position:absolute;display:flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;border:0;background:transparent;color:var(--dsw-alias-label-tertiary);line-height:1;cursor:pointer}',
+        '.cm-combo-clear{right:26px;border-radius:50%;font-size:14px}',
+        '.cm-combo-clear:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.14));color:var(--dsw-alias-label-primary)}',
+        '.cm-combo-caret{right:6px;font-size:10px}',
+        // 浮层固定定位挂到 body:设置面板是宿主 overlay 里 role=dialog 的 div,它带 overflow
+        // 与自己的层叠上下文;底色沿用宿主浮层令牌(bg-layer-2),靠 elevation 的描边+阴影分层。
+        '.cm-combo-panel{position:fixed;z-index:10000;display:flex;flex-direction:column;gap:2px;box-sizing:border-box;padding:4px;border-radius:12px;background:var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base));box-shadow:var(--dsw-elevation-panel,0 3px 8px rgba(0,0,0,.06),0 0 16px rgba(0,0,0,.04))}',
+        '.cm-combo-list{display:flex;flex-direction:column;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}',
+        // flex:none 不可省:面板限高后,列内子项默认可收缩,会把每行压扁成一条、文字被裁掉。
+        '.cm-combo-option{flex:none;font:inherit;font-size:12px;line-height:1.5;text-align:left;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+        '.cm-combo-option.active{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.14))}',
+        '.cm-combo-option[aria-selected="true"]{color:var(--dsw-alias-state-business-primary);font-weight:600}',
+        '.cm-combo-note{margin:0;padding:4px 8px;font-size:10px;color:var(--dsw-alias-label-tertiary)}',
+        '.cm-match-row .cm-combo{flex:1;min-width:160px}',
+        '.cm-repricing-warning{padding:12px;border:1px solid var(--dsw-alias-state-warn-primary,#c58a25);border-radius:10px;background:var(--dsw-alias-bg-layer-1)}.cm-repricing-warning p{margin:8px 0 12px;line-height:1.6}.cm-repricing-history{margin-top:12px}.cm-repricing-history table{width:100%;text-align:left;font-variant-numeric:tabular-nums}.cm-repricing-history td,.cm-repricing-history th{padding:8px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
+      ].join('')
       ctx.effect(() => () => style.remove(), 'cost-meter: pricing settings styles')
       return props => props.mode === 'matching' ? el(Matching, props) : el(props.mode === 'catalog' ? Catalog : props.mode === 'restore' ? RestorePrices : History, { ...props, rpc })
     }

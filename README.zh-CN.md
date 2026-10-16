@@ -12,7 +12,7 @@
 
 [![version](https://img.shields.io/badge/version-1.8.31-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
 
-**v1.8.31** 重新整理价格设置：模型定价、参考价格表、同步与规则分区展示，支持渠道模型搜索，单价、倍率与实际价格更清晰。
+**v1.8.31（待发布）** 重新整理价格设置：模型定价、参考价格表、同步与规则分区展示，支持渠道模型搜索，单价、倍率与实际价格更清晰。
 
 桌面端用户请按 [Desktop 安装说明](docs/install-troubleshooting.md#desktop-安装与更新)，使用应用自带的 CLI 和 `desktop` Profile。
 
@@ -327,22 +327,22 @@ Node.js 20 请改用 `npm install -g pnpm@10`。版本要求见 [pnpm 官方安�
 dsh plugin --profile web add dsh-cost-meter
 ```
 
-**PowerShell 一键脚本**(复制整行粘贴回车;自动补齐 pnpm、自动探测 git,无需克隆仓库;安装链**固定到发布 tag `v1.8.31`**,建议先下载审阅再运行):
+**PowerShell 一键脚本**(复制整行粘贴回车;自动补齐 pnpm、自动探测 git,无需克隆仓库;安装链**固定到发布 tag `v1.8.30`**,建议先下载审阅再运行):
 
 ```powershell
-irm https://raw.githubusercontent.com/Han-1413141/dsh-cost-meter/v1.8.31/install.ps1 | iex
+irm https://raw.githubusercontent.com/Han-1413141/dsh-cost-meter/v1.8.30/install.ps1 | iex
 ```
 
 **或直接命令行**(机器上需已有 pnpm 与 git;同样固定到 tag):
 
 ```sh
-dsh plugin --profile web add github:Han-1413141/dsh-cost-meter#v1.8.31
+dsh plugin --profile web add github:Han-1413141/dsh-cost-meter#v1.8.30
 ```
 
 没有 git 时可用 GitHub tag 打包直链:
 
 ```sh
-dsh plugin --profile web add https://github.com/Han-1413141/dsh-cost-meter/archive/refs/tags/v1.8.31.tar.gz
+dsh plugin --profile web add https://github.com/Han-1413141/dsh-cost-meter/archive/refs/tags/v1.8.30.tar.gz
 ```
 
 安装后**重启** `dsh web`(插件行、Typert 清单与客户端 bundle 均在启动时扫描):
