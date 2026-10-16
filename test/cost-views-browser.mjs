@@ -16,7 +16,7 @@ const { chromium } = browserReq('playwright-core')
 const executablePath = process.env.CM_TEST_BROWSER ?? ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', '/usr/bin/google-chrome', '/usr/bin/chromium'].find(existsSync)
 assert.ok(executablePath)
 const at = Date.parse('2026-10-14T09:00:00Z')
-const toolNames = ['read_file', 'grep', 'apply_patch', 'exec_command', 'web_search', 'send_message', ...Array.from({ length: 9 }, (_, i) => 'tool_' + i)]
+const toolNames = ['read_file', 'grep', 'apply_patch', 'exec_command', 'web_search', 'web_fetch', 'send_message', ...Array.from({ length: 9 }, (_, i) => 'tool_' + i)]
 const eventsOf = (id, count) => {
   const records = [{ type: 'turn/start', seq: 0, time: at, data: { turn: 1 } }]
   for (let i = 0; i < count; i++) {
@@ -40,7 +40,7 @@ const ctx = { get: name => name === 'sessionQuery' ? { listSessions: async () =>
 const initial = await getSessionTrajectory(ledger, ctx, { sessionId: 'root', basis: 'total', order: 'cost' })
 assert.equal(initial.totalSteps, 870)
 assert.equal(initial.groups.filter(row => row.kind === 'tool').length, 5)
-assert.equal(initial.operations.length, 7)
+assert.equal(initial.operations.length, 8)
 assert.ok(Math.abs(initial.operations.reduce((sum, row) => sum + row.cost, 0) - initial.cost) < 1e-10)
 assert.ok(initial.operationGroups.some(row => row.kind === 'other-tools'))
 const client = readFileSync('src/statistics/index.js', 'utf8').replace('return { mount, prefetchStatistics,', 'return { StepCosts, css, feeRectangles, parseTrajectory, mount, prefetchStatistics,')
@@ -114,6 +114,7 @@ try {
   assert.match(await chart.innerText(), /读取文件/)
   assert.match(await chart.innerText(), /文件修改/)
   assert.match(await chart.innerText(), /命令执行/)
+  assert.match(await chart.innerText(), /网页抓取/)
   await chart.getByRole('button', { name: '归类占比', exact: true }).click()
   const groups = chart.locator('.cm-cost-key')
   assert.equal(await groups.count(), initial.operations.length)

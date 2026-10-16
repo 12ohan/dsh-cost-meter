@@ -9,6 +9,7 @@ window.__ModuleLoader__.load({
     let createPortal = null
     try { createPortal = require('react-dom')?.createPortal ?? null } catch {}
     const runFields = ['at', 'before', 'after', 'days', 'sessions', 'skipped']
+    const isRequestKey = key => ['deepseek-official:deepseek-web-search', 'deepseek-official:deepseek-web-fetch'].includes(key)
     const historySchema = { parse: value => {
       if (!Array.isArray(value) || !value.every(row => runFields.every(key => Number.isFinite(row?.[key]) && row[key] >= 0) && (row.model === undefined || typeof row.model === 'string'))) throw new Error('Invalid recalculation history')
       return value
@@ -282,6 +283,7 @@ window.__ModuleLoader__.load({
           const matchMode = draft?.priceMatch ?? config.priceMatch
           const matchPrices = useMemo(() => ({ prices: pricesNow, priceMatch: matchMode }), [pricesNow, matchMode])
           const unmatchedKeys = useMemo(() => Object.keys(byProvider).filter(key => {
+            if (isRequestKey(key)) return false
             if (dismissed.includes(key)) return false
             if (overrides[key] !== undefined) return false // 已手动指定的键由下方 rows 展示
             const sep = key.indexOf(':')
@@ -289,12 +291,13 @@ window.__ModuleLoader__.load({
             const modelId = sep > 0 ? key.slice(sep + 1) : key
             return resolveClientPrice(provider, modelId, matchPrices).matched !== true
           }), [byProvider, dismissed, overrides, matchPrices, resolveClientPrice])
-          const rows = [...new Set([...unmatchedKeys, ...Object.keys(overrides)])].filter(key => !dismissed.includes(key))
+          const rows = [...new Set([...unmatchedKeys, ...Object.keys(overrides)])].filter(key => !dismissed.includes(key) && !isRequestKey(key))
           // 本月已命中价格且未手动指定的 provider:model 键(v1.6.11):同样允许
           // 改挂其它条目或标记为本地模型(零消耗)。数据取 state.month.byProviderModel
           // (比今日覆盖面广);override 写入后该键转入上方 rows(手动指定区)展示。
           const monthByProvider = state.month?.byProviderModel ?? {}
           const matchedKeys = useMemo(() => Object.keys(monthByProvider).filter(key => {
+            if (isRequestKey(key)) return false
             if (dismissed.includes(key)) return false
             if (overrides[key] !== undefined) return false
             const sep = key.indexOf(':')

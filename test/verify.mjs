@@ -6808,6 +6808,7 @@ await import('./billing-statistics-client.mjs')
 // 无外部依赖(纯 vm + 假 DOM),因此并入本套件而不是浏览器作业。
 await import('./client-style-injection.mjs')
 await import('./native-search-history.mjs')
+await import('./web-request-billing.mjs')
 await import('./versioned-session-logs.mjs')
 await import('./session-log-repair.mjs')
 await import('./client-issues-127-129.mjs')
