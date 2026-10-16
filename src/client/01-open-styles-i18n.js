@@ -94,6 +94,7 @@ window.__ModuleLoader__.load({
       '.cm-qguide .cm-buttons{display:flex;gap:8px;justify-content:flex-end}',
       '.cm-section{display:flex;flex-direction:column;gap:20px;padding:4px 2px 24px;font-size:13px;color:var(--dsw-alias-label-primary)}',
       '.cm-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:12px}',
+      '.cm-overview-grid{container:cm-overview / inline-size;min-width:0}.cm-overview-grid>.cm-cards{grid-template-columns:repeat(var(--cm-overview-count,3),minmax(0,1fr))}.cm-overview-grid .cm-card{min-width:0}.cm-overview-grid .cm-card-value{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.cm-overview-grid .cm-card-sub{line-height:1.65;overflow-wrap:anywhere}@container cm-overview (max-width:460px){.cm-overview-grid>.cm-cards{grid-template-columns:1fr}}',
       '.cm-cards-toggle{display:flex;align-items:center;gap:6px;margin:-6px 2px 0 auto;width:fit-content;font-size:12px;color:var(--dsw-alias-label-tertiary);cursor:pointer;user-select:none}',
       '.cm-cards-toggle:hover{color:var(--dsw-alias-label-primary)}',
       '.cm-cards-toggle input{margin:0;cursor:pointer}',

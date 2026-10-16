@@ -2079,7 +2079,8 @@
         // ── 概览:汇总卡片、今日会话、预算、官方余额 ──
         tab === 'overview' ? el(Fragment, { key: 'overview' },
         // 汇总卡片(今日卡片受 hideTodayCost 门控,issue #46;金额为真金白银口径,issue #64)
-        el('div', { className: 'cm-cards' },
+        el('div', { className: 'cm-overview-grid' },
+        el('div', { className: 'cm-cards', style: { '--cm-overview-count': config.hideTodayCost === true ? 2 : 3 } },
           config.hideTodayCost === true ? null : el(Card, {
             title: t('cardToday'),
             value: formatMoneyUsd(displayCostOf(state.today, config), config),
@@ -2104,7 +2105,7 @@
             title: t('cardTotal'),
             value: formatMoneyUsd(displayCostOf(state.total, config), config),
             sub: t('cardTotalSub', { calls: state.total.calls }),
-          })),
+          }))),
         el(ExternalUsagePanel, { state, t }),
         // 快照时点与 tokens 口径脚注(用户实测对账疑问:官方 5.64 vs 本地 5.78):
         // 防抖落盘产生分钟级时差;reasoning 由 API 单列上报但不计费,token 合计
