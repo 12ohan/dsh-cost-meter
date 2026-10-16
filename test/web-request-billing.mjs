@@ -19,7 +19,7 @@ Date.now = () => now
 const path = join(root, 'ledger.json'), session = { id: 'web-fees' }
 let ledger = new Ledger(sanitizeConfig({ exchangeRate: 7.2, peakEnabled: true,
   planBilling: { models: { 'deepseek-official:deepseek-web-fetch': 'plan' } } }), {}, path)
-let payload = { title: 'PRIVATE-TITLE', content: '# PRIVATE-PAGE' }, status = 200, both = true, error
+let payload = { title: 'PRIVATE-TITLE', content: '# PRIVATE-PAGE' }, status = 200, both = true, redirected = false, error
 const captured = [], gaps = []
 const target = { fetch(url, init) {
   if (error) return Promise.reject(error)
@@ -29,7 +29,7 @@ const target = { fetch(url, init) {
     publish('create'); publish('headers', { response: { statusCode: status, headers: [] } })
     publish('bodyChunkReceived', { chunk: Buffer.from(JSON.stringify(payload)) }); publish('trailers')
   }
-  return Promise.resolve({ status, ok: status >= 200 && status < 300, json: () => Promise.resolve(payload) })
+  return Promise.resolve({ status, redirected, ok: status >= 200 && status < 300, json: () => Promise.resolve(payload) })
 } }
 const original = target.fetch
 const monitor = createNativeSearchBilling({ now: () => now++, fetchTarget: target,
@@ -56,6 +56,7 @@ try {
   payload = { title: '', content: 'result' }
   for (const code of [201, 204, 302, 400, 402, 404, 429, 500, 504]) { status = code; await call() }
   status = 200
+  both = false; redirected = true; await call(); redirected = false; both = true
   await call('fetch', session, 'https://third-party.test/v1/tools/fetch')
   await target.fetch('https://api.deepseek.com/v1/tools/fetch', options).then(r => r.json())
   payload = { model: 'deepseek-flash', usage: { input_tokens: 100, output_tokens: 20 } }
