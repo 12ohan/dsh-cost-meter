@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { Ledger, sanitizeConfig, splitLedgerApiCost } from '../lib/store.js'
 import { createExchangeRateRefresh, parseExchangeRates } from '../lib/exchange-rate-refresh.js'
 import { displayUsd } from '../lib/exchange-rates.js'
-import { pricingConfigAt } from '../lib/billing-history.js'
+import { pricingConfigAt, recordPricingRevision } from '../lib/billing-history.js'
 import { replaySessionRecords } from '../lib/backfill.js'
 import { costFromSamples } from '../lib/turn-cost.js'
 import { billingStatistics } from '../lib/billing-statistics.js'
@@ -46,6 +46,10 @@ try {
  const sibling = Ledger.load(path)
  ledger.account({ input: 1e6 }, 'model', 'a', now + 50, 'fixture'); sibling.account({ input: 1e6 }, 'model', 'b', now + 60, 'fixture')
  ledger.flush(); sibling.close(); ledger.refresh(); near(ledger.sumDays().costCny, 26.5)
+ recordPricingRevision(ledger.pricingHistory, ledger.config, 'old', '2026-10-15', now, 1, 1)
+ ledger.config = { ...ledger.config, currency: 'EUR', exchangeRate: .8 }
+ const revised = pricingConfigAt(ledger.config, now - 86400000, 'old'); near(revised.fxRates.CNY, 6.5); near(revised.fxRates.EUR, .8)
+ ledger.config = { ...ledger.config, currency: 'CNY', exchangeRate: 6.5 }
  ledger.config = { ...ledger.config, exchangeRateAuto: false }; now += 86400000
  assert.equal(await refresh.refresh(), false)
  refresh.dispose()
