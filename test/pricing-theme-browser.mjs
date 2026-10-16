@@ -1,5 +1,5 @@
-// #258: exercise the real settings selectors with a dark skin over a light host.
-// Chromium exposes native option colors here; this fixture is not a full DSH app.
+// #282: the merged single-field model picker, plus #258's themed controls.
+// Chromium drives the real component; this fixture is not a full DSH app.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
@@ -33,7 +33,8 @@ const initialState = { config: sanitizeConfig({ locale: 'zh' }), today: day, mon
 const code = `
 import React from ${literal(req.resolve('react'))};
 import {createRoot} from ${literal(req.resolve('react-dom/client'))};
-window.__ModuleLoader__={load:mod=>{const value=mod.factory(name=>name==='react'?React:{Tooltip:({children})=>children});if(mod.chunk==='client.pricing.js')window.priceUI=value;else window.costUI=value}};
+import {createPortal} from ${literal(req.resolve('react-dom'))};
+window.__ModuleLoader__={load:mod=>{const value=mod.factory(name=>name==='react'?React:name==='react-dom'?{createPortal}:{Tooltip:({children})=>children});if(mod.chunk==='client.pricing.js')window.priceUI=value;else window.costUI=value}};
 ${client}
 ${readSource('src/pricing/index.js')}
 const {CostSection,parseConfig}=window.costUI.preview;
@@ -47,10 +48,13 @@ window.fixtureReady=true;
 const compiled = await build({ stdin: { contents: code, resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'iife', platform: 'browser' })
 // Token values copied from the published skin source, with provenance pinned.
 // https://github.com/RevolutionLA/dsh-dream-skin/blob/86761e4106874f3c0646c74f95a1a2d252c4b9ce/lib/client.js
-const light = { '--dsw-alias-label-primary': '#25262b', '--dsw-alias-label-secondary': '#737780', '--dsw-alias-label-tertiary': '#858a94', '--dsw-alias-bg-base': '#fff', '--dsw-alias-bg-layer-1': '#f7f8fa', '--dsw-alias-border-l1': '#e5e7eb', '--dsw-alias-button-elevated-fill': '#fff', '--dsw-alias-state-business-primary': '#4d6bfe' }
-const midnight = { '--dsw-alias-label-primary': '#eff0f1', '--dsw-alias-label-secondary': '#c0c1c2', '--dsw-alias-label-tertiary': '#a3a4a5', '--dsw-alias-bg-base': '#0b0b0c', '--dsw-alias-bg-layer-1': '#141415', '--dsw-alias-border-l1': 'rgba(255,255,255,.062)', '--dsw-alias-button-elevated-fill': '#141415', '--dsw-alias-state-business-primary': '#889ef6' }
-const dark = { ...midnight, '--dsw-alias-label-primary': '#ececee', '--dsw-alias-bg-base': '#202022', '--dsw-alias-bg-layer-1': '#29292c' }
-const html = '<!doctype html><html style="color-scheme:light"><head><meta charset="utf-8"><style>body{margin:0;padding:24px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:13px/1.5 system-ui}#root{max-width:900px;margin:auto}</style></head><body><div id="root"></div><select id="host-control"><option>Host control</option><option>Other plugin</option></select><script src="/app.js"></script></body></html>'
+// bg-layer-2 / elevation-panel 取自宿主 ui-theme:浅色下浮层与页面同为白底,靠 elevation 分层。
+const ELEVATION = '0 0 0 .5px rgba(0,0,0,.16), 0 3px 8px 0 rgba(0,0,0,.04), 0 0 16px 0 rgba(0,0,0,.05)'
+const light = { '--dsw-alias-label-primary': '#25262b', '--dsw-alias-label-secondary': '#737780', '--dsw-alias-label-tertiary': '#858a94', '--dsw-alias-bg-base': '#fff', '--dsw-alias-bg-layer-1': '#f7f8fa', '--dsw-alias-bg-layer-2': '#fff', '--dsw-elevation-panel': ELEVATION, '--dsw-alias-border-l1': '#e5e7eb', '--dsw-alias-button-elevated-fill': '#fff', '--dsw-alias-state-business-primary': '#4d6bfe' }
+const midnight = { '--dsw-alias-label-primary': '#eff0f1', '--dsw-alias-label-secondary': '#c0c1c2', '--dsw-alias-label-tertiary': '#a3a4a5', '--dsw-alias-bg-base': '#0b0b0c', '--dsw-alias-bg-layer-1': '#141415', '--dsw-alias-bg-layer-2': '#212123', '--dsw-elevation-panel': ELEVATION, '--dsw-alias-border-l1': 'rgba(255,255,255,.062)', '--dsw-alias-button-elevated-fill': '#141415', '--dsw-alias-state-business-primary': '#889ef6' }
+const dark = { ...midnight, '--dsw-alias-label-primary': '#ececee', '--dsw-alias-bg-base': '#202022', '--dsw-alias-bg-layer-1': '#29292c', '--dsw-alias-bg-layer-2': '#2c2c2e' }
+// 设置页滚动容器会裁剪就地定位的面板;宿主页面在这里用 overflow 复现该裁剪条件。
+const html = '<!doctype html><html style="color-scheme:light"><head><meta charset="utf-8"><style>body{margin:0;padding:24px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:13px/1.5 system-ui}#root{max-width:900px;margin:auto;max-height:520px;overflow:auto}</style></head><body><div id="root"></div><select id="host-control"><option>Host control</option><option>Other plugin</option></select><script src="/app.js"></script></body></html>'
 const server = createServer((request, response) => {
   if (request.url === '/app.js') { response.setHeader('content-type', 'text/javascript'); response.end(compiled.outputFiles[0].contents) }
   else if (request.url === '/') { response.setHeader('content-type', 'text/html; charset=utf-8'); response.end(html) }
@@ -72,12 +76,25 @@ const luminance = color => {
   })
   return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722
 }
+const contrast = (a, b) => {
+  const values = [luminance(a), luminance(b)].sort((x, y) => x - y)
+  return (values[1] + .05) / (values[0] + .05)
+}
+// 悬停底色是半透明的;先按 alpha 合成到面板底色,再算对比度,否则会把 14% 的灰当成实色。
+const rgba = color => { const parts = color.match(/[\d.]+/g).map(Number); return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 } }
+const blend = (front, back) => {
+  const f = rgba(front), b = rgba(back)
+  const mix = (x, y) => Math.round(x * f.a + y * (1 - f.a))
+  return `rgb(${mix(f.r, b.r)}, ${mix(f.g, b.g)}, ${mix(f.b, b.b)})`
+}
 const output = resolve('.tmp-pricing-theme-browser'); mkdirSync(output, { recursive: true })
 try {
   await page.goto(url); await page.waitForFunction(() => window.fixtureReady)
   await page.getByRole('tab', { name: '价格', exact: true }).click()
-  await page.locator('.cm-match-row select').first().waitFor()
-  assert.equal(await page.locator('.cm-match-row select').count(), 2, 'unknown and matched model selectors are both rendered')
+  const fields = page.locator('.cm-match-row [role=combobox]')
+  await fields.first().waitFor()
+  assert.equal(await fields.count(), 2, 'unknown and matched model rows each render one merged field')
+  assert.equal(await page.locator('.cm-match-row select').count(), 0, 'the separate search box and native dropdown are gone')
   for (const [theme, tokens, scheme] of [['midnight-light-host', midnight, 'light'], ['host-dark', dark, 'dark'], ['host-light', light, 'light']]) {
     await page.emulateMedia({ colorScheme: scheme })
     await page.evaluate(({ tokens, scheme }) => {
@@ -85,48 +102,194 @@ try {
       for (const [key, value] of Object.entries(tokens)) document.documentElement.style.setProperty(key, value)
     }, { tokens, scheme })
     await page.mouse.move(0, 0)
-    const colors = await page.locator('select.cm-input').evaluateAll(selects => selects.map(select => ({
-      color: getComputedStyle(select).color, background: getComputedStyle(select).backgroundColor,
-      options: [...select.options].map(option => ({ color: getComputedStyle(option).color, background: getComputedStyle(option).backgroundColor })),
-    })))
-    assert.ok(colors.length >= 4 && colors.every(select => select.options.length > 1), 'pricing choices are present')
-    for (const select of colors) for (const option of select.options) {
-      assert.equal(option.background, select.background, `${theme}: every unhovered native option has the theme background`)
-      assert.equal(option.color, select.color, `${theme}: every unhovered native option has the theme text color`)
-      const values = [luminance(option.color), luminance(option.background)].sort((a, b) => a - b)
-      assert.ok((values[1] + .05) / (values[0] + .05) >= 4.5, `${theme}: option text stays readable`)
+    await fields.first().click()
+    await page.locator('.cm-combo-panel').waitFor()
+    const panel = await page.locator('.cm-combo-panel').evaluate(node => ({
+      parent: node.parentElement.tagName,
+      background: getComputedStyle(node).backgroundColor,
+      shadow: getComputedStyle(node).boxShadow,
+      rect: node.getBoundingClientRect().toJSON(),
+      options: [...node.querySelectorAll('.cm-combo-option')].map(option => ({
+        color: getComputedStyle(option).color, background: getComputedStyle(option).backgroundColor,
+        height: option.getBoundingClientRect().height,
+      })),
+    }))
+    // 面板必须脱离滚动容器(否则被 overflow 裁掉),且完整落在视口内。
+    assert.equal(panel.parent, 'BODY', `${theme}: the open list is portaled out of the scrolling settings container`)
+    assert.ok(panel.rect.top >= 0 && panel.rect.bottom <= 950 && panel.rect.left >= 0 && panel.rect.right <= 1100,
+      `${theme}: the open list stays inside the viewport`)
+    assert.ok(panel.options.length > 1, `${theme}: the open list shows candidates`)
+    // 限高面板里的行不能被压扁:压扁后文字被裁成一条,颜色断言仍会通过,所以这里必须查几何。
+    const heights = panel.options.map(option => option.height)
+    assert.ok(Math.min(...heights) >= 20, `${theme}: every candidate row keeps a readable height (min ${Math.min(...heights)})`)
+    for (const option of panel.options) {
+      assert.ok(contrast(option.color, blend(option.background, panel.background)) >= 4.5, `${theme}: option text stays readable, hovered or not`)
     }
-    const model = page.locator('.cm-match-row select').first()
-    const before = await model.evaluate(select => [...select.options].map(option => getComputedStyle(option).backgroundColor))
-    await model.hover(); await page.mouse.move(0, 0)
-    assert.deepEqual(await model.evaluate(select => [...select.options].map(option => getComputedStyle(option).backgroundColor)), before, 'leaving hover preserves readable option colors')
-    assert.equal(await page.locator('#host-control option').first().evaluate(option => getComputedStyle(option).backgroundColor), 'rgba(0, 0, 0, 0)', 'the fix leaves host and other plugins outside cm-input untouched')
-    if (theme === 'midnight-light-host') {
-      await model.click()
-      await page.screenshot({ path: join(output, 'midnight-popup.png') })
-      await page.keyboard.press('Escape')
-    }
+    // 浅色主题下浮层与页面同为白底,必须靠宿主的 elevation 分层,否则看起来是「平贴」的。
+    // 只断言「不是 none」是恒真的(CSS 自带兜底阴影),所以这里断言阴影确实用了宿主 token 的值:
+    // 把 token 换成哨兵值,面板阴影必须跟着变。
+    assert.notEqual(panel.shadow, 'none', `${theme}: the open list paints a shadow`)
+    const sentinel = await page.evaluate(() => {
+      const previous = document.documentElement.style.getPropertyValue('--dsw-elevation-panel')
+      document.documentElement.style.setProperty('--dsw-elevation-panel', 'rgb(1, 2, 3) 0px 0px 0px 9px')
+      const shadow = getComputedStyle(document.querySelector('.cm-combo-panel')).boxShadow
+      if (previous) document.documentElement.style.setProperty('--dsw-elevation-panel', previous)
+      else document.documentElement.style.removeProperty('--dsw-elevation-panel')
+      return shadow
+    })
+    assert.ok(sentinel.includes('rgb(1, 2, 3)') && sentinel.includes('9px'),
+      `${theme}: the panel shadow actually follows the host elevation token (got ${sentinel})`)
+    if (theme === 'midnight-light-host') await page.screenshot({ path: join(output, 'open-light-host.png'), fullPage: true })
+    if (theme === 'host-dark') await page.screenshot({ path: join(output, 'open-dark.png'), fullPage: true })
+    await page.keyboard.press('Escape')
+    await page.locator('.cm-combo-panel').waitFor({ state: 'detached' })
     await page.screenshot({ path: join(output, theme + '.png'), fullPage: true })
-    checks.push({ theme, selectors: colors.length, options: colors.reduce((sum, select) => sum + select.options.length, 0) })
+    checks.push({ theme, panelOptions: panel.options.length, portaled: panel.parent === 'BODY' })
   }
-  const model = page.locator('.cm-match-row select').first()
-  const search = page.locator('.cm-match-row input[type=search]').first()
-  await search.fill('opencode gpt')
-  const filtered = await model.locator('option').allTextContents()
-  assert.ok(filtered.length > 1 && filtered.slice(1).every(label => /opencode/i.test(label) && /gpt/i.test(label)))
-  assert.equal(await page.evaluate(() => window.patches.length), 0, 'searching never saves a mapping')
-  await search.fill('no-model-matches-this-query')
-  await page.getByRole('status').filter({ hasText: '没有匹配的模型' }).waitFor()
-  assert.equal(await model.inputValue(), '', 'empty results do not change the selected mapping')
-  await search.press('Escape')
-  assert.equal(await search.inputValue(), '')
-  await model.selectOption('__local__')
+  // 小窗口:面板不得被画到视口外(120px 下限曾把 top 顶成负数 / 底边溢出)。
+  // 950 高的固定视口永远碰不到这条,所以必须单独缩窗口验证。
+  for (const height of [320, 200, 140]) {
+    await page.setViewportSize({ width: 1100, height })
+    await page.mouse.move(0, 0)
+    await fields.first().click()
+    await page.locator('.cm-combo-panel').waitFor()
+    const small = await page.locator('.cm-combo-panel').evaluate(node => node.getBoundingClientRect().toJSON())
+    assert.ok(small.top >= 0 && small.bottom <= height + 1, `${height}px viewport: the open list stays inside the viewport (top ${Math.round(small.top)}, bottom ${Math.round(small.bottom)})`)
+    assert.ok(small.height > 0, `${height}px viewport: the open list keeps a usable height (${Math.round(small.height)})`)
+    await page.keyboard.press('Escape')
+    await page.locator('.cm-combo-panel').waitFor({ state: 'detached' })
+  }
+  await page.setViewportSize({ width: 1100, height: 950 })
+  const field = fields.first()
+  const options = page.locator('.cm-combo-panel .cm-combo-option')
+  const note = page.locator('.cm-combo-note')
+  // 负向断言必须等过自动保存的 120ms 防抖窗口:否则晚到的写入会在断言之后才落地,
+  // 「没有写入」这条永远是绿的。settle() 先等窗口过去,再读计数。
+  const settle = async () => { await page.waitForTimeout(200); return page.evaluate(() => window.patches.length) }
+  // 打字实时筛选;未选中的空值字段不写入任何映射。
+  await field.click()
+  await field.fill('opencode gpt')
+  await options.first().waitFor()
+  const filtered = await options.allTextContents()
+  assert.ok(filtered.length > 1 && filtered.every(label => /opencode/i.test(label) && /gpt/i.test(label)), 'typing filters the list by every keyword')
+  assert.equal(await settle(), 0, 'searching never saves a mapping, even after the autosave debounce')
+  // 只打了筛选词、还没点选时,清空按钮必须可用(原生 × 已被隐藏)。
+  await page.locator('.cm-match-row .cm-combo-clear').first().click()
+  assert.equal(await field.inputValue(), '', 'the clear button also clears a typed query')
+  await page.locator('.cm-combo-panel').waitFor()
+  assert.ok(await options.count() > 100, 'clearing the query keeps the list open and restores every candidate')
+  assert.equal(await settle(), 0, 'clearing a typed query never saves a mapping, even after the autosave debounce')
+  await field.fill('no-model-matches-this-query')
+  await note.filter({ hasText: '没有匹配的模型' }).waitFor()
+  assert.equal(await page.locator('.cm-combo-panel .cm-combo-option').count(), 0, 'an unmatched query lists no candidates')
+  assert.equal(await note.count(), 1, 'the no-match feedback is stated exactly once')
+  assert.equal(await settle(), 0, 'an empty result set never saves a mapping, even after the autosave debounce')
+  await field.press('Escape')
+  await page.locator('.cm-combo-panel').waitFor({ state: 'detached' })
+  assert.equal(await field.inputValue(), '', 'Escape closes the list and clears the typed query')
+  // Escape 必须真的关掉面板:type=search 的原生输入框会自己清空并派发 input 事件,
+  // 不 preventDefault 就会被随后的 onChange 重新打开(实测连按三次仍是打开态)。
+  await field.click()
+  await field.fill('本地')
+  await options.first().waitFor()
+  await field.press('Escape')
+  await page.locator('.cm-combo-panel').waitFor({ state: 'detached' })
+  assert.equal(await page.locator('.cm-combo-panel').count(), 0, 'Escape leaves the list closed, not reopened')
+  // 键盘操作:↓ 打开并移动,Enter 选中。
+  await field.click()
+  await field.fill('本地')
+  await options.first().waitFor()
+  await field.press('ArrowDown')
+  await field.press('Enter')
   await page.waitForFunction(() => window.patches.length === 1)
-  assert.deepEqual(await page.evaluate(() => window.patches[0]), { priceOverrides: { 'fixture:unknown': '__local__' } }, 'the actual dropdown still saves only the chosen model override')
-  await search.fill('claude')
-  assert.equal(await model.inputValue(), '__local__', 'filtering retains an existing selection even when it does not match')
-  await search.press('Escape')
-  await model.selectOption('__custom__')
+  assert.deepEqual(await page.evaluate(() => window.patches[0]), { priceOverrides: { 'fixture:unknown': '__local__' } }, 'choosing from the merged field saves only the chosen model override')
+  assert.equal(await field.inputValue(), '本地模型（零消耗）', 'the field shows the chosen label after the list closes')
+  await page.locator('.cm-combo-panel').waitFor({ state: 'detached' })
+  // 输入法选词时按 Enter 不能当成选中模型(中文/日文输入法都会踩)。
+  // 直接构造 isComposing:true 的 keydown(合成事件可带该标志,实测构造时传入即生效),
+  // 并挑一个与当前值不同的候选,否则同值守卫会让断言假通过。
+  await field.click()
+  await field.fill('gpt-6-astra')
+  await options.first().waitFor()
+  const current = '本地模型（零消耗）'
+  const candidates = await options.allTextContents()
+  const otherIndex = candidates.findIndex(label => label !== current)
+  assert.ok(otherIndex > 0, 'the query offers a candidate other than the current choice')
+  await page.locator('.cm-combo-option').nth(otherIndex).hover()
+  const imeTarget = candidates[otherIndex]
+  await field.locator('xpath=.').evaluate(node => {
+    node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, isComposing: true }))
+  })
+  // 等过防抖窗口再断言,确保「没选中」不是因为还没来得及写。
+  assert.equal(await settle(), 1, `Enter during IME composition never picks a model (would have picked ${imeTarget})`)
+  assert.equal(await field.inputValue(), 'gpt-6-astra', 'the typed query stays while the IME is composing')
+  await field.press('Escape')
+  await page.locator('.cm-combo-panel').waitFor({ state: 'detached' })
+  // 选中后直接打字:输入框里显示的是已选标签,新字符不能被拼成「标签+字」的查询词。
+  await field.click()
+  await page.locator('.cm-combo-panel').waitFor()
+  await field.press('Escape')
+  await page.locator('.cm-combo-panel').waitFor({ state: 'detached' })
+  await field.click()
+  await field.type('claude')
+  const typed = await field.inputValue()
+  assert.equal(typed, 'claude', 'typing right after a choice drops the selected label instead of appending to it')
+  assert.ok(await options.count() > 1, 'the typed query still matches candidates')
+  await field.press('Escape')
+  await page.locator('.cm-combo-panel').waitFor({ state: 'detached' })
+  // 选中后重新打开:显示全部候选,已选项标记为当前,且高亮行滚入可视区。
+  await field.click()
+  await page.locator('.cm-combo-panel').waitFor()
+  assert.ok(await options.count() > 100, 'reopening lists every candidate, not only the previous query')
+  assert.equal(await page.locator('.cm-combo-option[aria-selected=true]').innerText(), '本地模型（零消耗）', 'the current choice is marked in the list')
+  // 已选项排在很后面时,打开后必须滚动到它,否则用户看不到自己选的是哪一行。
+  await page.locator('.cm-match-row [role=combobox]').nth(1).click()
+  await page.locator('.cm-combo-panel').waitFor()
+  // 滚动由 useLayoutEffect 完成,用条件等待而不是固定 sleep。
+  await page.waitForFunction(() => {
+    const list = document.querySelector('.cm-combo-list')
+    const active = list?.querySelector('[data-active="true"]')
+    if (!list || !active) return false
+    const outer = list.getBoundingClientRect(), inner = active.getBoundingClientRect()
+    return inner.top >= outer.top && inner.bottom <= outer.bottom
+  }, null, { timeout: 5000 })
+  const scrolled = await page.locator('.cm-combo-list').evaluate(list => {
+    const active = list.querySelector('[data-active="true"]')
+    return { scrollTop: list.scrollTop, visible: active ? active.getBoundingClientRect().top >= list.getBoundingClientRect().top && active.getBoundingClientRect().bottom <= list.getBoundingClientRect().bottom : null }
+  })
+  assert.ok(scrolled.visible === true, `the highlighted row is scrolled into view (scrollTop ${scrolled.scrollTop})`)
+  await page.keyboard.press('Escape')
+  await page.locator('.cm-combo-panel').waitFor({ state: 'detached' })
+  // 已选中后打一个不匹配的筛选词:已选项仍留在列表里(旧版原生下拉同样始终显示当前值)。
+  await field.click()
+  await field.fill('claude')
+  assert.equal(await page.locator('.cm-combo-option[aria-selected=true]').first().innerText(), '本地模型（零消耗）', 'the current choice survives a non-matching query and stays marked')
+  // 重新点当前已选项不产生第二次写入(旧原生 select 同值不触发 change)。
+  const before = await page.evaluate(() => window.patches.length)
+  await page.locator('.cm-combo-option[aria-selected=true]').first().click()
+  assert.equal(await settle(), before, 're-picking the current value does not save again, even after the autosave debounce')
+  assert.equal(await field.inputValue(), '本地模型（零消耗）', 'the field keeps the chosen label')
+  // 清空按钮把该行还原为「未手动指定」。
+  await page.locator('.cm-match-row .cm-combo-clear').first().click()
+  await page.waitForFunction(count => window.patches.length === count + 1, before)
+  assert.deepEqual(await page.evaluate(count => window.patches[count], before), { priceOverrides: {} }, 'clearing removes the manual override')
+  assert.equal(await field.inputValue(), '', 'the field is empty again after clearing')
+  assert.equal(await page.locator('#host-control option').first().evaluate(option => getComputedStyle(option).backgroundColor), 'rgba(0, 0, 0, 0)', 'the change leaves host and other plugins untouched')
+  // 上游 v1.8.30 的「自定义价格」路径:原来用 model.selectOption('__custom__'),
+  // 单框版改为在候选面板里点同名选项。
+  const pickOption = async label => {
+    await field.click()
+    await page.locator('.cm-combo-panel').waitFor()
+    await field.fill(label)
+    await page.locator('.cm-combo-option').first().waitFor()
+    await page.locator('.cm-combo-option').filter({ hasText: label }).first().click()
+    await page.locator('.cm-combo-panel').waitFor({ state: 'detached' })
+  }
+  const clearChoice = async () => {
+    await page.locator('.cm-match-row .cm-combo-clear').first().click()
+    await page.waitForTimeout(200)
+  }
+  await pickOption('自定义价格（此渠道模型）')
   const custom = page.getByRole('group', { name: /fixture:unknown.*自定义价格/ })
   await custom.waitFor()
   const inputPrice = custom.getByRole('textbox', { name: /输入 · 未命中缓存/ })
@@ -145,18 +308,21 @@ try {
   assert.equal(await page.evaluate(() => window.patches.length), countBeforeInvalid, 'invalid multiplication never saves')
   await inputPrice.press('Escape')
   await custom.getByRole('checkbox', { name: '分别设置倍率' }).uncheck()
-  await model.selectOption('')
-  await page.waitForTimeout(180)
-  await model.selectOption('__custom__')
+  // 切回自动匹配再切回自定义:已输入的报价保留。
+  await clearChoice()
+  await pickOption('自定义价格（此渠道模型）')
   assert.equal(await inputPrice.inputValue(), '2 × 0.8', 'switching to automatic matching and back retains entered quotes')
   for (const width of [390, 1100]) {
     await page.setViewportSize({ width, height: 1000 })
     const bounds = await custom.evaluate(node => ({ width: node.getBoundingClientRect().width, scroll: node.scrollWidth, client: node.clientWidth,
       fields: [...node.querySelectorAll('.cm-custom-grid:not(.cm-custom-more .cm-custom-grid) input')].map(input => input.getBoundingClientRect().width) }))
     assert.ok(bounds.scroll <= bounds.client + 1, 'custom editor has no internal horizontal overflow')
-    assert.ok(bounds.fields.length >= 3 && bounds.fields.every(value => value >= 80), 'custom price fields remain readable at '+width)
+    assert.ok(bounds.fields.length >= 3 && bounds.fields.every(value => value >= 80), 'custom price fields remain readable at ' + width)
   }
+  await page.setViewportSize({ width: 1100, height: 950 })
   await page.screenshot({ path: join(output, 'custom-channel-price.png'), fullPage: true })
+  // 收尾:回到「未手动指定」,让后面的重算用例从干净状态开始。
+  await clearChoice()
   const reprice = page.getByRole('button', { name: '按当前价格重算历史', exact: true })
   await reprice.click()
   await page.getByRole('alert').filter({ hasText: '这会改变历史费用' }).waitFor()
@@ -175,7 +341,7 @@ try {
   console.log(JSON.stringify({ checks, selectionSaved: true, browserErrors: errors.length, externalRequests: external.length }))
 } catch (error) {
   console.error(await page.locator('.cm-repricing').evaluateAll(nodes => nodes.map(node => node.outerHTML)))
-  console.error(JSON.stringify({ browserErrors: errors, styles: await page.evaluate(() => [...document.styleSheets].flatMap(sheet => [...sheet.cssRules].filter(rule => rule.selectorText?.includes('option')).map(rule => rule.cssText))), sample: await page.locator('select.cm-input').evaluateAll(selects => selects.map(select => ({html: select.outerHTML.slice(0, 180), background: getComputedStyle(select).backgroundColor, options: [...select.options].slice(0,2).map(option=>({html:option.outerHTML,color:getComputedStyle(option).color,background:getComputedStyle(option).backgroundColor}))}))) }))
+  console.error(JSON.stringify({ browserErrors: errors, panel: await page.locator('.cm-combo-panel').evaluateAll(nodes => nodes.map(node => node.outerHTML.slice(0, 400))), sample: await page.locator('.cm-match-row [role=combobox]').evaluateAll(nodes => nodes.map(node => ({ html: node.outerHTML.slice(0, 200), value: node.value }))) }))
   throw error
 } finally {
   await browser.close(); await new Promise(resolve => server.close(resolve))
