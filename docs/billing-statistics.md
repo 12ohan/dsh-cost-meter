@@ -13,6 +13,8 @@ The conversation **Cost details** view defaults to the treemap and offers four l
 
 Tool categories attribute the model-call cost of the associated step; they do not invent a separate execution price for a file read or command. Native search charges remain separate recorded billing events. Shares always use the whole conversation's selected cost basis.
 
+Web fetching has its own activity category. Official standalone Search/Fetch request fees use request counts and per-request rates, with no additional model tokens. Local HTTP fetching is not assigned an official API fee. See [billing scope](web-request-fees.md#english).
+
 The host prepares recently viewed conversations in the background at startup and refreshes them after completed turns. Conversation entry buttons also prefetch usage totals and fee categories. Calculated fees and price-independent usage metadata survive restarts; saved results appear first while changed logs refresh silently. View switches, sorting and paging share one calculation, and categories can display before call totals finish loading. Changes to price rules, plan ownership or subagent inclusion recalculate from the metadata cache; changed logs are reread. Caches are bounded and contain no message bodies, tool arguments, results or credentials.
 
 The step-cost share distribution groups many small steps into four ranges: below 0.1%, 0.1–1%, 1–5% and at least 5% of conversation costs. Each range shows step count and cumulative cost. Zero-cost and unpriced usage stay separate. Step details default to a global highest-cost-first ranking, with a trajectory-order option. Twenty rows are shown initially and more expand in place. Clicking a step opens a detail dialog. Category and agent dialogs list their steps by cost and show the selected call beside the list. Only that call’s recorded content is loaded; the close button remains visible while scrolling, and Escape returns to the underlying view. The individual-call section uses a highest-cost ranking with bars scaled to its largest call, alongside each amount and share of the whole conversation; remaining calls are summarized as text.
@@ -61,6 +63,8 @@ The statistics screen uses DSH's package-local asynchronous module loader. Since
 - **步骤热力图**：每格对应一个计费步骤，零费用和未定价步骤也保留。颜色区分类别，深浅表示相对费用；支持滚动、类别与代理筛选、金额或轨迹排序，以及按序号定位。点击格子弹出该步 Token、单价、金额及已记录的输入、回复与工具信息。只读取当前区域所需的精简元数据，避免同时渲染数千行表格。
 
 工具分类统计的是关联步骤的模型调用费用，不为读取文件、执行命令另造单价。原生搜索独立计费记录继续单独计算。占比始终以当前口径下的整段对话费用为分母。
+
+网页抓取独立分类。官方独立 Search／Fetch API 的次数费显示次数和每次单价，不增加模型 Token；本地 HTTP 抓取不套用官方请求费。[计费范围](web-request-fees.md#中文)
 
 「单步费用占比分布」把小费用归到低于 0.1%、0.1%–1%、1%–5% 和不低于 5% 四个区间，显示步数及累计金额。零费用和未定价记录单列。逐步费用明细默认按整段对话的金额从高到低排列，也可切回轨迹顺序；先显示 20 行，更多原位展开。点击步骤打开详情弹窗；点击类别或代理时，弹窗按金额排列其步骤，并在旁边显示选中调用。只读取选中调用的正文，关闭按钮始终可见，按 Escape 返回原视图。逐次调用区域用高额调用排名代替圆环图，横条相对最高单笔金额缩放，同时显示金额和占整段对话的比例；其余调用仅作文字合计。
 
