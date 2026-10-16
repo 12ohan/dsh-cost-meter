@@ -73,6 +73,8 @@ jobs:
           node test/model-stats-browser.mjs
           node test/factory-quota-browser.mjs
           node test/display-settings-browser.mjs
+          git fetch --depth=1 origin tag v1.8.29
+          node test/idle-performance-browser.mjs
       - name: Save context regression browser evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -81,6 +83,7 @@ jobs:
           path: |
             .tmp-context-regression-browser/*.png
             .tmp-display-review/*
+            .tmp-idle-performance/result.json
             .tmp-context-regression-browser/report.json
             .tmp-pricing-theme-browser/*.png
             .tmp-pricing-theme-browser/report.json

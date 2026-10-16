@@ -1464,11 +1464,14 @@
       const config = state?.config
       const [snapshot, setSnapshot] = useState(null)
       useProjectionRefresh(props, projection)
+      // Hosts may return a fresh projection object on every render (#284).
+      // Subscribe to billing values, never to that object's identity.
+      const projectionRevision = ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'calls', 'cost', 'apiCost'].map(key => projection?.[key] ?? '').join(':')
       useEffect(() => {
         if (!props.sessionId || !props.api?.getSessionCost) return
         let active = true, pending = false
         const refresh = async () => {
-          if (pending) return
+          if (pending || (typeof document !== 'undefined' && document.hidden)) return
           pending = true
           try {
             const value = await props.api.getSessionCost(props.sessionId)
@@ -1482,8 +1485,10 @@
         }
         void refresh()
         const timer = config?.includeSubagentCost === true ? setInterval(refresh, 10000) : null
-        return () => { active = false; if (timer !== null) clearInterval(timer) }
-      }, [props.sessionId, state?.meta?.now, projection, config?.includeSubagentCost])
+        const onVisible = () => { if (!document.hidden) void refresh() }
+        if (typeof document !== 'undefined') document.addEventListener?.('visibilitychange', onVisible)
+        return () => { active = false; if (timer !== null) clearInterval(timer); if (typeof document !== 'undefined') document.removeEventListener?.('visibilitychange', onVisible) }
+      }, [props.sessionId, state?.meta?.now, projectionRevision, config?.includeSubagentCost])
       const current = snapshot && snapshot.id === props.sessionId && snapshot.include === (config?.includeSubagentCost === true) ? snapshot : null
       const saved = current?.value
       return { usage: mergeSessionUsage(projection, saved, config?.includeSubagentCost === true, config), config,

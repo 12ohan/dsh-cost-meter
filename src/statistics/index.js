@@ -379,10 +379,12 @@ window.__ModuleLoader__.load({
             const scope = Original ? container.current : container.current?.closest('[data-conversation-session]')
             if (!scope || (!Original && scope.dataset.conversationSession !== props.sessionId) || typeof MutationObserver !== 'function') return
             const node = document.createElement('div'); node.className = 'cm-plan-host'; node.dataset.cmContextCosts = ''
+            let currentCard = null
             const sync = () => {
+              if (node.isConnected && currentCard?.matches('[data-lc-current]') && scope.contains(currentCard)) return
               const card = Original ? scope.querySelector('[data-lc-current]') : [...scope.querySelectorAll('[data-slot="conversation.view"] [data-lc-current]')].find(card => card.closest('[data-conversation-session]') === scope)
               if (!card) { node.remove(); setTarget(null); return }
-              if (node.parentElement !== card) { card.appendChild(node); setTarget(node) }
+              if (node.parentElement !== card) { currentCard = card; card.appendChild(node); setTarget(node) }
             }
             const observer = new MutationObserver(sync)
             observer.observe(scope, { childList: true, subtree: true }); sync()
@@ -496,14 +498,14 @@ window.__ModuleLoader__.load({
       disposers.push(store.subscribe(reconcile))
       if (supported) for (const [name] of contextTargets) disposers.push(slots.subscribe(name, () => void check()))
       const visible = () => { if (!document.hidden) void check(true) }
-      document.addEventListener('visibilitychange', visible)
+      document.addEventListener('visibilitychange', onVisibility)
       const storage = event => { if (event.key === introKey && event.newValue === '1' && !shown) { shown = true; emit({ prompt: false }); reconcile() } }
       window.addEventListener('storage', storage)
       void check(); reconcile()
       const dismiss = () => choose(state.manual ? store.getSnapshot().state?.config?.contextCostsEnabled === true : false, true)
       return { getSnapshot: () => state, subscribe: fn => { listeners.add(fn); return () => listeners.delete(fn) }, choose, dismiss, opened,
         preview: () => emit({ prompt: true, manual: true }), refresh: () => void check(true),
-        dispose: () => { active = false; ++checkId; for (const dispose of disposers) dispose(); bridge?.(); listeners.clear(); document.removeEventListener('visibilitychange', visible); window.removeEventListener('storage', storage) } }
+        dispose: () => { active = false; ++checkId; for (const dispose of disposers) dispose(); bridge?.(); listeners.clear(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('storage', storage) } }
     }
 
     const introCss = `
@@ -546,9 +548,11 @@ window.__ModuleLoader__.load({
           if (opened || document.hidden || [...document.querySelectorAll('dialog[open],[aria-modal="true"]')].some(other => other !== node && other.getClientRects().length)) return
           try { previous = document.activeElement; node.showModal(); node.querySelector('button')?.focus(); opened = true } catch {}
         }
-        show()
-        const timer = setInterval(show, 500)
-        return () => { clearInterval(timer); if (node.open) node.close(); if (opened && previous?.isConnected) previous.focus?.({ preventScroll: true }) }
+        let timer
+        const attempt = () => { show(); if (!opened && !document.hidden) timer = setTimeout(attempt, 1000) }
+        const onVisibility = () => { clearTimeout(timer); if (!document.hidden && !opened) attempt() }
+        attempt(); document.addEventListener('visibilitychange', onVisibility)
+        return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', onVisibility); if (node.open) node.close(); if (opened && previous?.isConnected) previous.focus?.({ preventScroll: true }) }
       }, [id, !!visible])
       if (!visible) return null
       return el('dialog', { ref, className: 'cm-billion-notice', 'aria-labelledby': 'cm-billion-title', 'aria-describedby': 'cm-billion-description',
@@ -579,9 +583,11 @@ window.__ModuleLoader__.load({
           if (!state.manual && [...document.querySelectorAll('dialog[open],[role="dialog"],[aria-modal="true"],.lc-modal-backdrop')].some(node => node !== dialog && node.getClientRects().length)) return
           try { previousFocus = document.activeElement; dialog.showModal(); opened = true; manager.opened() } catch { /* another UI transition: retry while this one prompt is pending */ }
         }
-        show()
-        const timer = setInterval(show, 1000)
-        return () => { active = false; clearInterval(timer); if (dialog.open) dialog.close(); if (opened && previousFocus?.isConnected) previousFocus.focus?.({ preventScroll: true }) }
+        let timer
+        const attempt = () => { show(); if (!opened && !document.hidden) timer = setTimeout(attempt, 1000) }
+        const onVisibility = () => { clearTimeout(timer); if (!document.hidden && !opened) attempt() }
+        attempt(); document.addEventListener('visibilitychange', onVisibility)
+        return () => { active = false; clearTimeout(timer); document.removeEventListener('visibilitychange', onVisibility); if (dialog.open) dialog.close(); if (opened && previousFocus?.isConnected) previousFocus.focus?.({ preventScroll: true }) }
       }, [state.prompt, state.manual, manager])
       if (!state.prompt) return null
       return el('dialog', { ref, className: 'cm-context-intro', 'aria-labelledby': 'cm-context-intro-title', 'aria-describedby': 'cm-context-intro-description',

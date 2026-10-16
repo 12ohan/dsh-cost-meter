@@ -316,7 +316,7 @@ window.__ModuleLoader__.load({
       '.cm-bbox.clickable:hover{border-color:var(--dsw-alias-state-business-primary)}',
       '.cm-bbox.clickable:focus-visible,.cm-foot.clickable:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:1px}',
       '@keyframes cm-click-refresh-pulse{0%,100%{opacity:.55}50%{opacity:1}}',
-      '.cm-bbox.clickable.busy,.cm-foot.clickable.busy{animation:cm-click-refresh-pulse 1.1s ease-in-out infinite}',
+      '.cm-bbox.clickable.busy,.cm-foot.clickable.busy{animation:cm-click-refresh-pulse 1.1s ease-in-out 2;cursor:progress}',
       '.cm-mm{padding:8px 10px;gap:4px}',
       '.cm-mm-title{font-size:12px;font-weight:600;color:var(--dsw-alias-label-primary)}',
       '.cm-mm-reset{font-size:11px;color:var(--dsw-alias-label-tertiary);grid-column:1/-1}',
