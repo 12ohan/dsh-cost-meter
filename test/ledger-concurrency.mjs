@@ -19,10 +19,18 @@ if (process.argv[2] === '--worker') {
   } else {
     // Every child reads the same starting snapshot before the parent releases it.
     process.send('ready')
-    process.once('message', () => {
+    process.once('message', async () => {
       for (let i = 0; i < 6; i++) call(ledger, `${process.pid}-${i}`)
       call(ledger, 'shared-session')
       call(ledger, undefined)
+      // A busy lock retains pending writes for retry. Let the real flush path
+      // drain them before terminating this fixture process, including on slow
+      // Windows runners. All eight writers and the exact totals stay asserted.
+      const deadline = Date.now() + 30000
+      while (ledger.pendingWrite && Date.now() < deadline) {
+        ledger.flush()
+        if (ledger.pendingWrite) await new Promise(resolve => setTimeout(resolve, 25))
+      }
       ledger.close()
       process.exit(ledger.pendingWrite ? 1 : 0)
     })

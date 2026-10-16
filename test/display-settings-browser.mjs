@@ -54,6 +54,9 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
 const url = `http://127.0.0.1:${server.address().port}/`
 const browser = await chromium.launch({ executablePath, headless: true })
 const page = await browser.newPage({ viewport: { width: 1100, height: 1000 } })
+// Both independently mounted sidebars must render at the same instant. Keep
+// Date fixed across a minute boundary while leaving autosave/animation timers live.
+await page.clock.setFixedTime(new Date('2026-10-16T04:30:00Z'))
 page.setDefaultTimeout(15000)
 const errors = [], external = [], previewQueries = []
 page.on('pageerror', error => errors.push(String(error)))

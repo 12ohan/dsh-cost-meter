@@ -10,13 +10,13 @@
 
 本会话费用 · 当日费用 · OpenCode Go 订阅额度显示 · 预算与已用百分比 · 官方账户余额 · 自定义 Provider 余额查询(可配任意 HTTP 端点) · 余额三段进度条 · 历史记录 · 峰谷计价时段显示(UTC 01:00–04:00、06:00–10:00 为峰时段;周末与中国法定假日全天按谷价,分别标注) · 峰/谷切换前弹窗与系统通知提醒(位置/提前量/提醒类型可配) · 官方价格一键同步 · 类 Codex Token 用量热图 · 多厂商多模型价格计费(内置 170+ 模型 ID 价格目录与自动匹配) · 主流 Coding Plan 额度查询与显示(Anthropic / Z.ai / MiniMax / Kimi / OpenRouter / SiliconFlow / CommandCode / SCNet / 火山方舟 / 千问 / 小米 MiMo 十一家,含 Volcano Ark AK/SK 签名与 MiMo 控制台 Cookie 查询) · Plan/API 双轨计费(订阅额度与按量金额分离统计,每 1% 额度与满窗的 token/等值金额估算及日/周/月曲线) · 输入框上方额度横条(预算/Go/Coding Plan 用量一条横排显示,可开关)
 
-[![version](https://img.shields.io/badge/version-1.8.30-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
+[![version](https://img.shields.io/badge/version-1.8.31-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
 
-**v1.8.30** 修复空闲、打字时重复读取会话费用的问题；明细按需计算，保留缓存与悬停预加载。
+**v1.8.31（待发布）** 重新整理价格设置：模型定价、参考价格表、同步与规则分区展示，支持渠道模型搜索，单价、倍率与实际价格更清晰。
 
 桌面端用户请按 [Desktop 安装说明](docs/install-troubleshooting.md#desktop-安装与更新)，使用应用自带的 CLI 和 `desktop` Profile。
 
-更新说明：[v1.8.30 空闲与输入性能修复](docs/update-notes-1.8.30.md#中文)。更新后完全重启 DSH。
+更新说明：[v1.8.31 价格设置优化](docs/update-notes-1.8.31.md#中文)。更新后完全重启 DSH。
 
 启动报 **Ledger is busy** 且费用卡片消失时，参见[账本锁恢复说明](docs/ledger-lock-recovery.md#简体中文)。
 

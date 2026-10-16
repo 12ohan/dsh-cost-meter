@@ -35,13 +35,15 @@ const source = readdirSync('src/client').filter(name => name.endsWith('.js')).so
 const code = `
 import React from ${literal(req.resolve('react'))};
 import {createRoot} from ${literal(req.resolve('react-dom/client'))};
-window.__ModuleLoader__={load:mod=>window.costUI=mod.factory(name=>name==='react'?React:{Tooltip:({children})=>children})};
+window.__ModuleLoader__={load:mod=>{const value=mod.factory(name=>name==='react'?React:{Tooltip:({children})=>children});if(mod.chunk==='client.pricing.js')window.priceUI=value;else window.costUI=value}};
 ${source};
+${readFileSync('src/pricing/index.js', 'utf8')};
 (async()=>{
   const {CostSection,parseConfig}=window.costUI.preview;
   const state=${literal(state)}; state.config=parseConfig(await window.readSavedConfig(),'config');
   window.savedCount=0;
-  const api={loadOpenRouter:async()=>()=>null, updateConfig:async patch=>{
+  const pricing=window.priceUI.mount({effect:fn=>fn(),get:key=>key==='remote'?{$mount:async()=>()=>{}}:{}});
+  const api={loadPricing:()=>pricing,loadOpenRouter:async()=>()=>null, updateConfig:async patch=>{
     await window.saveConfig(patch);window.savedCount++;
   }};
   createRoot(document.getElementById('root')).render(React.createElement(CostSection,{useCost:()=>({state,status:'ready'}),api}));
@@ -76,8 +78,9 @@ const card = name => page.locator('.cm-price-card').filter({ has: page.locator('
 const open = async (english = false) => {
   await page.goto(url); await page.waitForFunction(() => window.fixtureReady)
   await page.getByRole('tab', { name: english ? 'Pricing' : '价格', exact: true }).click()
-  await page.getByRole('button', { name: english ? 'Price table (USD / 1M tokens)' : '价格表(美元 / 1M tokens)', exact: true }).click()
+  await page.getByRole('tab', { name: english ? 'Price tables' : '参考价格表', exact: true }).click()
   await page.locator('.cm-vendor-toggle').filter({ hasText: 'fixture' }).click()
+  await page.getByRole('button', { name: english ? 'cache-model · Edit price' : 'cache-model · 编辑价格', exact: true }).click()
   await card('cache-model').getByRole('textbox', { name: english ? 'USD · Cache write' : 'USD · 缓存写入', exact: true }).waitFor()
 }
 const edit = async (control, value) => {
@@ -109,7 +112,7 @@ try {
   assert.equal(patches.length, count, 'negative rates never reach auto-save')
   await edit(usd, '5.125')
   await open(); assert.equal(await usd.inputValue(), '5.125', 'saved cache-write price survives reopening')
-  await page.locator('.cm-vendor-toggle').filter({ hasText: 'DeepSeek' }).click()
+  await page.getByRole('button', { name: 'cache-deepseek · 编辑价格', exact: true }).click()
   const ds = card('cache-deepseek')
   for (const [row, rate] of [[1, '1.25'], [2, '0'], [3, '2.5']]) {
     const control = ds.locator('.cm-price-row').nth(row).getByRole('textbox').nth(2)
@@ -124,6 +127,7 @@ try {
   assert.equal(Object.hasOwn(saved.prices.models['cache-deepseek'].offPeak, 'cacheWrite'), false)
   assert.deepEqual(saved.prices.models['cache-deepseek'].rateHistory, history)
   // The same card is also used by the default model and by directly shown models.
+  await page.getByRole('button', { name: 'default(未匹配模型时回退) · 编辑价格', exact: true }).click()
   const fallback = page.locator('.cm-price-card').filter({ hasText: '默认回退' })
   await edit(fallback.locator('.cm-price-row').nth(1).getByRole('textbox').nth(2), '0.8')
   assert.equal(saved.prices.default.cacheWrite, .8)
@@ -131,6 +135,7 @@ try {
   assert.equal(Object.hasOwn(saved.prices.default, 'cacheWrite'), false)
   await edit(fallback.locator('.cm-price-row').nth(2).getByRole('textbox').nth(2), '0.9')
   assert.deepEqual(saved.prices.default.offPeak, { ...tier, cacheWrite: .9 }, 'adding a cache-write tier preserves the other base rates')
+  await page.getByRole('button', { name: 'cache-model · 编辑价格', exact: true }).click()
   await page.locator('.cm-vendor-toggle').filter({ hasText: 'fixture' }).click()
   await page.locator('.cm-vendor-toggle').filter({ hasText: 'fixture' }).click()
   assert.equal(await usd.inputValue(), '5.125', 'reopening a vendor retains the same editor')
@@ -193,7 +198,7 @@ try {
     }, scheme)
     const bounds = await card('cache-model').evaluate(node => ({ width: node.clientWidth, scroll: node.scrollWidth, inputs: [...node.querySelectorAll('.cm-price-row input')].map(input => input.getBoundingClientRect().width) }))
     assert.ok(bounds.scroll <= bounds.width + 1, 'four price columns fit the card: ' + JSON.stringify({ locale, width, ...bounds }))
-    assert.ok(bounds.inputs.every(width => width >= 32), 'all four inputs remain usable')
+    assert.ok(bounds.inputs.every(width => width >= 80), 'all four inputs remain usable')
     await card('cache-model').screenshot({ path: join(output, `${locale}-${scheme}-${width}.png`) })
     checks.push({ locale, scheme, width, ...bounds })
   }

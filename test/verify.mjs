@@ -5337,11 +5337,8 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
     C11.resolveClientPrice('lmstudio', 'qwen3.8-9b-heretic-uncensored-i1', matchConfig11).priced,
     providerPriceEntryFor('lmstudio', 'qwen3.8-9b-heretic-uncensored-i1', prices11m, { mode: 'auto' }).priced,
     '客户端/服务端本地判定一致(漂移守卫)')
-  // ④ UI 接线哨兵。
-  assert.ok(clientSrc11.includes("value: '__local__', label: t('overrideTargetLocal')"), '映射下拉提供「本地模型(零消耗)」选项')
-  assert.ok(clientSrc11.includes("t('matchedTitle')") && clientSrc11.includes('matchedKeys'), '「本月已命中模型」改映射区块接入')
-  assert.ok(clientSrc11.includes("t('matchedKeepAuto')"), '已命中模型行默认保持自动命中')
-  console.log('[ok] 客户端镜像一致性 + 本地零消耗 UI 接线哨兵通过')
+  // Source selection and local zero-rate UI behavior are exercised in pricing-theme-browser.mjs.
+  console.log('[ok] 客户端与服务端的本地零消耗判定一致')
 }
 
 // ── v1.6.12:压缩摘要调用计费(issue #77,compaction/summary 不再漏计) ──
