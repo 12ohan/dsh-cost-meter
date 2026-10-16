@@ -76,7 +76,38 @@ window.__ModuleLoader__.load({
             : el('p', { className: 'cm-hint' }, en ? 'All bundled models are mounted.' : '内置模型均已挂载。')) : null)
     }
 
-    function Matching({ state, draft, setDraft, t, locale, resolveClientPrice, prettyProviderKey, setField }) {
+    function CustomPriceEditor({ value, label, locale, onChange, t, priceEditor }) {
+      const en = locale === 'en'
+      const { PriceInput, priceFactor, setPriceFactor, multiplierOptions } = priceEditor
+      const fields = [['cacheMiss', en ? 'Input · cache miss' : '输入 · 未命中缓存'], ['cacheHit', en ? 'Cached input' : '缓存读取'], ['output', en ? 'Output' : '输出'], ['cacheWrite', en ? 'Cache write' : '缓存写入'], ['reasoning', en ? 'Separate reasoning' : '单独推理费用']]
+      const edit = (key, number, factor) => {
+        const next = { ...value }
+        if (number === null) delete next[key]; else next[key] = number
+        setPriceFactor(next, 'base.' + key, factor)
+        onChange(next)
+      }
+      const field = ([key, title]) => el('label', { key }, title, el('span', { className: 'cm-custom-amount' },
+        el('span', { 'aria-hidden': true }, value.currency === 'CNY' ? '¥' : '$'), el(PriceInput, { entry: value, value: value[key] ?? null, path: 'base.' + key, t,
+          emptyMode: ['cacheWrite', 'reasoning'].includes(key) ? 'clear' : 'ignore', label: label + ' · ' + title,
+          placeholder: key === 'cacheWrite' ? (en ? 'Same as cached input' : '跟随缓存读取') : key === 'reasoning' ? (en ? 'Included in output' : '含在输出中') : '0',
+          onCommit: (number, factor) => edit(key, number, factor) })))
+      return el('fieldset', { className: 'cm-custom-price', 'aria-label': label + (en ? ' · Custom price' : ' · 自定义价格') },
+        el('legend', null, en ? 'Custom price · per 1M tokens' : '自定义价格 · 每百万 Token'),
+        el('div', { className: 'cm-custom-head' }, el('span', null, en ? 'Only this channel and model' : '仅用于此渠道的这个模型'),
+          el('label', null, en ? 'Currency' : '币种', el('select', { className: 'cm-input', value: value.currency, onChange: event => onChange({ ...value, currency: event.target.value }) },
+            el('option', { value: 'USD' }, en ? 'USD · US dollar' : 'USD · 美元'), el('option', { value: 'CNY' }, en ? 'CNY · Yuan' : 'CNY · 人民币')))),
+        el('div', { className: 'cm-custom-grid' }, ...fields.slice(0, 3).map(field)),
+        multiplierOptions(value, t, separate => onChange({ ...value, separateMultipliers: separate, multipliers: {} })),
+        el('div', { className: 'cm-custom-effective', role: 'status' }, el('span', null, en ? 'Effective prices' : '实际单价'),
+          el('span', null, (en ? 'Input / Cache / Output' : '输入 / 缓存读取 / 输出') + ' · ' + (value.currency === 'CNY' ? '¥' : '$') + ['cacheMiss', 'cacheHit', 'output'].map(key => Number((value[key] * priceFactor(value, 'base.' + key)).toPrecision(8)).toLocaleString(en ? 'en-US' : 'zh-CN', { maximumFractionDigits: 8 })).join(' / ')),
+          el('small', null, en ? 'Entered price × multiplier' : '填写单价 × 倍率')),
+        el('details', { className: 'cm-custom-more' }, el('summary', null, en ? 'More billing fields' : '更多计费项'),
+          el('div', { className: 'cm-custom-grid' }, ...fields.slice(3).map(field)),
+          el('p', { className: 'cm-hint' }, en ? 'Leave reasoning blank when it is included in output. Leave cache write blank to use the cached input rate.' : '推理已包含在输出中时无需另填。缓存写入留空则使用缓存读取价格。')),
+        el('p', { className: 'cm-hint' }, en ? 'Press Enter or leave the field to save. Applies to new calls; catalog and recorded costs stay unchanged. Automatic matching keeps these values.' : '按回车或离开输入框后自动保存，后续调用生效。价格表和历史费用保持原值；切回自动匹配后，已填价格仍会保留。'))
+    }
+
+    function Matching({ state, draft, setDraft, t, locale, resolveClientPrice, prettyProviderKey, setField, priceEditor }) {
       const config = state.config
           const overrides = draft?.priceOverrides ?? config.priceOverrides ?? {}
           const dismissed = draft?.priceMatchDismissed ?? config.priceMatchDismissed ?? []
@@ -112,6 +143,7 @@ window.__ModuleLoader__.load({
     // 「本地模型(零消耗)」哨兵(v1.6.11):__local__ 由服务端解析为未定价
     // (token 照记、后续调用费用为 0)。
     { value: '__local__', label: t('overrideTargetLocal') },
+    { value: '__custom__', label: locale === 'en' ? 'Custom price for this model' : '自定义价格（此渠道模型）' },
     { value: 'deepseek:__default__', label: t('overrideTargetDefault') },
     // DeepSeek 目标必须带 'deepseek:' 前缀存储(issue #56):裸名会被按
     // 「同渠道换名」解析,跨渠道映射(如 cephalon:x → deepseek-v4-flash)查无此价。
@@ -124,7 +156,13 @@ window.__ModuleLoader__.load({
             const next = { ...(draft.priceOverrides ?? {}) }
             if (value === '') delete next[key]
             else next[key] = value
-            setDraft({ ...draft, priceOverrides: next })
+            if (value === '__custom__' && !pricesNow.custom?.[key]) {
+              const split = key.indexOf(':'), resolved = resolveClientPrice(key.slice(0, split), key.slice(split + 1), { ...config, ...draft })
+              const entry = resolved.entry ?? {}, custom = { currency: resolved.currency ?? 'USD', billingMode: 'flat', ...priceEditor?.priceMultiplierSettings(entry),
+                cacheMiss: entry.cacheMiss ?? entry.input ?? 0, cacheHit: entry.cacheHit ?? entry.cachedInput ?? entry.cacheMiss ?? entry.input ?? 0, output: entry.output ?? 0,
+                ...(entry.cacheWrite !== undefined ? { cacheWrite: entry.cacheWrite } : {}), ...(entry.reasoning !== undefined ? { reasoning: entry.reasoning } : {}) }
+              setDraft({ ...draft, priceOverrides: next, prices: { ...pricesNow, custom: { ...pricesNow.custom, [key]: custom } } })
+            } else setDraft({ ...draft, priceOverrides: next })
           }
           const dismissMatch = key => {
             if (draft === null) return
@@ -150,8 +188,10 @@ window.__ModuleLoader__.load({
                 rows.map(key =>
                   el('div', { key, className: 'cm-match-row' },
                     el('span', null, prettyProviderKey(key)),
-                    el(SearchPriceSelect, { value: overrides[key] ?? '', options: targetOptions, placeholder: '—', label: prettyProviderKey(key), locale, onChange: value => setOverride(key, value) }),
-                    el('button', { className: 'cm-btn small', title: t('removePriceMatchHint'), onClick: () => dismissMatch(key) }, t('overrideRemove')))))
+                    el(SearchPriceSelect, { value: overrides[key] ?? '', options: targetOptions, placeholder: t('matchedKeepAuto'), label: prettyProviderKey(key), locale, onChange: value => setOverride(key, value) }),
+                    el('button', { className: 'cm-btn small', title: t('removePriceMatchHint'), onClick: () => dismissMatch(key) }, t('overrideRemove')),
+                    overrides[key] === '__custom__' && pricesNow.custom?.[key] ? el(CustomPriceEditor, { value: pricesNow.custom[key], label: prettyProviderKey(key), locale, t, priceEditor,
+                      onChange: entry => setDraft({ ...draft, prices: { ...pricesNow, custom: { ...pricesNow.custom, [key]: entry } } }) }) : null)))
               : el('p', { className: 'cm-hint' }, t('overrideNone')),
             dismissed.length > 0 ? el('button', { className: 'cm-btn small', onClick: () => setField('priceMatchDismissed', []) }, t('restorePriceMatches', { count: dismissed.length })) : null,
             // 已命中模型改映射(v1.6.11):默认「保持自动命中」,选择目标即写入手动覆盖。
@@ -212,7 +252,9 @@ window.__ModuleLoader__.load({
       }
       const style = document.createElement('style')
       style.textContent = '.cm-price-search{display:grid;gap:6px;min-width:0}.cm-price-search small{color:var(--dsw-alias-label-tertiary)}.cm-price-search select,.cm-price-search input{width:100%;min-width:0}.cm-repricing-warning{padding:12px;border:1px solid var(--dsw-alias-state-warning-primary,#c58a25);border-radius:10px;background:var(--dsw-alias-bg-layer-1)}.cm-repricing-warning p{margin:8px 0 12px;line-height:1.6}.cm-repricing-history{margin-top:12px}.cm-repricing-history table{width:100%;text-align:left;font-variant-numeric:tabular-nums}.cm-repricing-history td,.cm-repricing-history th{padding:8px;border-bottom:1px solid var(--dsw-alias-border-l1)}'
+      style.textContent += '.cm-custom-price{grid-column:1/-1;display:grid;gap:14px;margin:4px 0 12px;padding:16px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-lg,12px);background:var(--dsw-alias-bg-layer-1);min-width:0}.cm-custom-price legend{padding:0 6px;font-weight:500;font-size:13px}.cm-custom-price label{display:grid;gap:7px;font-size:12px;min-width:0;color:var(--dsw-alias-label-secondary)}.cm-custom-price .cm-input{width:100%;min-width:0}.cm-custom-head{display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--dsw-alias-label-secondary);font-size:12px}.cm-custom-head label{display:flex;align-items:center;gap:8px}.cm-custom-head select{width:auto!important}.cm-custom-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.cm-custom-amount{position:relative;display:block}.cm-custom-amount>span{position:absolute;inset-inline-start:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--dsw-alias-label-tertiary)}.cm-custom-amount input{padding-inline-start:28px}.cm-custom-more summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label-secondary)}.cm-custom-more .cm-custom-grid{grid-template-columns:repeat(2,minmax(0,1fr));margin:12px 0 8px}.cm-custom-price p{margin:0;line-height:1.6}@media(max-width:700px){.cm-custom-grid{grid-template-columns:1fr}.cm-custom-head{flex-wrap:wrap}}'
       document.head.appendChild(style)
+      style.textContent += '.cm-custom-head{flex-wrap:wrap}.cm-custom-head>span{flex:1;min-width:160px}.cm-custom-head .cm-custom-multiplier{width:80px}.cm-custom-effective{display:flex;flex-wrap:wrap;gap:4px 12px;padding:10px 12px;background:var(--dsw-alias-bg-base);border-radius:var(--dsw-radius-sm,8px);font-size:12px;font-variant-numeric:tabular-nums}.cm-custom-effective>span:first-child{font-weight:500}.cm-custom-effective small{width:100%;color:var(--dsw-alias-label-tertiary)}'
       ctx.effect(() => () => style.remove(), 'cost-meter: pricing settings styles')
       return props => props.mode === 'matching' ? el(Matching, props) : el(props.mode === 'restore' ? RestorePrices : History, { ...props, rpc })
     }

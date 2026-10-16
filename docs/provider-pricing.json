@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-15",
+  "generatedAt": "2026-10-16",
   "note": "Auto-generated from lib/pricing.js DEFAULT_PROVIDER_PRICE_TABLE. USD per 1M tokens; unpriced entries have no verified official price.",
   "providers": {
     "openai": {
@@ -3238,6 +3238,55 @@
           "sourceUrl": "https://opencode.ai/v2/docs/console/models/",
           "checkedAt": "2026-10-15",
           "notes": "Current published promotional rate; gateway pricing is independent of the direct API."
+        }
+      }
+    },
+    "stepfun": {
+      "models": {
+        "step-5-preview": {
+          "input": 1,
+          "cachedInput": 0.1,
+          "output": 2.7,
+          "billingMode": "flat",
+          "sourceUrl": "https://platform.stepfun.ai/docs/en/guides/pricing/details",
+          "checkedAt": "2026-10-16",
+          "notes": "StepFun global API, USD per million tokens. Reasoning is included in output. Regional pricing, Step Plan, search and audio/image generation charges are not included."
+        },
+        "step-3.7-flash": {
+          "input": 0.2,
+          "cachedInput": 0.04,
+          "output": 1.15,
+          "billingMode": "flat",
+          "sourceUrl": "https://platform.stepfun.ai/docs/en/guides/pricing/details",
+          "checkedAt": "2026-10-16",
+          "notes": "StepFun global API, USD per million tokens. Reasoning is included in output. Regional pricing, Step Plan, search and audio/image generation charges are not included."
+        },
+        "step-3.5-flash": {
+          "input": 0.1,
+          "cachedInput": 0.02,
+          "output": 0.3,
+          "billingMode": "flat",
+          "sourceUrl": "https://platform.stepfun.ai/docs/en/guides/pricing/details",
+          "checkedAt": "2026-10-16",
+          "notes": "StepFun global API, USD per million tokens. Reasoning is included in output. Regional pricing, Step Plan, search and audio/image generation charges are not included."
+        },
+        "step-3.5-flash-2603": {
+          "input": 0.1,
+          "cachedInput": 0.02,
+          "output": 0.3,
+          "billingMode": "flat",
+          "sourceUrl": "https://platform.stepfun.ai/docs/en/guides/pricing/details",
+          "checkedAt": "2026-10-16",
+          "notes": "StepFun global API, USD per million tokens. Reasoning is included in output. Regional pricing, Step Plan, search and audio/image generation charges are not included."
+        },
+        "step-1o-turbo-vision": {
+          "input": 0.36,
+          "cachedInput": 0.07,
+          "output": 1.15,
+          "billingMode": "flat",
+          "sourceUrl": "https://platform.stepfun.ai/docs/en/guides/pricing/details",
+          "checkedAt": "2026-10-16",
+          "notes": "StepFun global API, USD per million tokens. Reasoning is included in output. Regional pricing, Step Plan, search and audio/image generation charges are not included."
         }
       }
     }

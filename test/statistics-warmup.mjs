@@ -17,7 +17,8 @@ const ctx = { on: (name, callback) => events.set(name, callback), get: name => n
   ? { listSessions: async () => [{ id: 'parent' }, { id: 'child', origin: 'subagent', parentSession: 'parent' }] } : undefined }
 let warm, restarted
 try {
-  const calls = [], options = { delay: 60_000, refreshDelay: 60_000,
+  let clock = Date.now()
+  const calls = [], options = { now: () => clock, delay: 60_000, refreshDelay: 60_000,
     billing: async (_ledger, _ctx, query) => calls.push(['billing', query.sessionId]),
     trajectory: async (_ledger, _ctx, query) => calls.push(['trajectory', query.sessionId]) }
   warm = createStatisticsWarmup(ledger, ctx, options)
@@ -29,6 +30,9 @@ try {
   await warm.flush()
   assert.equal(calls.length, 4, 'a completed child refreshes the viewed top-level conversation')
   assert.ok(calls.every(([, id]) => id === 'parent'))
+  clock += 91_000
+  await events.get('session/event')({ header: { id: 'child' } }, { type: 'turn/end' })
+  await warm.flush(); assert.equal(calls.length, 4, 'closed views stop background work after their interest expires')
   warm.dispose()
   await events.get('session/event')({ id: 'parent' }, { type: 'turn/end' })
   await warm.flush()
@@ -36,12 +40,14 @@ try {
 
   restarted = createStatisticsWarmup({ ...ledger }, ctx, options)
   await restarted.flush()
-  assert.equal(calls.length, 6, 'startup restores the last viewed conversation before the dialog opens')
+  assert.equal(calls.length, 4, 'startup restores metadata without replaying unopened conversations')
+  await events.get('session/event')({ header: { id: 'child' } }, { type: 'turn/end' })
+  await restarted.flush(); assert.equal(calls.length, 4, 'remembered conversations do not trigger hidden background replay')
   for (let i = 0; i < 20; i++) restarted.touch('recent-' + i)
   await restarted.flush()
   const stored = JSON.parse(await readFile(join(path + '.details-cache', 'recent.json'), 'utf8'))
   assert.equal(stored.sessions.length, 6, 'background work and remembered conversations remain bounded')
-  assert.deepEqual(calls.slice(6).filter(([kind]) => kind === 'billing').map(([, id]) => id), Array.from({ length: 6 }, (_, i) => 'recent-' + (19 - i)), 'the current conversation warms before older queued work')
+  assert.deepEqual(calls.slice(4).filter(([kind]) => kind === 'billing').map(([, id]) => id), Array.from({ length: 6 }, (_, i) => 'recent-' + (19 - i)), 'the current conversation warms before older queued work')
   restarted.dispose()
 
   let release, started
@@ -89,7 +95,7 @@ try {
   const changed = records('session-0'); changed[2].data.usage.inputTokens = 12345
   await writeFile(join(root, 'sessions', 'project', 'session-0', 'session.jsonl'), changed.map(row => JSON.stringify(row)).join('\n'))
   assert.equal((await sessionUsageRecords(null, 'session-0', path))[2].data.usage.inputTokens, 12345, 'changed logs invalidate their metadata index')
-  console.log(JSON.stringify({ checks: 'startup restore, child refresh, bounded queue, disposal, metadata privacy, 54-session restart, log invalidation', restartMetadataReadMs: measured.ms }))
+  console.log(JSON.stringify({ checks: 'startup metadata only, demand-driven child refresh, bounded queue, disposal, metadata privacy, 54-session restart, log invalidation', restartMetadataReadMs: measured.ms }))
 } finally {
   warm?.dispose(); restarted?.dispose()
   if (oldHome === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = oldHome

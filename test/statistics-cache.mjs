@@ -76,7 +76,9 @@ try {
     { type: 'tool/call', seq: i * 2 + 1, time: at + i, data: { turn: 1, step: i, name: 'tool_' + i % 12, callId: 'c' + i, arguments: 'PRIVATE-ARGUMENTS' } })
   const ctx = { get: name => name === 'sessions' ? { get: () => ({ header: { createdAt: at }, snapshotEvents: () => events }) } : undefined }
   const large = makeLedger('large.json'), query = { sessionId: 'large-session', order: 'cost', basis: 'api' }
+  const coldAt = performance.now()
   const result = trajectorySchema.parse(await getSessionTrajectory(large, ctx, query))
+  const coldTrajectoryMs = Math.round(performance.now() - coldAt)
   assert.equal(result.totalSteps, 2880)
   const billingQuery = { sessionId: query.sessionId, basis: 'api', from: '2026-10-15', to: '2026-10-15' }
   const detail = await getSessionBilling(large, ctx, billingQuery)
@@ -91,10 +93,12 @@ try {
     assert.ok(Math.abs(tools.reduce((sum, row) => sum + row.apiCost, 0) - group.apiCost) < 1e-9)
     assert.equal(tools.reduce((sum, row) => sum + row.steps, 0), group.steps)
   }
+  const restoredAt = performance.now()
   const replayed = await getSessionTrajectory(makeLedger('large.json'), ctx, { ...query, background: true, offset: 100 })
+  const restoredTrajectoryMs = Math.round(performance.now() - restoredAt)
   assert.equal(replayed.totalSteps, 2880); assert.equal(replayed.cost, result.cost)
   assert.ok(replayed.steps[0].cost <= result.steps.at(-1).cost)
   await getSessionTrajectory(large, ctx, query)
   for (const file of readdirSync(large.path + '.details-cache')) assert.doesNotMatch(readFileSync(join(large.path + '.details-cache', file), 'utf8'), /PRIVATE-BODY|PRIVATE-HEADER|PRIVATE-ARGUMENTS/)
-  console.log(JSON.stringify({ restartPaintMs: Math.round(paintMs), calls: 2880, categories: result.operations.length, coalescedReads: 8, checks: 'restart, background refresh, invalidation, profile/session isolation, paging, full totals, no content or credentials' }))
+  console.log(JSON.stringify({ restartPaintMs: Math.round(paintMs), coldTrajectoryMs, restoredTrajectoryMs, calls: 2880, categories: result.operations.length, coalescedReads: 8, checks: 'restart, background refresh, invalidation, profile/session isolation, paging, full totals, no content or credentials' }))
 } finally { rmSync(root, { recursive: true, force: true }) }
