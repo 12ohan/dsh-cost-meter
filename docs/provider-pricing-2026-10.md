@@ -21,7 +21,7 @@ Haiku 5.5 按 100,000 输入 Token 分档，缓存读取和写入也计入阈值
 - 缺失渠道的旧宿主兼容推断只保留旧 Go 模型集合，并且要求该模型仍在 Go 渠道表中。新增目录条目不会仅因同名就把 API 消费变成订阅
 - `openrouter` 使用完整模型 ID 精确匹配。`:free` / `:online` 等变体、其他路由及本地模型不会借用其价格
 
-例如 Gemini 3.8 Flash 的直接 Google 促销价是输入 $0.75 / 输出 $3.75，Zen 是 $1.50 / $7.50，每百万 token。Zen 的 DeepSeek Pro 为固定 $1.74 / $3.48；Go 的 Pro 为自己的峰谷参考价；均不能复用直接 DeepSeek 的当前 Flash 路由价。
+例如 Gemini 3.8 Flash 的直接 Google 促销价是输入 $0.75 / 输出 $3.75，Zen 是 $1.50 / $7.50，每百万 token。Zen 的 DeepSeek Pro 为固定 $1.74 / $3.48；Go 的 Pro 为自己的峰谷参考价；均不能与直接 DeepSeek 的独立 Pro / Flash 官方价格混用。
 
 自动匹配允许唯一的大小写、标点和日期装饰别名，以及与实际厂商一致的已知前缀，如 `openai/gpt-6.1-sol`、`anthropic/claude-opus-5.5`。不同版本、未知变体、多个候选或错误厂商前缀保持未定价。`exact` 模式要求价格表中存储的完整 ID。
 

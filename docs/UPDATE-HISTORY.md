@@ -3,6 +3,11 @@
 > 本文是面向使用者的版本更新总览；逐条开发记录见 [CHANGELOG.md](../CHANGELOG.md),完整提交历史见
 > [Commits](https://github.com/Han-1413141/dsh-cost-meter/commits/master)。
 
+## v1.8.33(2026-10-16)—— Pro 价格修正与单模型历史重算
+
+- 修复 [ztszzz733 提供报告与定位的 #292](https://github.com/Han-1413141/dsh-cost-meter/issues/292)，恢复 Pro 独立官方价格；官方同步同时更新旧 Flash 名称。
+- 新增按渠道＋模型重算历史费用，保留其他模型、原调用汇率、完整备份与范围记录；不完整日志不改，升级不自动重算旧金额。[操作说明](model-history-repricing.md)
+
 ## v1.8.32(2026-10-16)—— Token Rhythm 可用余额
 
 - 额度页新增 Token Rhythm 余额卡片，保存网站登录 Cookie 后显示官网人民币可用余额，沿用缓存、凭据库与显示设置。

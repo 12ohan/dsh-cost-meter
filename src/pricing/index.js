@@ -10,7 +10,7 @@ window.__ModuleLoader__.load({
     try { createPortal = require('react-dom')?.createPortal ?? null } catch {}
     const runFields = ['at', 'before', 'after', 'days', 'sessions', 'skipped']
     const historySchema = { parse: value => {
-      if (!Array.isArray(value) || !value.every(row => runFields.every(key => Number.isFinite(row?.[key]) && row[key] >= 0))) throw new Error('Invalid recalculation history')
+      if (!Array.isArray(value) || !value.every(row => runFields.every(key => Number.isFinite(row?.[key]) && row[key] >= 0) && (row.model === undefined || typeof row.model === 'string'))) throw new Error('Invalid recalculation history')
       return value
     } }
     const resultSchema = { parse: value => {
@@ -18,6 +18,7 @@ window.__ModuleLoader__.load({
       return value
     } }
     const boolSchema = { parse: value => { if (typeof value !== 'boolean') throw new Error('Expected confirmation'); return value } }
+    const modelSchema = { parse: value => { if (typeof value !== 'string' || value.length > 2048 || value.indexOf(':') <= 0 || value.endsWith(':') || /[\r\n]/.test(value)) throw new Error('Expected channel/model'); return value } }
     const catalogSchema = { parse: value => {
       if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid price catalog')
       return value
@@ -27,10 +28,11 @@ window.__ModuleLoader__.load({
       { id: 'dsh-cost-meter#costMeter/getPriceCatalog', service: 'costMeter', namespace: 'costMeter', method: 'getPriceCatalog', invocation: { kind: 'direct' }, parameters: [], result: codec('PriceCatalog', catalogSchema) },
       { id: 'dsh-cost-meter#costMeter/getRepricingHistory', service: 'costMeter', namespace: 'costMeter', method: 'getRepricingHistory', invocation: { kind: 'direct' }, parameters: [], result: codec('RepricingHistory', historySchema) },
       { id: 'dsh-cost-meter#costMeter/repriceHistory', service: 'costMeter', namespace: 'costMeter', method: 'repriceHistory', invocation: { kind: 'direct' }, parameters: [{ name: 'confirmed', wire: 'confirmed', source: 'json', codec: codec('RepricingConfirmation', boolSchema) }], result: codec('FetchPricesResult', resultSchema) },
+      { id: 'dsh-cost-meter#costMeter/repriceModelHistory', service: 'costMeter', namespace: 'costMeter', method: 'repriceModelHistory', invocation: { kind: 'direct' }, parameters: [{ name: 'confirmed', wire: 'confirmed', source: 'json', codec: codec('RepricingConfirmation', boolSchema) }, { name: 'model', wire: 'model', source: 'json', codec: codec('RepricingModel', modelSchema) }], result: codec('FetchPricesResult', resultSchema) },
     ] }
 
     const comboText = option => (option.label + ' ' + option.value).toLowerCase()
-    function SearchPriceSelect({ options, value, placeholder, label, locale, onChange }) {
+    function SearchPriceSelect({ options, value, placeholder, label, ariaLabel, locale, onChange }) {
       const en = locale === 'en'
       // 稳定且互不相同的 id:aria-controls / aria-activedescendant 要按 id 引用被 portal
       // 出输入框子树的候选表。用 React 的 useId(与 statistics 用 useSyncExternalStore
@@ -141,7 +143,7 @@ window.__ModuleLoader__.load({
             'aria-controls': open && shown.length ? listId : undefined,
             // 候选表被 portal 出输入框子树,读屏靠 activedescendant 才知道高亮项。
             'aria-activedescendant': open && shown.length ? optionId(index) : undefined,
-            'aria-label': label + (en ? ' · Price model' : ' · 价格模型'),
+            'aria-label': ariaLabel ?? label + (en ? ' · Price model' : ' · 价格模型'),
             placeholder: open && selected ? selected.label : placeholder,
             onFocus: openList, onClick: () => { if (!open) openList() },
             onChange: event => {
@@ -434,14 +436,24 @@ window.__ModuleLoader__.load({
 
     function History({ state, locale, formatMoneyUsd, api, rpc, disabled }) {
       const [confirm, setConfirm] = useState(false), [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [runs, setRuns] = useState([]), [error, setError] = useState('')
-      const en = locale === 'en', money = amount => formatMoneyUsd(amount, state.config)
+      const [model, setModel] = useState('')
+      const en = locale === 'en'
+      const money = (row, field) => {
+        const suffix = state.config.currency === 'CNY' ? 'Cny' : state.config.currency === 'EUR' ? 'Eur' : ''
+        const native = suffix && row[field + suffix], rate = Number(state.config.exchangeRate)
+        return formatMoneyUsd(typeof native === 'number' && rate > 0 ? native / rate : row[field], state.config)
+      }
+      const allLabel = en ? 'All models' : '全部模型'
+      const models = useMemo(() => [...new Set([state.today, state.month, ...(state.history ?? [])]
+        .flatMap(day => Object.keys(day?.byProviderModel ?? {})))].filter(key => key.indexOf(':') > 0).sort(), [state.today, state.month, state.history])
+      const options = useMemo(() => [{ value: '', label: allLabel }, ...models.map(key => ({ value: key, label: key }))], [models, allLabel])
       const refresh = () => rpc('getRepricingHistory').then(value => { setRuns(historySchema.parse(value)); setError('') }).catch(e => setError(String(e.message ?? e)))
       useEffect(() => { let active = true; rpc('getRepricingHistory').then(value => { if (active) setRuns(historySchema.parse(value)) }, e => { if (active) setError(String(e.message ?? e)) }); return () => { active = false } }, [rpc])
       const run = async () => {
         if (!confirm || busy || disabled) return
         setBusy(true); setError(''); setMessage('')
         try {
-          const result = await rpc('repriceHistory', true)
+          const result = model ? await rpc('repriceModelHistory', true, model) : await rpc('repriceHistory', true)
           if (!result.ok) throw new Error(result.message)
           setMessage(result.message); setConfirm(false)
           await refresh(); await api.reload()
@@ -451,18 +463,22 @@ window.__ModuleLoader__.load({
       return el('section', { className: 'cm-repricing' },
         el('h3', { className: 'cm-h' }, en ? 'Historical pricing' : '历史费用'),
         el('p', { className: 'cm-note' }, en ? 'Rate changes apply to new calls. Recorded historical rates remain fixed.' : '修改价格只影响后续调用，历史费用沿用原价格。'),
+        el('div', { className: 'cm-repricing-scope' },
+          el('label', null, en ? 'Recalculation scope' : '重算范围'),
+          el(SearchPriceSelect, { options, value: model, locale, label: en ? 'Choose channel and model' : '选择渠道与模型', ariaLabel: en ? 'Choose channel and model' : '选择渠道与模型', placeholder: en ? 'Search historical models' : '搜索历史渠道或模型', onChange: value => { if (busy) return; setModel(value); setConfirm(false); setMessage('') } }),
+          el('p', { className: 'cm-hint' }, model ? (en ? 'Only this channel/model changes. Other models and original exchange rates remain unchanged.' : '仅重算此渠道下的这个模型，其他模型及原调用汇率保持不变。') : (en ? 'Choose a single channel/model to limit the recalculation.' : '可选择单个渠道模型，缩小重算范围。'))),
         confirm ? el('div', { className: 'cm-repricing-warning', role: 'alert', onKeyDown: event => { if (event.key === 'Escape' && !busy) { setConfirm(false); event.stopPropagation() } } },
-          el('strong', null, en ? 'This changes historical amounts' : '这会改变历史费用'),
+          el('strong', null, (model || allLabel) + (en ? ' · Historical amounts will change' : ' · 将修改历史费用')),
           el('p', null, en ? 'Recalculate retained calls using current rates and replace their amounts in statistics. Original amounts, price versions and a full ledger backup are kept. Records with incomplete logs are unchanged.' : '确认后，将按当前价格重新计算保留的历史调用，并更新统计金额。原金额、原价格版本和完整账本备份都会保留；日志不完整的记录不改。'),
           el('div', { className: 'cm-buttons' }, el('button', { type: 'button', className: 'cm-btn', disabled: busy, onClick: () => setConfirm(false) }, en ? 'Cancel' : '取消'),
             el('button', { type: 'button', className: 'cm-btn danger', disabled: busy || disabled, onClick: run }, busy ? (en ? 'Recalculating…' : '正在重算…') : (en ? 'Confirm recalculation' : '确认重算'))))
-          : el('button', { type: 'button', className: 'cm-btn', disabled: disabled || busy, onClick: () => setConfirm(true) }, en ? 'Recalculate history at current rates' : '按当前价格重算历史'),
+          : el('button', { type: 'button', className: 'cm-btn', disabled: disabled || busy, onClick: () => setConfirm(true) }, model ? (en ? 'Recalculate this model' : '重算此模型的历史费用') : (en ? 'Recalculate history at current rates' : '按当前价格重算历史')),
         message ? el('p', { role: 'status', className: 'cm-note' }, message) : null,
         error ? el('p', { role: 'alert', className: 'cm-err' }, error) : null,
         runs.length ? el('details', { className: 'cm-repricing-history' }, el('summary', null, en ? 'Recalculation records · original amounts retained' : '重算记录 · 原金额已保留'),
           el('div', { className: 'cm-stat-scroll' }, el('table', { className: 'cm-stat-table' },
-            el('thead', null, el('tr', null, ...(en ? ['Time', 'Before', 'After', 'Session/day records'] : ['重算时间', '原金额', '重算后', '会话日期记录']).map(s => el('th', { key: s, scope: 'col' }, s)))),
-            el('tbody', null, ...runs.map(row => el('tr', { key: row.at }, el('td', null, new Date(row.at).toLocaleString(locale)), el('td', null, money(row.before)), el('td', null, money(row.after)), el('td', null, row.sessions))))))) : null)
+            el('thead', null, el('tr', null, ...(en ? ['Time', 'Scope', 'Before', 'After', 'Session/day records'] : ['重算时间', '范围', '原金额', '重算后', '会话日期记录']).map(s => el('th', { key: s, scope: 'col' }, s)))),
+            el('tbody', null, ...runs.map(row => el('tr', { key: row.at }, el('td', null, new Date(row.at).toLocaleString(locale)), el('td', null, row.model || allLabel), el('td', null, money(row, 'before')), el('td', null, money(row, 'after')), el('td', null, row.sessions))))))) : null)
     }
 
     async function mount(ctx) {
@@ -470,13 +486,16 @@ window.__ModuleLoader__.load({
       ctx.effect(() => () => unmount(), 'cost-meter: pricing settings contribution')
       const service = ctx.get('remote.costMeter')
       const rpc = async (method, ...args) => {
-        if (method === 'repriceHistory') boolSchema.parse(args[0])
+        if (method === 'repriceHistory' || method === 'repriceModelHistory') boolSchema.parse(args[0])
+        if (method === 'repriceModelHistory') modelSchema.parse(args[1])
         const result = await service[method](...args)
         if (result?.ok !== true) throw new Error(result?.error?.message ?? 'Pricing request failed')
         return (method === 'getPriceCatalog' ? catalogSchema : method === 'getRepricingHistory' ? historySchema : resultSchema).parse(result.value)
       }
       const style = document.createElement('style')
-      style.textContent = '.cm-price-search{display:grid;gap:6px;min-width:0}.cm-price-search small{color:var(--dsw-alias-label-tertiary)}.cm-price-search select,.cm-price-search input{width:100%;min-width:0}.cm-repricing-warning{padding:12px;border:1px solid var(--dsw-alias-state-warn-primary,#c58a25);border-radius:10px;background:var(--dsw-alias-bg-layer-1)}.cm-repricing-warning p{margin:8px 0 12px;line-height:1.6}.cm-repricing-history{margin-top:12px}.cm-repricing-history table{width:100%;text-align:left;font-variant-numeric:tabular-nums}.cm-repricing-history td,.cm-repricing-history th{padding:8px;border-bottom:1px solid var(--dsw-alias-border-l1)}'
+      style.textContent = '.cm-repricing-scope{display:grid;gap:8px;max-width:620px;margin:16px 0}.cm-repricing-scope>label{font-size:13px;color:var(--dsw-alias-label-secondary)}.cm-repricing-scope .cm-hint{margin:0;line-height:1.6}'
+      style.textContent += '.cm-price-search{display:grid;gap:6px;min-width:0}.cm-price-search small{color:var(--dsw-alias-label-tertiary)}.cm-price-search select,.cm-price-search input{width:100%;min-width:0}.cm-repricing-warning{padding:12px;border:1px solid var(--dsw-alias-state-warn-primary,#c58a25);border-radius:10px;background:var(--dsw-alias-bg-layer-1)}.cm-repricing-warning p{margin:8px 0 12px;line-height:1.6}.cm-repricing-history{margin-top:12px}.cm-repricing-history table{width:100%;text-align:left;font-variant-numeric:tabular-nums}.cm-repricing-history td,.cm-repricing-history th{padding:8px;border-bottom:1px solid var(--dsw-alias-border-l1)}'
+      style.textContent += '.cm-repricing-history .cm-stat-scroll{overflow-x:auto;max-width:100%}.cm-repricing-history table{min-width:560px}.cm-repricing-history th{white-space:nowrap}.cm-repricing-history td:nth-child(2){min-width:150px;max-width:260px;overflow-wrap:anywhere}'
       style.textContent += '.cm-custom-price{grid-column:1/-1;display:grid;gap:14px;margin:4px 0 12px;padding:16px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-lg,12px);background:var(--dsw-alias-bg-layer-1);min-width:0}.cm-custom-price legend{padding:0 6px;font-weight:500;font-size:13px}.cm-custom-price label{display:grid;gap:7px;font-size:12px;min-width:0;color:var(--dsw-alias-label-secondary)}.cm-custom-price .cm-input{width:100%;min-width:0}.cm-custom-head{display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--dsw-alias-label-secondary);font-size:12px}.cm-custom-head label{display:flex;align-items:center;gap:8px}.cm-custom-head select{width:auto!important}.cm-custom-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.cm-custom-amount{position:relative;display:block}.cm-custom-amount>span{position:absolute;inset-inline-start:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--dsw-alias-label-tertiary)}.cm-custom-amount input{padding-inline-start:28px}.cm-custom-more summary{cursor:pointer;font-size:12px;color:var(--dsw-alias-label-secondary)}.cm-custom-more .cm-custom-grid{grid-template-columns:repeat(2,minmax(0,1fr));margin:12px 0 8px}.cm-custom-price p{margin:0;line-height:1.6}@media(max-width:700px){.cm-custom-grid{grid-template-columns:1fr}.cm-custom-head{flex-wrap:wrap}}'
       document.head.appendChild(style)
       style.textContent += `
