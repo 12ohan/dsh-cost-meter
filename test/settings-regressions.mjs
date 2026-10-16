@@ -48,7 +48,7 @@ vm.runInNewContext(code, {
   setTimeout: fn => { timers.set(++timerId, fn); return timerId }, clearTimeout: id => timers.delete(id),
 })
 const ui = factory(name => name === 'react' ? react : {}).test
-vm.runInNewContext(readFileSync(new URL('../src/pricing/index.js', import.meta.url), 'utf8').replace('return { mount, CONTRIBUTION }', 'return { Matching, RestorePrices, SearchPriceSelect }'), {
+vm.runInNewContext(readFileSync(new URL('../src/pricing/index.js', import.meta.url), 'utf8').replace('return { mount, CONTRIBUTION }', 'return { Matching, Catalog, RestorePrices, SearchPriceSelect }'), {
   window: { __ModuleLoader__: { load: value => { factory = value.factory } } },
 })
 pricing = factory(name => name === 'react' ? react : {})
@@ -251,6 +251,7 @@ for (const locale of ['zh', 'en']) {
   tree = openPrices()
   row = rowFor(tree, 'unknown-model')
   assert.ok(row)
+  nodes(row).find(n => n.props['aria-expanded'] === false && n.type === 'button').props.onClick(); tree = section(); row = rowFor(tree, 'unknown-model')
   button(row, t('overrideRemove')).props.onClick()
   tree = section()
   assert.equal(rowFor(tree, 'unknown-model'), undefined, '删除映射后账本不会立即重新生成该行(#104)')
@@ -324,10 +325,17 @@ console.log('[ok] 设置交互：千问空费率/自动保存回读/模型移除
   let tree = section()
   button(tree, '价格').props.onClick(); tree = section()
   button(tree, '参考价格表').props.onClick(); tree = section()
+  const catalogProps = nodes(tree).find(n => n.props.mode === 'catalog').props
+  const catalog = renderer(pricing.Catalog, () => catalogProps)
   for (const [vendor, id] of [['DeepSeek', 'deepseek-v4-flash'], ['OpenAI', 'gpt-6-astra']]) {
+    tree = catalog()
+    const search = nodes(tree).find(n => n.props['aria-label'] === '搜索已挂载价格')
+    search.props.onChange({ target: { value: id } }); tree = catalog()
     const group = nodes(tree).find(node => node.props.className === 'cm-catalog-vendor cm-vendor-toggle' && textOf(node).includes(vendor))
     assert.ok(group, vendor + ' is reachable')
-    group.props.onClick(); tree = section()
+    const model = nodes(tree).find(n => n.props['aria-label'] === id + ' · 编辑价格')
+    assert.ok(model, id + ' is searchable regardless of legacy display flags')
+    model.props.onClick(); tree = catalog()
     assert.ok(nodes(tree).some(node => node.props.modelId === id), id + ' hidden editor is reachable')
   }
   timers.clear()
