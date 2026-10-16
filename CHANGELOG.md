@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- 修复 [@playgithub 反馈的 #274](https://github.com/Han-1413141/dsh-cost-meter/issues/274#issuecomment-6215322540)：后台旧查询不能再覆盖刚保存的 OpenDesign 开关、工作区及其他费用配置；保存期间暂停重复读取，保存失败后恢复轮询。
+
 ## [1.8.35] - 2026-10-16
 
 - 适配 DeepSeek 独立 Search／Fetch API：只对 HTTP 200 且有结果的请求按 ¥0.005／次入账，分别显示次数与单价，复用账本、预算及历史汇率；请求去重，不把次数混进 Token，不套用模型倍率、峰谷价或订阅计费。
