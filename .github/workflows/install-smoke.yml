@@ -58,7 +58,7 @@ jobs:
           export DSH_CONTEXT_068="$PWD/.tmp-context-068/package/lib/client.js"
           export CM_TEST_BROWSER=/usr/bin/google-chrome
           test -x "$CM_TEST_BROWSER" || (sudo apt-get update && sudo apt-get install -y google-chrome-stable)
-          node test/context-costs.mjs
+          node test/context-costs.mjs --host
           node test/context-costs-client.mjs
           node test/context-costs-lifecycle.mjs
           node test/context-costs-regression-browser.mjs
