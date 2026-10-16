@@ -3,7 +3,7 @@
 > 本文是面向使用者的版本更新总览；逐条开发记录见 [CHANGELOG.md](../CHANGELOG.md),完整提交历史见
 > [Commits](https://github.com/Han-1413141/dsh-cost-meter/commits/master)。
 
-## v1.8.31（2026-10-16）—— 价格设置优化
+## v1.8.31(2026-10-16)—— 价格设置与交互优化
 
 - 接入 [UNscientific-9 的 PR #287](https://github.com/Han-1413141/dsh-cost-meter/pull/287)：价格模型搜索与选择合为单框，支持键盘和输入法，候选浮层沿用宿主主题并避开滚动裁剪。
 - 修复该选择器搜索新模型后 Enter 仍选择旧值的问题；先定位并限制面板高度，再把末尾已选项滚入视野，搜索词改变时同步滚动。保留当前自定义价格、倍率和设置预览。
