@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- 修复 [@XHPAN 报告并定位的 #297](https://github.com/Han-1413141/dsh-cost-meter/issues/297)：历史价表无损差分保存，每 24 层保留完整快照；旧账本自动转换前原样备份，所有时间点、历史金额与重算记录保留。另提供离线转换命令。
+- 账本合并共享不可变历史价表，跨进程用量更新复用已验证版本；自己的落盘不再触发下一轮重复读盘与深拷贝。普通写入遇锁保留待提交记录，交由定时器重试，不同步等待。详见[存储与迁移说明](docs/pricing-history-storage.md)。
+
 ## [1.8.34] - 2026-10-16
 
 - 修复 [1349422030 报告的 #293](https://github.com/Han-1413141/dsh-cost-meter/issues/293)：上下文费用优先采用宿主 `contextPressure` 校准总量，与 dsh-context 标题及输入区占用环一致；无校准时保留旧宿主回退。
