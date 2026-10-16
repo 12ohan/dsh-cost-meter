@@ -3,6 +3,12 @@
 > 本文是面向使用者的版本更新总览；逐条开发记录见 [CHANGELOG.md](../CHANGELOG.md),完整提交历史见
 > [Commits](https://github.com/Han-1413141/dsh-cost-meter/commits/master)。
 
+## v1.8.34(2026-10-16)—— 压缩后的上下文费用校准
+
+- 上下文参考费用改用与 dsh-context 标题、宿主占用环一致的校准总量，修正压缩后原始文本估算偏大的问题；分类保持比例估算，实际账单不变。
+- 补充金额口径与分类估算说明，监听上下文占用变化，保留原有性能策略。
+- 感谢 [1349422030 的截图与环境信息](https://github.com/Han-1413141/dsh-cost-meter/issues/293)。[更新说明](update-notes-1.8.34.md)
+
 ## v1.8.33(2026-10-16)—— Pro 价格修正与单模型历史重算
 
 - 修复 [ztszzz733 提供报告与定位的 #292](https://github.com/Han-1413141/dsh-cost-meter/issues/292)，恢复 Pro 独立官方价格；官方同步同时更新旧 Flash 名称。
