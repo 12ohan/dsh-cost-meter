@@ -145,7 +145,13 @@ try {
   await field.fill('DeepSeek')
   await page.waitForFunction(()=>{const list=document.querySelector('.cm-combo-list'),row=list?.querySelector('[data-active=true]');if(!row)return false;const a=list.getBoundingClientRect(),b=row.getBoundingClientRect();return b.top>=a.top-1&&b.bottom<=a.bottom+1})
   await field.press('Escape')
-  for(const height of [320,200,140]){await page.setViewportSize({width:1100,height});await field.click();const rect=await page.locator('.cm-combo-panel').evaluate(node=>node.getBoundingClientRect().toJSON());assert.ok(rect.top>=0&&rect.bottom<=height+1,'candidate panel fits short viewport');await field.press('Escape')}
+  for(const height of [320,200,140]){
+    await page.setViewportSize({width:1100,height});await field.click()
+    await page.locator('.cm-combo-panel').waitFor({state:'visible'})
+    await page.waitForFunction(()=>{const panel=document.querySelector('.cm-combo-panel');if(!panel)return false;const rect=panel.getBoundingClientRect();return rect.top>=0&&rect.bottom<=innerHeight+1})
+    const rect=await page.locator('.cm-combo-panel').evaluate(node=>node.getBoundingClientRect().toJSON())
+    assert.ok(rect.top>=0&&rect.bottom<=height+1,'candidate panel fits short viewport: '+JSON.stringify({height,rect}));await field.press('Escape')
+  }
   await page.setViewportSize({width:1100,height:950})
   await unknown.getByRole('button', { name: '本地', exact: true }).click()
   await page.waitForFunction(() => window.patches.some(p => p.priceOverrides?.['fixture:unknown'] === '__local__'))

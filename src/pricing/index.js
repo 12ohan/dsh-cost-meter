@@ -70,7 +70,7 @@ window.__ModuleLoader__.load({
       }
       // 有筛选词时先清词(列表回到全部候选);否则清掉已选值,交回「未手动指定」。
       const clear = () => { if (open && query) { setQuery(''); setActive(0); return } if (value) onChange(''); closeList() }
-      useEffect(() => {
+      useLayoutEffect(() => {
         if (!open || typeof document === 'undefined') return
         const node = inputRef.current, browser = typeof window === 'undefined' ? null : window
         // 面板恒挂到 body:设置面板是宿主 overlay 里 role=dialog 的 div(不是 <dialog> 元素),
@@ -85,7 +85,9 @@ window.__ModuleLoader__.load({
           const below = viewport - rect.bottom - margin, above = rect.top - margin
           const flip = below < 180 && above > below
           const available = Math.max(60, flip ? above : below)
-          const maxHeight = Math.min(280, available)
+          // Resizing/scrolling may briefly leave the anchor outside the viewport.
+          // The panel must still fit the viewport itself, not just that anchor.
+          const maxHeight = Math.max(0, Math.min(280, available, viewport - margin * 2))
           const top = Math.max(margin, Math.min(flip ? rect.top - maxHeight - 6 : rect.bottom + 6, viewport - maxHeight - margin))
           // 坐标没变就保留原对象:监听挂在 window 的 capture 上,滚动设置页里任意容器
           // 都会命中,否则每帧都要把整个候选面板重渲染一遍。
