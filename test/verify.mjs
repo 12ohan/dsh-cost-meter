@@ -1863,7 +1863,7 @@ console.log('[ok] 宽泛匹配与跨厂商兑底(路由 provider 费用为零修
   assert.ok(matchClientSource.includes('resolveClientPrice(provider, modelId, matchPrices).matched !== true'), '未命中判定走 resolveClientPrice 完整解析链(与计费口径一致)')
   assert.ok(matchClientSource.includes('if (overrides[key] !== undefined) return false'), '已手动指定的键不重复列入未命中(rows 仍展示)')
   assert.ok(matchClientSource.includes('matched: true') && matchClientSource.includes('matched: false'), 'resolveClientPrice 区分显式命中与默认价兜底(matched 标志)')
-  assert.ok(matchClientSource.includes('最近出现但未命中价格的模型') && matchClientSource.includes('Recently seen models without a price hit'), '未命中标题双语文案更新')
+  assert.ok(matchClientSource.includes('待匹配与手动设置') && matchClientSource.includes('Unmatched and manually configured models'), '未命中与手动价格区提供双语标题')
   console.log('[ok] 未命中列表判定与计费口径一致断言通过')
 }
 

@@ -74,8 +74,11 @@ try {
   const popup=page.getByRole('dialog',{name:'费用详细信息',exact:true})
   const closePopup=async()=>{await popup.getByRole('button',{name:'关闭详细信息',exact:true}).click();await popup.waitFor({state:'detached'})}
   await page.goto(url); await page.waitForFunction(() => window.fixtureReady)
+  await page.waitForTimeout(400)
+  assert.equal(await page.evaluate(()=>window.requests.length),0,'unopened details do not replay logs automatically')
+  await page.locator('.cm-stat-entry').hover()
   await page.waitForFunction(()=>window.completedReads>0)
-  assert.equal(await page.locator('dialog').count(),0,'prefetch prepares data before opening a dialog')
+  assert.equal(await page.locator('dialog').count(),0,'hover prepares data before opening a dialog')
   await page.locator('.cm-stat-entry').click()
   await page.locator('.cm-stat-metrics').waitFor()
   assert.equal(await page.getByText('正在读取本对话的用量明细…',{exact:true}).count(),0,'preloaded data is present on opening')
