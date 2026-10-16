@@ -3,6 +3,12 @@
 > 本文是面向使用者的版本更新总览；逐条开发记录见 [CHANGELOG.md](../CHANGELOG.md),完整提交历史见
 > [Commits](https://github.com/Han-1413141/dsh-cost-meter/commits/master)。
 
+## v1.8.32(2026-10-16)—— Token Rhythm 可用余额
+
+- 额度页新增 Token Rhythm 余额卡片，保存网站登录 Cookie 后显示官网人民币可用余额，沿用缓存、凭据库与显示设置。
+- 核对当前官网钱包接口，区分可用余额、冻结金额与历史消费；凭据变更后旧结果作废，登录失效或金额缺失时提示错误。
+- 感谢 [ykoneee 的需求与参考](https://github.com/Han-1413141/dsh-cost-meter/issues/290)，以及 [162568316 的认证与字段参考](https://github.com/162568316/dsh-tokenrhythm-bill)。[设置说明](tokenrhythm-balance.md)
+
 ## v1.8.31(2026-10-16)—— 价格设置与交互优化
 
 - [Oct1AtJoe 的 PR #288](https://github.com/Han-1413141/dsh-cost-meter/pull/288)：Antigravity 额度优先查询生产端点，补齐 daily / sandbox 回退结果的解析。

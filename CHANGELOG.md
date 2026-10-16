@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.32] - 2026-10-16
+
+- 新增 [Token Rhythm 可用余额](docs/tokenrhythm-balance.md)：额度页专用入口，使用官网网站登录 Cookie，只读查询当前钱包接口的 `availableBalanceCny`，按人民币显示。
+- 复用余额卡片、缓存、请求合并、取消及 DSH 只写凭据库；支持显示位置、刷新间隔、手动刷新和环境变量 `TOKENRHYTHM_COOKIE`。
+- 固定官方域名与 GET 请求，仅发送 `tr_session`，拒绝重定向，响应限制 256 KiB；真实零余额正常显示，缺失金额和登录失效不伪造余额。
+- 感谢 [ykoneee](https://github.com/ykoneee) 在 [#290](https://github.com/Han-1413141/dsh-cost-meter/issues/290) 提出需求并提供参考，感谢 [162568316/dsh-tokenrhythm-bill](https://github.com/162568316/dsh-tokenrhythm-bill) 提供认证与字段参考。
+
 ## [1.8.31] - 2026-10-16
 
 - 接入 [Oct1AtJoe 的 PR #288](https://github.com/Han-1413141/dsh-cost-meter/pull/288)：Antigravity 额度优先查询生产端点，daily 与 sandbox 保留回退；修复备用端点成功后仍解析首个空响应槽位的问题，保留 Gemini 筛选及原有凭据处理。
