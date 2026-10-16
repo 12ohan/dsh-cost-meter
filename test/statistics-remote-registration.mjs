@@ -79,7 +79,7 @@ class Connection extends Service {
         if (endpoint === 'costMeter/getRepricingHistory') return { ok: true, value: [] }
         if (endpoint === 'costMeter/getPriceCatalog') return { ok: true, value: buildPriceCatalog() }
         if (endpoint === 'costMeter/releasePriceLock') return { ok: true, value: { ok: payload.args.id !== 'missing', message: payload.args.id, state } }
-        if (endpoint === 'costMeter/repriceHistory') return { ok: true, value: { ok: true, message: 'synthetic recalculation' } }
+        if (endpoint === 'costMeter/repriceHistory' || endpoint === 'costMeter/repriceModelHistory') return { ok: true, value: { ok: true, message: 'synthetic recalculation' } }
         if (endpoint === 'costMeter/getContextCosts') return { ok: true, value: getContextCosts(ledger, { get: () => undefined }, payload.args.query) }
         if (endpoint === 'costMeter/getContextIntegration') return { ok: true, value: await getContextIntegration({ get: () => undefined }) }
         if (endpoint === 'costMeter/loginCodingPlan') return { ok: true, value: { ok: false, message: 'synthetic login response', state } }
@@ -200,6 +200,9 @@ try {
     assert.equal((await pricingRpc('repriceHistory', true)).ok, true)
     assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/repriceHistory', { confirmed: true }])
     await assert.rejects(pricingRpc('repriceHistory', 'true'), /Expected confirmation/)
+    assert.equal((await pricingRpc('repriceModelHistory', true, 'deepseek:deepseek-v4-pro')).ok, true)
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/repriceModelHistory', { confirmed: true, model: 'deepseek:deepseek-v4-pro' }])
+    await assert.rejects(pricingRpc('repriceModelHistory', true, ''), /Expected channel\/model/)
     const expectedMethods = TYPERT.invocations.filter(d => d.namespace === 'costMeter').map(d => d.method).sort()
     const actualMethods = Array.from(client.typert.remotes.list().filter(d => d.namespace === 'costMeter'), d => d.method).sort()
     assert.deepEqual(actualMethods, expectedMethods, 'all main and statistics methods coexist exactly once')

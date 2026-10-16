@@ -42,7 +42,7 @@ const {CostSection,parseConfig}=window.costUI.preview;
 const state=${literal(initialState)};state.config=parseConfig(state.config,'config');
 if(new URLSearchParams(location.search).has('many'))state.today.byProviderModel=state.month.byProviderModel=Object.fromEntries(Array.from({length:500},(_,i)=>['channel:model-'+i,{calls:1,input:1,output:1,cost:0}]));
 window.patches=[];window.reprices=[];window.historyReads=0;
-const pricing=window.priceUI.mount({effect:fn=>fn(),get:key=>key==='remote'?{$mount:async()=>()=>{}}:{getRepricingHistory:async()=>{window.historyReads++;return ({ok:true,value:window.reprices.length?[{at:1792050000000,before:1,after:2,days:1,sessions:1,skipped:0}]:[]})},repriceHistory:async confirmed=>{window.reprices.push(confirmed);return {ok:true,value:{ok:true,message:'已重算，原金额已保留。'}}}}});
+const pricing=window.priceUI.mount({effect:fn=>fn(),get:key=>key==='remote'?{$mount:async()=>()=>{}}:{getRepricingHistory:async()=>{window.historyReads++;return ({ok:true,value:window.reprices.map((item,i)=>({at:1792050000000+i,before:1,after:2,days:1,sessions:1,skipped:0,...(typeof item==='object'?{model:item.model}:{})}))})},repriceHistory:async confirmed=>{window.reprices.push(confirmed);return {ok:true,value:{ok:true,message:'已重算，原金额已保留。'}}},repriceModelHistory:async (confirmed,model)=>{window.reprices.push({confirmed,model});return {ok:true,value:{ok:true,message:'单模型重算完成，其他模型保持不变。'}}}}});
 const api={reload:async()=>{},loadPricing:()=>pricing,loadOpenRouter:async()=>()=>null,updateConfig:async patch=>{window.patches.push(patch)}};
 createRoot(document.getElementById('root')).render(React.createElement(CostSection,{useCost:()=>({state,status:'ready'}),api}));
 window.fixtureReady=true;
@@ -199,7 +199,7 @@ try {
   await page.getByRole('tab', { name: '同步与规则', exact: true }).click()
   const reprice = page.getByRole('button', { name: '按当前价格重算历史', exact: true })
   await reprice.click()
-  await page.getByRole('alert').filter({ hasText: '这会改变历史费用' }).waitFor()
+  await page.getByRole('alert').filter({ hasText: '将修改历史费用' }).waitFor()
   assert.deepEqual(await page.evaluate(() => window.reprices), [], 'warning does not execute recalculation')
   await page.getByRole('button', { name: '取消', exact: true }).click()
   assert.deepEqual(await page.evaluate(() => window.reprices), [], 'cancel leaves history untouched')
@@ -209,6 +209,23 @@ try {
   assert.deepEqual(await page.evaluate(() => window.reprices), [true])
   await page.getByText('重算记录 · 原金额已保留', { exact: true }).click()
   await page.getByRole('columnheader', { name: '原金额', exact: true }).waitFor()
+  const scope = page.getByRole('combobox', { name: '选择渠道与模型', exact: true })
+  const patchesBeforeScope = await page.evaluate(() => window.patches.length)
+  await scope.fill('deepseek-v4-flash')
+  await page.getByRole('option', { name: 'deepseek:deepseek-v4-flash', exact: true }).click()
+  assert.equal(await page.evaluate(() => window.patches.length), patchesBeforeScope, '选择重算范围不修改价格配置')
+  await page.getByRole('button', { name: '重算此模型的历史费用', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'deepseek:deepseek-v4-flash' }).waitFor()
+  assert.equal(await page.evaluate(() => window.reprices.length), 1, '单模型也须确认')
+  await page.getByRole('button', { name: '确认重算', exact: true }).click()
+  await page.waitForFunction(() => window.reprices.length === 2)
+  assert.deepEqual(await page.evaluate(() => window.reprices[1]), { confirmed: true, model: 'deepseek:deepseek-v4-flash' })
+  await page.getByRole('cell', { name: 'deepseek:deepseek-v4-flash', exact: true }).waitFor()
+  await page.setViewportSize({ width: 430, height: 900 })
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, '单模型重算在窄窗口不溢出')
+  await page.screenshot({ path: join(output, 'single-model-repricing.png'), fullPage: true })
+  await page.setViewportSize({ width: 1100, height: 950 })
+
   await page.getByRole('tab', { name: '模型定价', exact: true }).click()
   await page.getByRole('tab', { name: '模型定价', exact: true }).press('ArrowRight')
   assert.equal(await page.getByRole('tab', { name: '参考价格表', exact: true }).getAttribute('aria-selected'), 'true')
