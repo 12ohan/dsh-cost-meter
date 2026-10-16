@@ -5,6 +5,8 @@
 
 ## v1.8.31(2026-10-16)—— 价格设置与交互优化
 
+- [Oct1AtJoe 的 PR #288](https://github.com/Han-1413141/dsh-cost-meter/pull/288)：Antigravity 额度优先查询生产端点，补齐 daily / sandbox 回退结果的解析。
+
 - 接入 [UNscientific-9 的 PR #287](https://github.com/Han-1413141/dsh-cost-meter/pull/287)：价格模型搜索与选择合为单框，支持键盘和输入法，候选浮层沿用宿主主题并避开滚动裁剪。
 - 修复该选择器搜索新模型后 Enter 仍选择旧值的问题；先定位并限制面板高度，再把末尾已选项滚入视野，搜索词改变时同步滚动。保留当前自定义价格、倍率和设置预览。
 - 价格表统一使用 SVG 展开箭头；OpenRouter 重开恢复上次价格、搜索、排序和页码，一分钟内复用，后台更新失败保留旧表。
