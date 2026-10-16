@@ -112,12 +112,12 @@
     }
     function parseConfig(v, path) {
     const parseCustomEntry = e => (e == null ? undefined : {
-      ...(e.adapter === 'aliyun' ? { adapter: 'aliyun' } : {}),
+      ...(['aliyun', 'tokenrhythm'].includes(e.adapter) ? { adapter: e.adapter } : {}),
       enabled: e.enabled === true,
       label: typeof e.label === 'string' ? e.label : '',
       labelEn: typeof e.labelEn === 'string' ? e.labelEn : '',
       display: oneOf(e.display, ['sidebar', 'settings', 'off'], 'both'),
-      unit: ['CNY', 'EUR', 'CREDITS'].includes(e.unit) ? e.unit : 'USD',
+      unit: e.adapter === 'tokenrhythm' ? 'CNY' : ['CNY', 'EUR', 'CREDITS'].includes(e.unit) ? e.unit : 'USD',
       convertToDisplayCurrency: e.convertToDisplayCurrency === true,
       refreshMinutes: typeof e.refreshMinutes === 'number' && Number.isFinite(e.refreshMinutes) ? e.refreshMinutes : 15,
       request: e.request && typeof e.request === 'object' ? e.request : { url: '' },
@@ -1722,6 +1722,7 @@
 
     function segmentsForCustomBalance(state, config, custom = null, entryCfg = null) {
       const target = custom ?? state.customBalance
+      if ((entryCfg ?? config?.customBalance)?.adapter === 'tokenrhythm') return { cap: null, ...computeBalanceSegments({ remaining: target?.remaining, cap: null }) }
       // 全局 budgetCap 是货币金额，不适用于积分；积分只接受同一响应的上限。
       const cap = resolveBalanceCap(customBalanceUnitOf(config, target, entryCfg) === 'CREDITS' ? null : config, target)
       const remaining = Number(target?.remaining) || 0
@@ -1883,6 +1884,7 @@
     // 多配置形态(v1.7.0,issue #79):unit/label 优先读条目自身配置,旧单条
     // customBalance 作为回落(兼容旧快照/旧宿主)。
     function customBalanceUnitOf(config, custom, entryCfg) {
+      if ((entryCfg ?? config?.customBalance)?.adapter === 'tokenrhythm') return 'CNY'
       if ((entryCfg ?? config?.customBalance)?.adapter === 'aliyun' && ['CNY', 'USD', 'EUR'].includes(custom?.unit)) return custom.unit
       const unit = entryCfg?.unit ?? config?.customBalance?.unit
       if (['CNY', 'EUR', 'USD', 'CREDITS'].includes(unit)) return unit
@@ -1909,6 +1911,7 @@
     // 参数化(custom, entryCfg);旧调用路径(全局 customBalance)由外层包装传入。
     function customBalanceDetailText(custom, config, t, state, entryCfg = null) {
       const remaining = formatCustomBalanceMoney(custom.remaining, config, custom, entryCfg)
+      if ((entryCfg ?? config?.customBalance)?.adapter === 'tokenrhythm') return t('customBalanceRemaining', { amount: remaining })
       const formatAmt = v => formatCustomBalanceMoney(v, config, custom, entryCfg)
       if (state && config.balance?.showProgressBar === true) {
         const segments = segmentsForCustomBalance(state, config, custom, entryCfg)
@@ -1979,7 +1982,7 @@
       const visible = visibleCustomEntries(state, config)
       if (visible.length === 0) return null
       return el(Fragment, null, visible.map(({ index, entry, snapshot }) =>
-        el(CustomBalanceEntryBox, { key: 'cb-' + index, state, wide, api, t, index, entry, snapshot })))
+        el(entry.adapter === 'tokenrhythm' ? CustomBalanceEntryRow : CustomBalanceEntryBox, { key: 'cb-' + index, state, wide, api, t, index, entry, snapshot })))
     }
 
     function CustomBalanceEntryBox(props) {

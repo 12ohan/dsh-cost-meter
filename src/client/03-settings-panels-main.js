@@ -1216,6 +1216,8 @@
     function CustomBalanceEntryPanel(props) {
       const { state, api, t, entry, index, canRemove, onPatch, onRemove } = props
       const aliyun = entry.adapter === 'aliyun'
+      const tokenrhythm = entry.adapter === 'tokenrhythm'
+      const fixedAdapter = aliyun || tokenrhythm
       const [open, setOpen] = useState(false)
       const readJsonText = () => ({
         headers: JSON.stringify(entry.request?.headers ?? {}, null, 2),
@@ -1244,6 +1246,7 @@
       // 请求头里出现的全部 {{VAR}} 占位符名(去重保序):驱动凭据输入区。
       const placeholderVars = (() => {
         if (aliyun) return ['ALIBABA_CLOUD_ACCESS_KEY_ID', 'ALIBABA_CLOUD_ACCESS_KEY_SECRET', 'ALIBABA_CLOUD_SECURITY_TOKEN']
+        if (tokenrhythm) return ['TOKENRHYTHM_COOKIE']
         return [...new Set(Object.values(entry.request?.headers ?? {}).flatMap(value =>
           typeof value === 'string' ? [...value.matchAll(/\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g)].map(match => match[1]) : []))]
       })()
@@ -1262,7 +1265,7 @@
           setJsonErr(err => ({ ...err, [field]: t('customBalanceInvalidJson') }))
         }
       }
-      const jsonField = (field, label, rows, hint) => !aliyun && el('div', { className: 'cm-field', style: { gridColumn: '1 / -1' } },
+      const jsonField = (field, label, rows, hint) => !fixedAdapter && el('div', { className: 'cm-field', style: { gridColumn: '1 / -1' } },
         el('label', null, t(label)),
         hint && el('span', { className: 'cm-hint' }, t(hint)),
         el('textarea', { className: 'cm-input', rows, value: jsonText[field], onChange: event => applyJsonText(field, event.target.value) }),
@@ -1282,7 +1285,7 @@
       })
       const preview = custom !== null && custom.status === 'ok'
         ? el(Fragment, null,
-          config.balance?.showProgressBar === true
+          config.balance?.showProgressBar === true && !tokenrhythm
             ? el('div', { className: 'cm-budget', style: { marginTop: '8px' } },
               el(BalanceBar, { segments: segmentsForCustomBalance(state, config, custom, entry), direction: barDirectionOf(config, 'balance') }),
               el('div', { className: 'cm-bal-line' }, customBalanceDetailText(custom, config, t, state, entry)))
@@ -1293,13 +1296,13 @@
           ? el('div', { className: 'cm-bal-line err' }, custom.message || t('unknownError'))
           : el('div', { className: 'cm-bal-line' }, custom?.message || t('balanceNotQueried'))
       const configFields = el(Fragment, null,
-          el('p', { className: 'cm-note' }, t(aliyun ? 'aliyunBalanceNote' : 'customBalanceConfigNote')),
-          el('label', { className: 'cm-check' },
+          el('p', { className: 'cm-note' }, t(tokenrhythm ? 'tokenRhythmBalanceNote' : aliyun ? 'aliyunBalanceNote' : 'customBalanceConfigNote')),
+          !tokenrhythm && el('label', { className: 'cm-check' },
             el('input', { type: 'checkbox', checked: entry.convertToDisplayCurrency === true,
               disabled: customBalanceUnitOf(config, custom, entry) !== 'USD',
               onChange: event => setField('convertToDisplayCurrency', event.target.checked) }),
             t('customBalanceConvert')),
-          el('p', { className: 'cm-note' }, t('customBalanceConvertNote')),
+          !tokenrhythm && el('p', { className: 'cm-note' }, t('customBalanceConvertNote')),
           el('div', { className: 'cm-grid' },
             [['label', 'customBalanceLabelZh'], ['labelEn', 'customBalanceLabelEn']].map(([field, label]) => el('div', { key: field, className: 'cm-field' },
               el('label', null, t(label)),
@@ -1308,7 +1311,7 @@
                 value: entry[field] ?? '',
                 onChange: event => setField(field, event.target.value),
               }))),
-            !aliyun && el('div', { className: 'cm-field' },
+            !fixedAdapter && el('div', { className: 'cm-field' },
               el('label', null, t('customBalanceUnitLabel')),
               el('select', {
                 className: 'cm-input',
@@ -1330,7 +1333,7 @@
             el('div', { className: 'cm-field' },
               el('label', null, t('customBalanceRefreshInterval')),
               numInput({ value: entry.refreshMinutes ?? 15 }, v => setField('refreshMinutes', Math.min(1440, Math.max(1, Math.floor(v)))))),
-            !aliyun && el('div', { className: 'cm-field' },
+            !fixedAdapter && el('div', { className: 'cm-field' },
               el('label', null, t('customBalanceMethod')),
               el('select', {
                 className: 'cm-input',
@@ -1339,7 +1342,7 @@
               },
                 el('option', { value: 'GET' }, 'GET'),
                 el('option', { value: 'POST' }, 'POST'))),
-            !aliyun && el('div', { className: 'cm-field', style: { gridColumn: '1 / -1' } },
+            !fixedAdapter && el('div', { className: 'cm-field', style: { gridColumn: '1 / -1' } },
               el('label', null, t('customBalanceUrl')),
               el('input', {
                 className: 'cm-input',
@@ -1353,22 +1356,22 @@
             // 与 goQuota/codingPlans 的 CredentialField 同款(值走 setCredential,永不回显);
             // 头里还没有占位符时给一行提示,引导改用占位符而非明文。
             el('div', { className: 'cm-field', style: { gridColumn: '1 / -1' } },
-              el('label', null, t('customBalanceCredentialsTitle')),
+              el('label', null, tokenrhythm ? 'Token Rhythm Cookie' : t('customBalanceCredentialsTitle')),
               placeholderVars.length > 0
                 ? el(Fragment, null,
-                  !aliyun && el('span', { className: 'cm-hint' }, t('customBalanceCredentialsHint')),
+                  !fixedAdapter && el('span', { className: 'cm-hint' }, t('customBalanceCredentialsHint')),
                   placeholderVars.map(varName => el(CredentialField, {
                     key: 'cb-var-' + varName,
                     target: 'customVar:' + varName,
                     configured: (state.customVarStatus?.[varName]?.configured ?? false) === true,
                     source: state.customVarStatus?.[varName]?.source ?? '',
                     t, api,
-                    placeholder: '{{' + varName + '}}',
+                    placeholder: tokenrhythm ? 'tr_session=…' : '{{' + varName + '}}',
                   })))
                 : el('span', { className: 'cm-hint' }, t('customBalanceNoPlaceholders'))),
             // 凭据白名单(v1.7.6,issue #86):携带密钥(占位符或明文)的请求只放行列表内
             // 主机;逗号分隔文本 ↔ 字符串数组,同 headers 的草稿即时解析策略。
-            !aliyun && el('div', { className: 'cm-field', style: { gridColumn: '1 / -1' } },
+            !fixedAdapter && el('div', { className: 'cm-field', style: { gridColumn: '1 / -1' } },
               el('label', null, t('customBalanceAllowedHosts')),
               el('input', {
                 className: 'cm-input',
@@ -1751,14 +1754,14 @@
       const addEntry = (adapter = 'custom') => {
         if (entries.length >= 8) return
         setEntries([...entries, {
-          ...(adapter === 'aliyun' ? { adapter } : {}),
+          ...(adapter !== 'custom' ? { adapter } : {}),
           enabled: false,
-          label: adapter === 'aliyun' ? '千问 / 阿里云' : '',
-          labelEn: adapter === 'aliyun' ? 'Qianwen / Alibaba Cloud' : '',
+          label: adapter === 'tokenrhythm' ? 'Token Rhythm' : adapter === 'aliyun' ? '千问 / 阿里云' : '',
+          labelEn: adapter === 'tokenrhythm' ? 'Token Rhythm' : adapter === 'aliyun' ? 'Qianwen / Alibaba Cloud' : '',
           display: 'both',
-          unit: adapter === 'aliyun' ? 'CNY' : 'USD',
+          unit: adapter !== 'custom' ? 'CNY' : 'USD',
           refreshMinutes: 15,
-          request: { url: adapter === 'aliyun' ? 'https://business.aliyuncs.com/' : '', method: adapter === 'aliyun' ? 'POST' : 'GET', headers: {} },
+          request: { url: adapter === 'tokenrhythm' ? 'https://tokenrhythm.studio/api/wallet/summary' : adapter === 'aliyun' ? 'https://business.aliyuncs.com/' : '', method: adapter === 'aliyun' ? 'POST' : 'GET', headers: {} },
           extract: {},
           allowedHosts: [],
         }])
@@ -1796,7 +1799,8 @@
         el('div', { className: 'cm-buttons' },
           el('button', { className: 'cm-btn small', onClick: addGateway, disabled: sources.length >= 4 }, t('gatewaySourceAdd')),
           el('button', { className: 'cm-btn small', onClick: () => addEntry(), disabled: entries.length >= 8 }, t('customBalanceAdd')),
-          el('button', { className: 'cm-btn small', onClick: () => addEntry('aliyun'), disabled: entries.length >= 8 }, t('aliyunBalanceAdd'))))
+          el('button', { className: 'cm-btn small', onClick: () => addEntry('aliyun'), disabled: entries.length >= 8 }, t('aliyunBalanceAdd')),
+          el('button', { className: 'cm-btn small', onClick: () => addEntry('tokenrhythm'), disabled: entries.length >= 8 }, t('tokenRhythmBalanceAdd'))))
     }
 
     // ── Token 用量统计(历史总量 + 每日格子热图;显示位置可配) ────────────────
