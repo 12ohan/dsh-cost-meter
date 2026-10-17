@@ -3,6 +3,12 @@
 > 本文是面向使用者的版本更新总览；逐条开发记录见 [CHANGELOG.md](../CHANGELOG.md),完整提交历史见
 > [Commits](https://github.com/Han-1413141/dsh-cost-meter/commits/master)。
 
+## v1.8.36(2026-10-17)—— 旧会话金额修复、赠送余额对账与 DSH 0.2.1-rc.2
+
+- 修复 [#300](https://github.com/Han-1413141/dsh-cost-meter/issues/300)：升级后老会话费用显示 ¥0；冻结汇率金额随首次落盘持久化，跨进程合并不丢失不重复，客户端增加 USD 回退。USD 账本与历史金额不变。
+- 修复 [#302](https://github.com/Han-1413141/dsh-cost-meter/issues/302)：赠送余额部分到期/回收不再误报消费偏差，改为重置基准并给出一次性说明；真实 drift 仍提示。
+- DSH 最低要求 0.2.0，适配目标 npm `next` 0.2.1-rc.2；补充宿主内置 pnpm 供应链策略导致的安装/卸载失败排障。[验证与影响](release-notes/v1.8.36.md)
+
 ## v1.8.35(2026-10-16)—— DSH alpha.5 适配
 
 - 新增官方 Search／Fetch API 次数费：有结果的成功请求 ¥0.005／次，保留历史汇率；网页抓取独立分类，不将本地抓取套成付费接口。[计费说明](web-request-fees.md)

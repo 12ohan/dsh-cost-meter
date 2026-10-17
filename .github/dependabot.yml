@@ -28,6 +28,10 @@ updates:
       - dependency-name: "@deepseek-ai/*"
         update-types:
           - "version-update:semver-major"
+      # acorn 会被打包进 lib/bootstrap.js，升级必须重新生成 lib/ 构建产物；
+      # zod 为精确锁版（宿主供应链策略与 wire 契约相关）。二者改由发版时人工评估。
+      - dependency-name: "acorn"
+      - dependency-name: "zod"
 
   # GitHub Actions 工作流
   - package-ecosystem: "github-actions"

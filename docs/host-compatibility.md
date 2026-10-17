@@ -4,6 +4,8 @@
 
 ## 已验证宿主：DSH 0.2.1-rc.2（2026-10-17）
 
+> 发布版本说明：v1.8.36 沿用本节的 rc.2 兼容结论——该版本只包含 #300/#302 的账本与对账修复及文档更新，未改动宿主兼容声明、依赖范围与运行时导入面。
+
 插件版本：1.8.35（PR #301 合并后的兼容跟进分支 `codex/pr301-followups`）。适配目标为 npm `next` 标签的 `0.2.1-rc.2`；最低兼容要求仍为 0.2.0。
 
 - **宿主准入**：用真实 `@deepseek-ai/dsh-app-boot@0.2.1-rc.2` 的 `evaluatePluginCompatibility` 对 `package.json` 实测——接受 `0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.0`、`0.2.1-alpha.1`、`0.2.1-alpha.5`、`0.2.1-rc.1`、`0.2.1-rc.2`、`0.2.1`，拒绝 `0.1.0-rc.5`、`0.1.5-alpha.1`、`0.1.7-rc.2`、`0.2.0-alpha.1`、`0.2.0-rc.0`、`0.3.0-alpha.1`、`0.3.0`。rc.2 的 `dsh-app-boot` 与 rc.1 逐字节一致：`engines.dsh` 存在时 peer 不参与判定；`test/host-peer-compatibility.mjs` 在 rc.2 夹具下通过。
