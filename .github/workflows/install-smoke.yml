@@ -106,7 +106,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dsh: ['0.1.7-rc.2', '0.2.0-rc.2']
+        # 0.1.x legs removed: the plugin floor is 0.2.0 (engines.dsh), so every 0.1.x host is out of range.
+        dsh: ['0.2.0-rc.2']
     steps:
       - uses: actions/checkout@v7
         with:
@@ -132,7 +133,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dsh: ['0.1.7-rc.2', '0.2.0-rc.2']
+        # 0.1.x legs removed for the same reason as sidebar-search-recovery.
+        dsh: ['0.2.0-rc.2']
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -226,7 +228,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Install pinned DSH 0.2.1-alpha.5 host
+      - name: Install pinned DSH 0.2.1-rc.1 host
         run: |
           npm install -g pnpm
           pnpm install --frozen-lockfile
@@ -239,7 +241,7 @@ jobs:
           node test/host-peer-compatibility.mjs
           node test/verify.mjs
           node test/market-hot-install.mjs
-      - name: Verify alpha.5 context calibration and published peer UI
+      - name: Verify rc.1 context calibration and published peer UI
         run: |
           export DSH_TEST_NODE_MODULES="$PWD/.tmp-next-host/node_modules"
           export DSH_TEST_UI_MODULES="$DSH_TEST_NODE_MODULES"
@@ -285,8 +287,10 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      # npm 0.1.6-alpha.1 predates the create() contract in source checkouts (#149).
-      # Pin actual upstream code so a package-only smoke test cannot mask this failure.
+      # The plugin floor is 0.2.0, so the npm closure is a 0.2.x host (the previous 0.1.x pin is
+      # out of range; 0.2.0-rc.2 is the in-range host the rest of this workflow uses). The upstream
+      # commit stays pinned: it carries the create() contract in source checkouts that a
+      # package-only smoke test cannot mask (#149).
       - uses: actions/checkout@v7
         with:
           repository: deepseek-ai/deepseek-harness
@@ -300,7 +304,7 @@ jobs:
         run: |
           npm install -g pnpm
           pnpm install --frozen-lockfile
-          npm install --prefix .tmp-typert-host --no-audit --no-fund @deepseek-ai/dsh@0.1.6-alpha.1
+          npm install --prefix .tmp-typert-host --no-audit --no-fund @deepseek-ai/dsh@0.2.0-rc.2
       - name: Validate source host and shipped client codecs
         run: |
           export DSH_TEST_SOURCE_ROOT="$PWD/.tmp-typert-upstream"
@@ -327,9 +331,10 @@ jobs:
           node-version: 22
       - name: Install DeepSeek Harness
         shell: bash
-        # Pin the tested host graph: upstream ^0.1.5-rc.1 ranges currently select
-        # rc.3 packages requiring an unpublished sidebar-documentpreview@rc.3.
-        # Exercise the real host and install.ps1 without skipping any assertions.
+        # Pin the tested host graph to an in-range 0.2.x host: the fixture installs
+        # @deepseek-ai/dsh@0.2.0-rc.2, whose closure pins every @deepseek-ai/dsh-* package
+        # exactly, so no overrides are needed. Exercise the real host and install.ps1
+        # without skipping any assertions.
         run: |
           mkdir -p .tmp-install-host
           cp test/fixtures/install-host/package.json .tmp-install-host/package.json
@@ -379,4 +384,4 @@ jobs:
       # 的产物差异都会让 CI 变红,杜绝把过期 bundle 发布出去。
       - name: Check client bundle is in sync with src
         shell: bash
-        run: node scripts/build.mjs && git diff --exit-code lib/bootstrap.js lib/client.js lib/client.statistics.js lib/client.openrouter.js lib/client.community.js lib/client.pricing.js
+        run: node scripts/build.mjs && git diff --exit-code lib/bootstrap.js lib/client.js lib/client.statistics.js lib/client.openrouter.js lib/client.community.js lib/client.pricing.js lib/client.display.js
