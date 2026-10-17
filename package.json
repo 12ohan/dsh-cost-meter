@@ -33,7 +33,8 @@
         "0.2.0-rc.1": "compatible",
         "0.2.0-rc.2": "compatible",
         "0.2.1-alpha.5": "compatible",
-        "0.2.1-rc.1": "compatible"
+        "0.2.1-rc.1": "compatible",
+        "0.2.1-rc.2": "compatible"
       }
     }
   },
