@@ -40,24 +40,20 @@
     /**
      * 费用明细弹窗的定位与尺寸。
      *
-     * 样式写在 01 片段的 .cm-stat-dialog 规则里,**不用内联样式**。三个理由:
+     * 样式写在 01 片段的 .cm-stat-dialog 规则里,**不用内联样式**。两个理由:
      *
      * 1. 内联样式会盖掉皮肤对 [role=dialog] 的定位规则。v1.8.6 补 role="dialog" 的
      *    本意就是让皮肤能接管这个弹窗的样式(issue #219),内联 inset/margin 会让
      *    皮肤把弹窗钉到底部一类的规则失效。
-     * 2. 顶部避让量要走四级回退链,并注册成 <length>(@property --cm-dialog-top):
+     * 2. 顶部避让量要走回退链,并注册成 <length>(@property --cm-dialog-top):
      *    宿主变量「存在但为空值/非法值」时,var() 不会走 fallback,calc()/inset 会在
      *    计算值阶段整条失效(IACVT)——弹窗失去高度上限、被内容撑到视口外且无法滚动,
      *    比修复前更差。注册后非法值整体退回 initial-value 0px,仍是一份可用的兜底。
-     * 3. 旧宿主(≤0.1.7)没有 --dsh-frame-chrome-top,全屏时回退链会命中不随全屏变化的
-     *    --dsh-windows-titlebar-height(40px),白留一条 40px 空隙;样式表里补一条
-     *    html[data-fullscreen] 归零规则。新宿主本就由 chrome-top 归 0,这条是旧宿主兜底。
      *
-     * 四级回退的取值来源(顺序不能换:全屏时 chrome-top 为 0,后两级仍是 40/48px,
-     * 排前面会让全屏白留空隙):
-     *   --dsh-frame-chrome-top      DSH ≥0.2.0:Windows 标题栏高,全屏由宿主置 0;darwin 未定义
-     *   --dsh-frame-top-clearance   darwin 红绿灯区 48px;DSH ≥0.2.0 的 Windows 由它派生
-     *   --dsh-windows-titlebar-height  Electron preload 注入的 40px(旧宿主唯一保证存在的一级)
+     * 回退链的取值来源(顺序不能换:全屏时 chrome-top 为 0,后一级仍是 48px,
+     * 排前面会让全屏白留空隙),两级都是 DSH ≥0.2.0 的现行机制:
+     *   --dsh-frame-chrome-top      Windows 标题栏高,全屏由宿主置 0;darwin 未定义
+     *   --dsh-frame-top-clearance   darwin 红绿灯区 48px
      *   0px                         纯 Web / 未标记环境:与修复前一致
      */
     const STAT_DIALOG_CLASS = 'cm-stat-dialog'
@@ -2373,9 +2369,7 @@
       }
       const pages = {}
       const loadPage = name => {
-        if (!pages[name]) pages[name] = (typeof require.async === 'function'
-          ? require.async('./client.' + name + '.js').then(module => module.mount(ctx, store, resolveLocale))
-          : Promise.reject(new Error(rpcT()('statisticsUpgrade')))).catch(error => { delete pages[name]; throw error })
+        if (!pages[name]) pages[name] = require.async('./client.' + name + '.js').then(module => module.mount(ctx, store, resolveLocale)).catch(error => { delete pages[name]; throw error })
         return pages[name]
       }
       const api = {
