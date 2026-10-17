@@ -3159,6 +3159,9 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   const indexSrcRecon = readFileSync(join(import.meta.dirname, '..', 'lib', 'index.js'), 'utf8')
   assert.ok(indexSrcRecon.includes('exchangeRate: ledger.config.exchangeRate'), '对账调用传入汇率做折算')
   assert.ok(indexSrcRecon.includes('spentCurrency'), '提示按余额真实币种取符号')
+  assert.equal((indexSrcRecon.match(/reconcileGrantedRelease: '/g) ?? []).length, 2, '赠送余额到期/回收提示 zh/en 双份(issue #302)')
+  assert.ok(indexSrcRecon.includes('赠送余额到期/回收而非消费'), 'zh 提示说明差额不是消费')
+  assert.ok(indexSrcRecon.includes('granted balance expiring or being reclaimed'), 'en 提示说明差额不是消费')
   // 旧参考点无币种标记(升级前账本):重置一次基准。
   const legacyBase = { date: day, total: 10, granted: 1, topped: 9, at: t0 }
   r = reconcileBalanceDelta(legacyBase, { ...bal(9), currency: 'CNY' }, 0.95, day, t1)
@@ -3180,6 +3183,48 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
     const keepBase = reconcileBalanceDelta(null, { ...bal(100, 80, 20), currency: 'CNY' }, 0, day, t0).ref
     r = reconcileBalanceDelta(keepBase, { ...bal(98.6, 78.6, 20), currency: 'CNY' }, 1.4 / 7.2, day, t1, { exchangeRate: 7.2 })
     assert.equal(r.event.kind, 'ok', 'granted 剩余时 total 差值口径不变(¥1.4≈$0.194)')
+  }
+  // 赠送余额「部分」减少(issue #302):#89 只覆盖归零;赠送桶到期/回收造成部分减量时,
+  // 充值桶不变、本地官方渠道费用远低于减量——整块差额不是消费,降级为「到期/回收」
+  // 提示并重置基准,不再报消费 drift;本地费用能解释相当比例时仍保留 drift。
+  {
+    // 复现 issue #302 的实测数值(CNY 账户):基准 00:02 → 19:53 刷新,赠送 −5.5471。
+    const ref302 = reconcileBalanceDelta(null, { ...bal(827.262, 38.4004, 788.8616), currency: 'CNY' }, 0, day, t0).ref
+    r = reconcileBalanceDelta(ref302, { ...bal(821.7149, 32.8532, 788.8617), currency: 'CNY' }, 0, day, t1, { exchangeRate: 7.2 })
+    assert.equal(r.event.kind, 'granted-release', '赠送余额部分减少不再报消费 drift(#302 实测数值)')
+    assert.notEqual(r.event.kind, 'drift', '不再把到期金额当成消费偏差')
+    assert.equal(r.ref.total, 821.7149, '重置后的基准为当前余额快照')
+    assert.equal(r.ref.granted, 32.8532, '重置后的基准记录当前赠送余额')
+    assert.equal(r.ref.ledgerCost, 0, '重置后的基准记录当前累计账本费用')
+    assert.ok(Math.abs(r.event.spent - 5.5471) < 1e-9, '事件携带原生币种减量')
+    assert.ok(Math.abs(r.event.spentUsd - 5.5471 / 7.2) < 1e-9, '事件携带折算 USD 减量')
+    assert.equal(r.event.spentCurrency, 'CNY', '事件携带余额币种供提示取符号')
+    // 基准已重置:同日下一次刷新余额持平静默,不重复提示。
+    r = reconcileBalanceDelta(r.ref, { ...bal(821.7149, 32.8532, 788.8617), currency: 'CNY' }, 0.39 / 7.2, day, t1 + 60_000, { exchangeRate: 7.2 })
+    assert.equal(r.event.kind, 'flat', '重置后同日继续对账(余额持平静默)')
+  }
+  {
+    // 本地官方渠道费用已解释减量 1/4 以上:不能排除真实漏记消费,仍报 drift。
+    const ref302b = reconcileBalanceDelta(null, { ...bal(100, 20, 80), currency: 'CNY' }, 0, day, t0).ref
+    r = reconcileBalanceDelta(ref302b, { ...bal(90, 10, 80), currency: 'CNY' }, 0.5, day, t1, { exchangeRate: 7.2 })
+    assert.equal(r.event.kind, 'drift', '本地费用能解释较多减量时保留 drift')
+    // 阈值边界(USD):本地费用占减量 24% → 降级提示;26% → 保留 drift。
+    const ref302c = reconcileBalanceDelta(null, { ...bal(100, 20, 80), currency: 'USD' }, 0, day, t0).ref
+    const snap302c = { ...bal(90, 10, 80), currency: 'USD' }
+    r = reconcileBalanceDelta(ref302c, snap302c, 2.4, day, t1)
+    assert.equal(r.event.kind, 'granted-release', '本地费用不超过减量 1/4 时降级提示')
+    r = reconcileBalanceDelta(ref302c, snap302c, 2.6, day, t1)
+    assert.equal(r.event.kind, 'drift', '本地费用超过减量 1/4 时保留 drift')
+  }
+  {
+    // 充值桶自身减少:仍按真实消费 drift 上报,不被赠送桶降级规则吞掉。
+    const ref302d = reconcileBalanceDelta(null, { ...bal(827.262, 32.8532, 794.4088), currency: 'CNY' }, 0, day, t0).ref
+    r = reconcileBalanceDelta(ref302d, { ...bal(821.7149, 32.8532, 788.8617), currency: 'CNY' }, 0, day, t1, { exchangeRate: 7.2 })
+    assert.equal(r.event.kind, 'drift', '充值余额减少仍报 drift')
+    // 赠送余额归零仍沿用 #89 的静默重置(新降级分支不改变归零行为)。
+    const ref302e = reconcileBalanceDelta(null, { ...bal(100, 20, 80), currency: 'CNY' }, 0, day, t0).ref
+    r = reconcileBalanceDelta(ref302e, { ...bal(79, 0, 79), currency: 'CNY' }, 0, day, t1, { exchangeRate: 7.2 })
+    assert.equal(r.event.kind, 'structure-reset', '赠送余额归零仍沿用 #89 静默重置')
   }
   // 配置链路:非布尔拒绝、默认开启、可关闭。
   assert.ok(applyConfigPatch(sanitizeConfig({}), { balance: { reconcile: 'yes' } }).errors.length > 0, 'reconcile 非布尔被拒绝')
@@ -5783,6 +5828,75 @@ await import('./typert-codecs.mjs')
     else process.env.DSH_HOME = prevHome81
   }
   console.log('[ok] 对账警告币种符号一致(CNY 账户 e2e drift 文案)通过')
+}
+
+// ── issue #302:赠送余额部分减少降级为「到期/回收」提示 ──
+
+// 15-3) e2e:预置 #302 实测形态(赠送 38.4004 → 32.8532、充值不变、本地官方费用 0),
+// 刷新后不再显示「偏差较大」的消费 drift 文案,而是赠送余额到期/回收说明 + 已重置基准;
+// 下一次刷新余额持平,提示清空(基准重置生效,不重复告警)。
+{
+  const prevHome302 = process.env.DSH_HOME
+  const root302 = join(tmpdir(), `cm-reconcile-granted-release-${Date.now()}`)
+  mkdirSync(join(root302, 'storages', 'cost-meter'), { recursive: true })
+  const todayKey302 = localDayKey(Date.now())
+  writeFileSync(join(root302, 'storages', 'cost-meter', 'ledger.json'), JSON.stringify({
+    version: 1,
+    config: sanitizeConfig({ balance: { reconcile: true }, exchangeRate: 7.2 }),
+    balanceRef: { date: todayKey302, total: 827.2620, granted: 38.4004, topped: 788.8616, currency: 'CNY', at: Date.now() - 3600_000, ledgerCost: 0 },
+    days: {},
+  }))
+  process.env.DSH_HOME = root302
+  const prevKey302 = process.env.DEEPSEEK_API_KEY
+  process.env.DEEPSEEK_API_KEY = 'sk-test-302'
+  try {
+    const provided302 = {}
+    const origFetch302 = globalThis.fetch
+    // 当日主要使用第三方渠道:官方余额只在赠送桶减少,充值桶不变。
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        is_available: true,
+        balance_infos: [{ currency: 'CNY', total_balance: '821.7149', granted_balance: '32.8532', topped_up_balance: '788.8617' }],
+      }),
+      text: async () => '',
+    })
+    try {
+      const { apply: apply302 } = await import('../lib/index.js')
+      apply302({
+        on: () => () => {},
+        effect: () => {},
+        inject: () => {},
+        provide: (k, v) => { provided302[k] = v },
+        logger: console,
+        get: key => (key === 'settings' ? { get: () => ({}) } : undefined),
+      })
+      const first302 = await provided302.costMeter.refreshBalance()
+      const notice302 = first302?.state?.reconcile ?? {}
+      const msg302 = notice302.message ?? ''
+      assert.ok(msg302.length > 0, '赠送余额部分减少给出一次性说明:' + JSON.stringify(notice302))
+      assert.ok(msg302.includes('赠送余额') && (msg302.includes('到期') || msg302.includes('回收')), '文案说明可能是赠送余额到期/回收:' + msg302)
+      assert.ok(msg302.includes('¥5.5471'), '文案携带官方余额减量(原生 ¥):' + msg302)
+      assert.ok(msg302.includes('已重置本次对账基准'), '文案说明已重置对账基准:' + msg302)
+      assert.ok(!msg302.includes('偏差较大'), '不再出现消费 drift 的「偏差较大」文案:' + msg302)
+      // 基准已重置:同一余额再刷新 → flat,提示清空。
+      const second302 = await provided302.costMeter.refreshBalance()
+      assert.equal(second302?.state?.reconcile?.ok, true, '重置基准后同日不再重复提示')
+      assert.equal(second302?.state?.reconcile?.message, '', '余额持平时提示清空')
+      // 基准重置会触发 2s 防抖落盘:等写入完成再删临时目录,避免写定时器对已删路径无限重试。
+      await new Promise(resolve => setTimeout(resolve, 2300))
+    } finally {
+      globalThis.fetch = origFetch302
+    }
+  } finally {
+    rmSync(root302, { recursive: true, force: true })
+    if (prevKey302 === undefined) delete process.env.DEEPSEEK_API_KEY
+    else process.env.DEEPSEEK_API_KEY = prevKey302
+    if (prevHome302 === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = prevHome302
+  }
+  console.log('[ok] 赠送余额部分减少 e2e(到期/回收提示 + 基准重置,issue #302)通过')
 }
 
 // ── v1.7.3:中转链路缓存字段未上报的显式标注(issue #65 讨论) ──
