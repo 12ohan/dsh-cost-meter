@@ -1087,12 +1087,15 @@
      */
     function displayCostOf(entry, config) {
       const suffix = { CNY: 'Cny', EUR: 'Eur' }[config?.currency]
-      const saved = suffix && entry?.[(config?.showTotalWithPlan ? 'cost' : 'apiCost') + suffix]
-      if (Number.isFinite(saved)) return saved / (config.exchangeRate || 1)
-      if (config !== null && typeof config === 'object' && config.showTotalWithPlan === true) {
-        return Number(entry?.cost) || 0
-      }
-      return moneyCostOf(entry)
+      const withPlan = config?.showTotalWithPlan === true
+      const saved = suffix && entry?.[(withPlan ? 'cost' : 'apiCost') + suffix]
+      const usd = withPlan ? (Number(entry?.cost) || 0) : moneyCostOf(entry)
+      // Old rows were written before frozen FX amounts existed, and a merge could
+      // drop the derived fields; a finite 0 would then hide real spend (issue #300).
+      // Fall back to the USD amount so the current rate converts it for display.
+      if (!Number.isFinite(saved)) return usd
+      if (saved === 0 && usd > 0) return usd
+      return saved / (config.exchangeRate || 1)
     }
     // ── Plan/API 双轨分类(issue #64):与 lib/plan-billing.js 同逻辑的镜像实现
     //    (bundle 无法导入 Node 模块,修改时两处同步)。──
