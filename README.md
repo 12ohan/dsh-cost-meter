@@ -401,6 +401,24 @@ If Plugin Hub reports only `diagnostics: .../.plugin-manager/logs/operation-.../
 
 Account-mode balance: in DSH Desktop a signed-in official account is read without any API key; if you still get HTTP 401, save a dedicated Open Platform key under **Settings → Cost → Account balance**. See [credential sources and priority](docs/balance-credentials.md).
 
+### Install troubleshooting: uninstall fails with ERR_PNPM_RESOLUTION_POLICY_VIOLATIONS_UNHANDLED (DSH 0.2.1-rc.x)
+
+On DSH **0.2.1-rc.1 / 0.2.1-rc.2** the host bundles pnpm **11.28.5**, which enables a built-in 24-hour `minimumReleaseAge`. Uninstalling or reinstalling a plugin can then fail with `ERR_PNPM_RESOLUTION_POLICY_VIOLATIONS_UNHANDLED`; the plugin page shows something like `Uninstall failed` plus `✓ Lockfile passes supply-chain policies (verified 28m ago)` and `Progress: resolved 1, reused 0, ...`. A package younger than 24 hours (the plugin version just installed, or a host `0.2.1-rc.x` package) is enough to trigger it. The unhandled-callback error comes from the host's bundled pnpm, so the plugin cannot patch it.
+
+Workarounds:
+
+1. Wait until the package is 24 hours old, then retry. The plugin keeps working in the meantime.
+2. Add an exact exclusion to the profile's `pnpm-workspace.yaml` (keep existing entries), then fully restart DSH and retry:
+
+   ```yaml
+   minimumReleaseAgeExclude:
+     - dsh-cost-meter@1.8.36
+   ```
+
+3. For a one-off CLI operation, forward the pnpm flag: `dsh plugin --profile desktop remove dsh-cost-meter --config.minimum-release-age=0` (or add `--trust-lockfile` when only lockfile verification fails). Both flags were verified against pnpm 11.28.5 in a temporary profile.
+
+Read the first `ERR_PNPM_*` line in `<profile>/.plugin-manager/logs/operation-*/pnpm.log` before reporting and remove credentials. Do not delete the profile or the ledger. Details: [pnpm supply-chain policy](docs/pnpm-supply-chain-policy.md).
+
 ### Update / Uninstall
 
 ```sh

@@ -401,6 +401,24 @@ DSH `0.2.0-rc.1` 已通过安装包安装、Web 启动、模块复用、合成�
 
 账号模式余额：DSH 桌面版登录官方账号后无需 API Key，插件直接读取账号钱包；若仍报 HTTP 401，请在「设置 → 费用 → 官方账户余额」保存独立的开放平台 API Key。凭据来源、优先级和存储说明见[余额凭据来源](docs/balance-credentials.md)。
 
+### 安装排障：卸载失败并报 ERR_PNPM_RESOLUTION_POLICY_VIOLATIONS_UNHANDLED（DSH 0.2.1-rc.x）
+
+DSH **0.2.1-rc.1 / 0.2.1-rc.2** 宿主自带 pnpm **11.28.5**，默认启用内置 24 小时 `minimumReleaseAge`。此时卸载或重装插件可能失败并报 `ERR_PNPM_RESOLUTION_POLICY_VIOLATIONS_UNHANDLED`；插件页会显示「卸载失败」，并附 `✓ Lockfile passes supply-chain policies (verified 28m ago)` 与 `Progress: resolved 1, reused 0, ...` 之类日志。发布不足 24 小时的包（刚安装的插件版本，或宿主自身 `0.2.1-rc.x` 包）即可触发；该未接回调错误来自宿主内置 pnpm，插件无法修补。
+
+处理办法：
+
+1. 等待该包发布满 24 小时后再重试，期间插件可正常使用。
+2. 在 Profile 的 `pnpm-workspace.yaml` 中补一条精确排除（保留文件里已有条目），完全重启 DSH 后重试：
+
+   ```yaml
+   minimumReleaseAgeExclude:
+     - dsh-cost-meter@1.8.36
+   ```
+
+3. 仅本次操作用 CLI 透传 pnpm 参数：`dsh plugin --profile desktop remove dsh-cost-meter --config.minimum-release-age=0`；若只是 lockfile 校验阶段失败，可改用 `--trust-lockfile`。这两个参数已在本机 pnpm 11.28.5 临时 Profile 上实测可用。
+
+反馈前请先打开 `<profile>/.plugin-manager/logs/operation-*/pnpm.log` 读取第一条 `ERR_PNPM_*` 并删除凭据；不要删除 Profile 或账本。详见 [pnpm 供应链策略说明](docs/pnpm-supply-chain-policy.md)。
+
 ### 更新 / 卸载
 
 ```sh
