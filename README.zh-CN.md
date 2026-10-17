@@ -12,16 +12,16 @@
 
 [![version](https://img.shields.io/badge/version-1.8.35-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
 
-**v1.8.35** 完成 [DSH 0.2.1-alpha.5 兼容验证](docs/dsh-alpha5-compatibility.md#中文)，适配新宿主的旧会话离线修复命令，日常计费逻辑保持不变。
+**最低支持宿主：DSH 0.2.0。** 插件声明 `engines.dsh` `>=0.2.0-rc.1 <0.3.0-0`（宿主准入插件的唯一闸门），不再支持任何 DSH 0.1.x 版本；本轮适配目标为 npm `next` 标签的 **0.2.1-rc.1**。见[兼容声明](docs/dsh-0.2.1-compatibility.md#中文)。
 
 新增 [DeepSeek Search／Fetch API 次数费](docs/web-request-fees.md#中文)，只计有结果的成功请求，并将网页抓取独立分类。
 
 
 桌面端用户请按 [Desktop 安装说明](docs/install-troubleshooting.md#desktop-安装与更新)，使用应用自带的 CLI 和 `desktop` Profile。
 
-更新说明：[v1.8.35 DSH alpha.5 适配](docs/update-notes-1.8.35.md#中文)。更新后完全重启 DSH。
+更新说明：[v1.8.35](docs/update-notes-1.8.35.md#中文)。更新后完全重启 DSH。
 
-已验证 DSH **0.2.1-alpha.5**：v1.8.34 日常计费可直接使用；在该宿主上运行离线修复命令请使用 v1.8.35。见[兼容性验证说明](docs/dsh-alpha5-compatibility.md#中文)。
+声明范围内的宿主记录：DSH `0.2.0-rc.1` 与 `0.2.1-alpha.5` 已通过安装包安装、Web 启动、模块复用与合成计费。此前的 0.1.x 检查属历史记录，已不在支持范围内。见[兼容记录](docs/host-compatibility.md)。
 
 启动报 **Ledger is busy** 且费用卡片消失时，参见[账本锁恢复说明](docs/ledger-lock-recovery.md#简体中文)。
 
@@ -383,7 +383,7 @@ dsh web
 
 症状:`dsh plugin --profile web add` 阶段安装失败,pnpm 报 `[ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION] N lockfile entries failed verification`。
 
-原因:你的环境(pnpm 配置或上层安装器自带策略)启用了「最小发布年龄」供应链保护——lockfile 中**发布时间距今小于阈值**的包一律拒绝。插件引入依赖精确锁版之前的历史版本,生产依赖是浮动区间,首次安装会解析到当时最新发布版(实测 `^0.1.0-rc.6` 漂到仅发布一周左右的 rc.8),在该策略下即被拒绝。
+原因:你的环境(pnpm 配置或上层安装器自带策略)启用了「最小发布年龄」供应链保护——lockfile 中**发布时间距今小于阈值**的包一律拒绝。插件引入依赖精确锁版之前的历史版本,生产依赖是浮动区间,首次安装会解析到当时最新发布版(实测 `@deepseek-ai/dsh-credentials` 的浮动区间落到仅发布一周左右的版本),在该策略下即被拒绝。
 
 处理:
 
@@ -395,7 +395,7 @@ minimumReleaseAgeExclude:
   - '<报错中的包名>@<版本>'
 ```
 
-DSH `0.2.0-rc.1` 已通过安装包安装、Web 启动、模块复用、合成计费、RPC 和完整回归。此前宿主适配验证覆盖 DSH `0.1.2-rc.1`、`0.1.3-alpha.2`、`0.1.5-alpha.1` 的安装、启动、模块复用和卸载；`0.1.3-alpha.1` 在此前核查中无可获取的官方 npm 版本，暂标记为未知。验证环境及边界见[兼容记录](docs/host-compatibility.md)。
+DSH `0.2.0-rc.1` 已通过安装包安装、Web 启动、模块复用、合成计费、RPC 和完整回归；当前声明接受 `>=0.2.0-rc.1 <0.3.0-0`，拒绝 `0.1.x` 与 `0.3.0`。此前的 0.1.x 检查（`0.1.2-rc.1`、`0.1.3-alpha.2`、`0.1.5-alpha.1`）仅作历史记录保留；`0.1.3-alpha.1` 在此前核查中无可获取的官方 npm 版本，仍标记为未知。验证环境及边界见[兼容记录](docs/host-compatibility.md)。
 
 如果插件市场仅显示 `diagnostics: .../.plugin-manager/logs/operation-.../pnpm.log`，这行信息无法指出失败的包或命令。请打开所指的 `pnpm.log`，反馈其中第一条实际错误；分享前删去凭据及私人路径。DSH `0.2.0-rc.1` 的 Git 地址和 npm 包名安装已在隔离 Windows 环境通过；特定机器上的失败仍需要该机器的诊断日志。
 
