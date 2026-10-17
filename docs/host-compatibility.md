@@ -1,6 +1,18 @@
-# 当前宿主兼容验证
+# 宿主兼容验证
 
-## DSH 0.2.0-rc.1（2026-09-28）
+> **当前声明范围**：`engines.dsh` = `>=0.2.0-rc.1 <0.3.0-0`，`dsh.compatibility.dsh` 与 `dshhub.compatibility.dsh` 同值；本轮适配目标为 npm `next` 标签的 `0.2.1-rc.1`。**DSH 0.1.x 已不在支持范围内**：下文「历史验证：DSH 0.1」与 [1.7.14 兼容记录](host-compatibility-v1.7.14.md)中的 0.1.x 条目只作历史留存，不代表当前支持。声明理由见[兼容性说明](dsh-0.2.1-compatibility.md)。
+
+## 已验证宿主：DSH 0.2.1-rc.1（2026-10-17）
+
+插件版本：1.8.35（分支 `feat/dsh-021rc1-compat`）。适配目标为 npm `next` 标签的 `0.2.1-rc.1`；本轮同时把最低兼容要求提到 0.2.0。
+
+- **宿主准入**：用真实 `@deepseek-ai/dsh-app-boot@0.2.1-rc.1` 的 `evaluatePluginCompatibility` 对最终 `package.json` 实测——接受 `0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.1-alpha.5`、`0.2.1-rc.1`，拒绝 `0.1.0-rc.5`、`0.1.5-alpha.1`、`0.3.0`（修复了此前 peer 里的 `^0.1.5-0` 会放行 `0.1.5-alpha.1` 的缺口）。`engines.dsh` 存在的宿主上 peer 不再参与判定；`0.2.0-rc.x` 宿主尚无该分支，改由收紧后的 peer 准入——两条路径都在 `test/host-peer-compatibility.mjs` 里覆盖并实测。
+- **打包产物端到端**：隔离 `DSH_HOME` 下 `npm pack` → 真实 `dsh plugin --profile web add <tgz>`（无版本豁免，配置图出现 `dsh-cost-meter`）→ 启动 Web 并运行兼容探针：`hostVersion=0.2.1-rc.1`、`pluginVersion=1.8.35`、两个宿主 peer 均复用宿主同一模块文件、三次合成调用共 300 输入 tokens、SCNet 快照与损坏回退通过，`passed: true`。
+- **全量回归**：`node test/verify.mjs` 在 0.2.1-rc.1 宿主下退出码 0、239 个 `[ok]`、0 个 `[fail]`；`test/host-peer-compatibility.mjs`、`test/market-hot-install.mjs` 通过；`statistics-dialog-titlebar.mjs` 在真实浏览器（Edge）下 A/B/C 三条不变式全绿；构建产物两次重建哈希一致。
+- **宿主侧变更核对**：`dsh-credentials`、`dsh-home-paths`、`dsh-web`、`dsh-client-ui-primitives`（`Tooltip`）在本版无破坏性变化；相对 `0.2.0-rc.2`，0.2.1-rc.1 的 npm 依赖闭包少了 11 个 `@deepseek-ai/*` 包，其中 `dsh-client-ui-primitives` 仍由随包发布的 `dsh-web-frontend` 前端 bundle 提供并导出 `Tooltip`（实测可用），其余 10 个本插件 0 引用；前端 `--dsw-*` 设计令牌无消失项。
+- **覆盖面与边界**：未验证 DSH Desktop 整个桌面外壳、真实付费请求与其他第三方插件的账单查询；合成数据只写入仓库内临时 Profile，测试进程清除了继承的 API 凭据，未发起真实模型请求。低于 0.2.0 下限的宿主会在准入阶段被拒绝，不再进入运行时。
+
+## 已验证宿主：DSH 0.2.0-rc.1（2026-09-28）
 
 插件版本：1.7.44。本地环境：Windows、Node.js 24.19.0；CI 新增 Ubuntu / Node.js 24 的同版本宿主验证。
 
@@ -13,7 +25,7 @@
 
 测试进程移除继承的 API 凭据，合成数据只写入临时 Profile，没有发起真实模型请求。本次未验证 Desktop 外壳、0.2 宿主卸载、其他第三方服务的在线账单或未发布的 0.2 稳定版本。`0.2.0` / `0.2.1` 仅用于版本范围边界断言；精确 `compatible` 记录只新增实测的 `0.2.0-rc.1`。
 
-## 历史验证：DSH 0.1（2026-09-09）
+## 历史验证：DSH 0.1（2026-09-09，已不在声明范围内）
 
 插件版本：1.7.17。验证日期：2026-09-09。环境：Windows、Node.js 24.19.0。
 

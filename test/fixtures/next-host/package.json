@@ -1,10 +1,10 @@
 {
   "name": "dsh-cost-meter-test-host-next",
   "private": true,
-  "description": "Pinned DSH alpha.5 host for compatibility, installation, RPC and context UI regression tests.",
+  "description": "Pinned DSH 0.2.1-rc.1 host for compatibility, installation, RPC and context UI regression tests.",
   "dependencies": {
-    "@deepseek-ai/dsh": "0.2.1-alpha.5",
-    "@deepseek-ai/dsh-client-ui-slots": "0.2.1-alpha.5",
+    "@deepseek-ai/dsh": "0.2.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.1-rc.1",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "jsdom": "28.1.0",

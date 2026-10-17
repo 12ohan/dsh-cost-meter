@@ -23,7 +23,7 @@ updates:
           - "minor"
           - "patch"
     ignore:
-      # @deepseek-ai 官方辅助包目前处于 0.1.0-rc 阶段,semver 大版本跳跃
+      # @deepseek-ai 官方辅助包与宿主同版本演进（当前 0.2.x）,semver 大版本跳跃
       # 可能伴随宿主协议变化,忽略自动升级,改由发版时人工对齐宿主版本。
       - dependency-name: "@deepseek-ai/*"
         update-types:
