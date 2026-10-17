@@ -54,7 +54,16 @@ const previous = { ...withoutEngines, peerDependencies: belowFloorPeers }
 const originalFailure = evaluatePluginCompatibility(previous)
 assert.deepEqual(refused(originalFailure).sort(), [...peerNames].sort())
 assert.equal(originalFailure.exempted, false, 'the pre-0.2 floor reproduces rejection without exemptions')
-assert.equal(evaluatePluginCompatibility({ ...withoutEngines, peerDependencies: pkg.peerDependencies }, {}, hostVersion), undefined, 'the declared peers admit the running host')
+const peerOnly = { ...withoutEngines, peerDependencies: pkg.peerDependencies }
+// 0.2.0-rc.1/rc.2 predate engines.dsh, so those hosts decide by the peers alone. Check
+// that path against the versions it exists for, not just against the running host.
+for (const version of ['0.2.0-rc.1', '0.2.0-rc.2']) {
+  assert.equal(evaluatePluginCompatibility(peerOnly, {}, version), undefined, `the declared peers admit ${version} on a peer-only host`)
+}
+for (const version of ['0.1.5-alpha.1', '0.3.0']) {
+  assert.ok(evaluatePluginCompatibility(peerOnly, {}, version), `the declared peers refuse ${version} on a peer-only host`)
+}
+assert.equal(evaluatePluginCompatibility(peerOnly, {}, hostVersion), undefined, 'the declared peers admit the running host')
 
 // The host evaluates ranges with includePrerelease; npm and pnpm use default semantics. The two
 // readings differ only for prereleases above the floor, so pin both explicitly: the engines range
