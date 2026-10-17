@@ -12,7 +12,7 @@
 
 [![version](https://img.shields.io/badge/version-1.8.35-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
 
-**最低支持宿主：DSH 0.2.0。** 插件声明 `engines.dsh` `>=0.2.0-rc.1 <0.3.0-0`（宿主准入插件的唯一闸门），不再支持任何 DSH 0.1.x 版本；本轮适配目标为 npm `next` 标签的 **0.2.1-rc.1**。见[兼容声明](docs/dsh-0.2.1-compatibility.md#中文)。
+**最低支持宿主：DSH 0.2.0。** 插件把下限声明在 `engines.dsh`（宿主准入插件的闸门），不再支持任何 DSH 0.1.x 版本；本轮适配目标为 npm `next` 标签的 **0.2.1-rc.1**。具体范围与宿主的读取方式见[兼容声明](docs/dsh-0.2.1-compatibility.md#中文)。
 
 新增 [DeepSeek Search／Fetch API 次数费](docs/web-request-fees.md#中文)，只计有结果的成功请求，并将网页抓取独立分类。
 
@@ -21,7 +21,7 @@
 
 更新说明：[v1.8.35](docs/update-notes-1.8.35.md#中文)。更新后完全重启 DSH。
 
-声明范围内的宿主记录：DSH `0.2.0-rc.1`、`0.2.1-alpha.5` 与 `0.2.1-rc.1` 已通过安装包安装、Web 启动、模块复用与合成计费。此前的 0.1.x 检查属历史记录，已不在支持范围内。见[兼容记录](docs/host-compatibility.md)。
+声明范围内的宿主记录与此前的 0.1.x 历史见[兼容记录](docs/host-compatibility.md)；逐版本清单在 `package.json` 的 `dsh.compatibility.dshReleases`。
 
 启动报 **Ledger is busy** 且费用卡片消失时，参见[账本锁恢复说明](docs/ledger-lock-recovery.md#简体中文)。
 

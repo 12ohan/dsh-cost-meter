@@ -12,7 +12,7 @@ Per-conversation cost · daily totals · OpenCode Go subscription quota display 
 
 [![version](https://img.shields.io/badge/version-1.8.35-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
 
-**Minimum supported host: DSH 0.2.0.** The plugin declares `engines.dsh` `>=0.2.0-rc.1 <0.3.0-0` — the host's only admission gate for plugins — and no longer supports any DSH 0.1.x release; the adaptation target is the npm `next` release **0.2.1-rc.1**. See the [compatibility declaration](docs/dsh-0.2.1-compatibility.md#english).
+**Minimum supported host: DSH 0.2.0.** The plugin declares the floor in `engines.dsh`, the host's admission gate for plugins, and no longer supports any DSH 0.1.x release; the adaptation target is the npm `next` release **0.2.1-rc.1**. Exact ranges and how the host reads them: [compatibility declaration](docs/dsh-0.2.1-compatibility.md#english).
 
 Supports [official Search/Fetch request fees](docs/web-request-fees.md#english), separately from model tokens.
 
@@ -21,7 +21,7 @@ Desktop users: follow the [Desktop installation instructions](docs/install-troub
 
 Release notes: [v1.8.35](docs/update-notes-1.8.35.md#english). Fully restart DSH after updating.
 
-Host records inside the declared range: DSH `0.2.0-rc.1`, `0.2.1-alpha.5` and `0.2.1-rc.1` passed packed installation, Web startup, shared-module checks and synthetic billing. Earlier 0.1.x checks are historical and outside the supported range. See the [compatibility record](docs/host-compatibility.md).
+Host records inside the declared range, and the earlier 0.1.x history, are in the [compatibility record](docs/host-compatibility.md); the per-release list lives in `package.json` (`dsh.compatibility.dshReleases`).
 
 If startup reports **Ledger is busy** and the cost widgets are missing, see [ledger lock recovery](docs/ledger-lock-recovery.md#english).
 
