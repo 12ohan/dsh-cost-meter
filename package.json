@@ -130,7 +130,8 @@
     "docs/update-notes-1.8.35.md",
     "docs/model-history-repricing.md",
     "docs/tokenrhythm-balance.md",
-    "docs/dsh-0.2.1-compatibility.md"
+    "docs/dsh-0.2.1-compatibility.md",
+    "docs/pnpm-supply-chain-policy.md"
   ],
   "dependencies": {
     "acorn": "8.15.0",
