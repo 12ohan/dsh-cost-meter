@@ -47,7 +47,7 @@ jobs:
         run: |
           npm install -g pnpm
           pnpm install --frozen-lockfile
-          npm install --prefix .tmp-context-host --no-audit --no-fund @deepseek-ai/dsh@0.2.0-rc.2 react@18.2.0 react-dom@18.2.0 jsdom@28.1.0 playwright-core@1.56.1
+          npm install --prefix .tmp-context-host --no-audit --no-fund @deepseek-ai/dsh@${{ env.DSH_PIN }} react@18.2.0 react-dom@18.2.0 jsdom@28.1.0 playwright-core@1.56.1
           mkdir -p .tmp-context-062 .tmp-context-066 .tmp-context-068
           npm pack dsh-context@0.62.0 --pack-destination .tmp-context-062
           npm pack dsh-context@0.66.0 --pack-destination .tmp-context-066
@@ -220,7 +220,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Install pinned DSH 0.2.1-rc.1 host
+      - name: Install the pinned next host (test/fixtures/next-host)
         run: |
           npm install -g pnpm
           pnpm install --frozen-lockfile
