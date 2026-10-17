@@ -130,8 +130,6 @@ ${[['dsh', 1280, 800, 1], ['dsh', 900, 600, 1], ['dsh', 520, 600, 1],
   // (margin:auto 与 margin:16px 在顶满时同值,断言照样全绿)。
   ['dsh', 1280, 800, 0], ['dsh', 900, 600, 0], ['dsh', 520, 600, 0],
   ['fullscreen', 1280, 800, 1], ['fullscreen', 1280, 800, 0], ['web', 1280, 800, 1], ['web', 1280, 800, 0],
-  // 0.1.x 宿主(无 chrome-top、Windows 下无 top-clearance)已不在支持范围内,
-  // 对应的 legacy / legacy-fullscreen 档位随之删除;A/B/C 三条不变式仍由下面各档守住。
   // macOS:不设 data-windows-titlebar,红绿灯区由 --dsh-frame-top-clearance: 48px 表达。
   ['darwin', 1280, 800, 1], ['darwin', 900, 600, 1], ['darwin', 1280, 800, 0]]
   .map(([env, w, h, tall]) => `<iframe title="${env}|${w}x${h}|t${tall}" width="${w}" height="${h}" src="/case?env=${env}&tall=${tall}"></iframe>`).join('')}
@@ -271,8 +269,8 @@ const server = createServer((request, response) => {
   const requestedEnv = new URL(request.url, 'http://127.0.0.1').searchParams.get('env') ?? 'dsh'
   // Select a constant scenario. Never interpolate the request parameter into HTML
   // or JavaScript: JSON.stringify alone does not escape a closing script tag.
-  const environments = { dsh: 'dsh', fullscreen: 'fullscreen', web: 'web', darwin: 'darwin' }
-  const env = Object.hasOwn(environments, requestedEnv) ? environments[requestedEnv] : null
+  const environments = ['dsh', 'fullscreen', 'web', 'darwin']
+  const env = environments.includes(requestedEnv) ? requestedEnv : null
   if (env === null) {
     response.statusCode = 400
     response.setHeader('content-type', 'text/plain; charset=utf-8')
@@ -300,7 +298,7 @@ html[data-windows-titlebar][data-fullscreen]{--dsh-frame-chrome-top:0px}`
   const caption = env === 'web' || isFullscreenEnv ? '' : `<div id="caption" aria-hidden="true"><i>–</i><i>□</i><i>×</i></div>`
   // 纯 Web 环境**没有** preload,因此 --dsh-windows-titlebar-height 必须不存在
   // (真实 DSH 里它只由 Windows preload 注入)。若在 :root 里无条件定义它,
-  // 四级回退的最后一档就会被误命中,测出的行为与真实纯 Web 不符。
+  // 两级回退的最后一档就会被误命中,测出的行为与真实纯 Web 不符。
   const titlebarHeightVar = env === 'web' ? '' : '--dsh-windows-titlebar-height:40px;'
   response.end(`<!doctype html><meta charset="utf-8"><style>
 :root{${titlebarHeightVar}
