@@ -8,8 +8,9 @@
 - 修复 [@XHPAN 报告并定位的 #297](https://github.com/Han-1413141/dsh-cost-meter/issues/297)：历史价表无损差分保存，每 24 层保留完整快照；旧账本自动转换前原样备份，所有时间点、历史金额与重算记录保留。另提供离线转换命令。
 - 账本合并共享不可变历史价表，跨进程用量更新复用已验证版本；自己的落盘不再触发下一轮重复读盘与深拷贝。普通写入遇锁保留待提交记录，交由定时器重试，不同步等待。详见[存储与迁移说明](docs/pricing-history-storage.md)。
 - 修复 [@playgithub 反馈的 #274](https://github.com/Han-1413141/dsh-cost-meter/issues/274#issuecomment-6215322540)：后台旧查询不能再覆盖刚保存的 OpenDesign 开关、工作区及其他费用配置；保存期间暂停重复读取，保存失败后恢复轮询。
-- 最低兼容要求从 DSH 0.1.x 提升到 **0.2.0**，适配目标为 npm `next` 标签的 `0.2.1-rc.1`：`package.json` 新增 `engines.dsh` 准入闸门（0.2.1 起的宿主按它判定，`0.2.0-rc.x` 仍按收紧后的 peer 判定），`dsh.compatibility.dsh` / `dshhub.compatibility.dsh` / `dsh.compatibility.dshReleases` 同步收紧并只保留 0.2.x 逐版本记录，两个宿主 peer 去掉全部 0.1.x 备选（旧范围里的 `^0.1.5-0` 会放行 `0.1.5-alpha.1`，是本轮前唯一实测准入失败项），开发回归依赖升到 `0.2.1-rc.1` 并同步锁文件与供应链排除表。**DSH 0.1.x 不再支持。** 字段取值、范围写法、peer 第二段的保留理由与两套 semver 语义的差异见[兼容性说明](docs/dsh-0.2.1-compatibility.md)。
-- 文档口径统一：双语 README 与[宿主兼容验证](docs/host-compatibility.md)改为「最低 DSH 0.2.0、目标 0.2.1-rc.1、0.1.x 不再支持」，并补上 0.2.1-rc.1 的实测记录；alpha.5 专题改写为 [最低 0.2.0 / 目标 0.2.1-rc.1 兼容性说明](docs/dsh-0.2.1-compatibility.md)，`package.json` 的 `files` 清单同步。
+- 最低兼容要求从 DSH 0.1.x 提升到 **0.2.0**，适配目标为 npm `next` 标签的 `0.2.1-rc.2`：`package.json` 新增 `engines.dsh` 准入闸门（0.2.1 起的宿主按它判定，`0.2.0-rc.x` 仍按收紧后的 peer 判定），`dsh.compatibility.dsh` / `dshhub.compatibility.dsh` / `dsh.compatibility.dshReleases` 同步收紧并只保留 0.2.x 逐版本记录，两个宿主 peer 去掉全部 0.1.x 备选（旧范围里的 `^0.1.5-0` 会放行 `0.1.5-alpha.1`；该组合历史上通过安装与启动检查，本轮起不再支持），开发回归依赖升到 `0.2.1-rc.1` 并同步锁文件与供应链排除表。**DSH 0.1.x 不再支持。** 字段取值、范围写法、peer 第二段的保留理由与两套 semver 语义的差异见[兼容性说明](docs/dsh-0.2.1-compatibility.md)。
+- 文档口径统一：双语 README 与[宿主兼容验证](docs/host-compatibility.md)改为「最低 DSH 0.2.0、目标 0.2.1-rc.2、0.1.x 不再支持」，并补上 0.2.1-rc.1 / 0.2.1-rc.2 的实测记录；alpha.5 专题改写为 [最低 0.2.0 / 目标 0.2.1-rc.2 兼容性说明](docs/dsh-0.2.1-compatibility.md)，`package.json` 的 `files` 清单同步。
+- 补充 DSH `0.2.1-rc.2`（当前 npm `next`）真机覆盖：next-host 夹具升到 rc.2，`dsh.compatibility.dshReleases` 增加 `0.2.1-rc.2: compatible`；按真实 rc.2 宿主复核准入判定、依赖闭包与运行时导入面，并与 rc.1 逐项对比。同时修正兼容性说明中关于旧版宿主下限的表述、`0.1.5-alpha.1` 的历史状态描述，以及 1.8.35 更新说明的验证链接。
 
 ## [1.8.35] - 2026-10-16
 

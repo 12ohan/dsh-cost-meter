@@ -1,10 +1,20 @@
 # 宿主兼容验证
 
-> **当前声明范围**：`engines.dsh` = `>=0.2.0-rc.1 <0.3.0-0`，`dsh.compatibility.dsh` 与 `dshhub.compatibility.dsh` 同值；本轮适配目标为 npm `next` 标签的 `0.2.1-rc.1`。**DSH 0.1.x 已不在支持范围内**：下文「历史验证：DSH 0.1」与 [1.7.14 兼容记录](host-compatibility-v1.7.14.md)中的 0.1.x 条目只作历史留存，不代表当前支持。声明理由见[兼容性说明](dsh-0.2.1-compatibility.md)。
+> **当前声明范围**：`engines.dsh` = `>=0.2.0-rc.1 <0.3.0-0`，`dsh.compatibility.dsh` 与 `dshhub.compatibility.dsh` 同值；本轮适配目标为 npm `next` 标签的 `0.2.1-rc.2`（此前的 `0.2.1-rc.1` 验证记录保留在下方）。**DSH 0.1.x 已不在支持范围内**：下文「历史验证：DSH 0.1」与 [1.7.14 兼容记录](host-compatibility-v1.7.14.md)中的 0.1.x 条目只作历史留存，不代表当前支持。声明理由见[兼容性说明](dsh-0.2.1-compatibility.md)。
+
+## 已验证宿主：DSH 0.2.1-rc.2（2026-10-17）
+
+插件版本：1.8.35（PR #301 合并后的兼容跟进分支 `codex/pr301-followups`）。适配目标为 npm `next` 标签的 `0.2.1-rc.2`；最低兼容要求仍为 0.2.0。
+
+- **宿主准入**：用真实 `@deepseek-ai/dsh-app-boot@0.2.1-rc.2` 的 `evaluatePluginCompatibility` 对 `package.json` 实测——接受 `0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.0`、`0.2.1-alpha.1`、`0.2.1-alpha.5`、`0.2.1-rc.1`、`0.2.1-rc.2`、`0.2.1`，拒绝 `0.1.0-rc.5`、`0.1.5-alpha.1`、`0.1.7-rc.2`、`0.2.0-alpha.1`、`0.2.0-rc.0`、`0.3.0-alpha.1`、`0.3.0`。rc.2 的 `dsh-app-boot` 与 rc.1 逐字节一致：`engines.dsh` 存在时 peer 不参与判定；`test/host-peer-compatibility.mjs` 在 rc.2 夹具下通过。
+- **打包产物端到端**：隔离 `DSH_HOME` 下 `npm pack` → 真实 `dsh plugin --profile web add <tgz>`（无版本豁免，配置图出现 `dsh-cost-meter`）→ 启动 Web 并运行兼容探针：`hostVersion=0.2.1-rc.2`、`pluginVersion=1.8.35`、两个宿主 peer 均复用宿主同一模块文件、三次合成调用共 300 输入 tokens、SCNet 快照与损坏回退通过，`passed: true`。
+- **全量回归与适配器**：`node test/verify.mjs` 在 rc.2 宿主下退出码 0、240 个 `[ok]`、0 个 `[fail]`、0 个 `[skip]`；`test/host-peer-compatibility.mjs`、`test/market-hot-install.mjs`、`test/next-host-install.mjs`、`test/native-search-host.mjs`、`test/web-request-host.mjs`、`test/context-costs.mjs --host` 通过；`statistics-dialog-titlebar.mjs` 在无头 Edge 下 PASS 203 条断言；`npm run build` 重建后 `lib` 无差异。
+- **宿主侧变更核对**：rc.1→rc.2 的 `dsh-app-boot`、`dsh-client-modules`（含客户端 loader）、`dsh-client-ui-layout`、`dsh-credentials`、`dsh-home-paths`、`dsh-web-frontend`（含 `Tooltip` 所在 seed 表与全部 `--dsw-*` token）实现文件逐字节一致，只有版本号/内嵌提交号变化；`dsh-web` 的内部 provider 取配置方式改为响应式，`native-search-host.mjs` 与 `web-request-host.mjs` 在 rc.2 真机通过。依赖闭包相对 rc.1 新增 2 个 `@deepseek-ai/*` 包（`dsh-client-ui-deepseek-model-label-1017`、`dsh-web-deepseek-api`）、移除 0 个，本插件 0 引用。
+- **覆盖面与边界**：未验证 DSH Desktop 整个桌面外壳、真实付费请求与其他第三方插件的账单查询；合成数据只写入仓库内临时 Profile，测试进程清除了继承的 API 凭据，未发起真实模型请求。CI 通用作业仍按 npm `latest`（`0.2.0-rc.2`）运行，rc.2 由 next-host 夹具作业做真机覆盖；statistics / sidebar 的 jsdom 套件本轮未在 rc.2 上单独重跑。
 
 ## 已验证宿主：DSH 0.2.1-rc.1（2026-10-17）
 
-插件版本：1.8.35（分支 `feat/dsh-021rc1-compat`）。适配目标为 npm `next` 标签的 `0.2.1-rc.1`；本轮同时把最低兼容要求提到 0.2.0。
+插件版本：1.8.35（PR #301 分支 `feat/dsh-021rc1-compat`）。当时适配目标为 npm `next` 标签的 `0.2.1-rc.1`；该轮同时把最低兼容要求提到 0.2.0。
 
 - **宿主准入**：用真实 `@deepseek-ai/dsh-app-boot@0.2.1-rc.1` 的 `evaluatePluginCompatibility` 对最终 `package.json` 实测——接受 `0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.1-alpha.5`、`0.2.1-rc.1`，拒绝 `0.1.0-rc.5`、`0.1.5-alpha.1`、`0.3.0`（修复了此前 peer 里的 `^0.1.5-0` 会放行 `0.1.5-alpha.1` 的缺口）。`engines.dsh` 存在的宿主上 peer 不再参与判定；`0.2.0-rc.x` 宿主尚无该分支，改由收紧后的 peer 准入——两条路径都在 `test/host-peer-compatibility.mjs` 里覆盖并实测。
 - **打包产物端到端**：隔离 `DSH_HOME` 下 `npm pack` → 真实 `dsh plugin --profile web add <tgz>`（无版本豁免，配置图出现 `dsh-cost-meter`）→ 启动 Web 并运行兼容探针：`hostVersion=0.2.1-rc.1`、`pluginVersion=1.8.35`、两个宿主 peer 均复用宿主同一模块文件、三次合成调用共 300 输入 tokens、SCNet 快照与损坏回退通过，`passed: true`。

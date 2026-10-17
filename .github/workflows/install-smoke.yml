@@ -10,9 +10,10 @@ permissions:
   contents: read
 
 env:
-  # Single pin for every job that installs a DSH closure directly. The other two hosts live in
-  # their fixtures: test/fixtures/install-host (plugin install smoke) and test/fixtures/next-host
-  # (next-host compatibility).
+  # Single pin for every job that installs a DSH closure directly: the npm `latest` closure
+  # (0.2.0-rc.2). The other two hosts live in their fixtures: test/fixtures/install-host
+  # (plugin install smoke, same closure) and test/fixtures/next-host (npm `next`, currently
+  # 0.2.1-rc.2; the next-host job exercises it end to end).
   DSH_PIN: 0.2.0-rc.2
 
 jobs:
@@ -233,7 +234,7 @@ jobs:
           node test/host-peer-compatibility.mjs
           node test/verify.mjs
           node test/market-hot-install.mjs
-      - name: Verify rc.1 context calibration and published peer UI
+      - name: Verify next-host context calibration and published peer UI
         run: |
           export DSH_TEST_NODE_MODULES="$PWD/.tmp-next-host/node_modules"
           export DSH_TEST_UI_MODULES="$DSH_TEST_NODE_MODULES"

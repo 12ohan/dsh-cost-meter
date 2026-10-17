@@ -12,7 +12,7 @@ Per-conversation cost · daily totals · OpenCode Go subscription quota display 
 
 [![version](https://img.shields.io/badge/version-1.8.35-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
 
-**Minimum supported host: DSH 0.2.0.** The plugin declares the floor in `engines.dsh`, the host's admission gate for plugins, and no longer supports any DSH 0.1.x release; the adaptation target is the npm `next` release **0.2.1-rc.1**. Exact ranges and how the host reads them: [compatibility declaration](docs/dsh-0.2.1-compatibility.md#english).
+**Minimum supported host: DSH 0.2.0.** The plugin declares the floor in `engines.dsh`, the host's admission gate for plugins, and no longer supports any DSH 0.1.x release; the adaptation target is the npm `next` release **0.2.1-rc.2**. Exact ranges and how the host reads them: [compatibility declaration](docs/dsh-0.2.1-compatibility.md#english).
 
 Supports [official Search/Fetch request fees](docs/web-request-fees.md#english), separately from model tokens.
 
