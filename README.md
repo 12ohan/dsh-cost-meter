@@ -21,7 +21,7 @@ Desktop users: follow the [Desktop installation instructions](docs/install-troub
 
 Release notes: [v1.8.35](docs/update-notes-1.8.35.md#english). Fully restart DSH after updating.
 
-Host records inside the declared range: DSH `0.2.0-rc.1` and `0.2.1-alpha.5` passed packed installation, Web startup, shared-module checks and synthetic billing. Earlier 0.1.x checks are historical and outside the supported range. See the [compatibility record](docs/host-compatibility.md).
+Host records inside the declared range: DSH `0.2.0-rc.1`, `0.2.1-alpha.5` and `0.2.1-rc.1` passed packed installation, Web startup, shared-module checks and synthetic billing. Earlier 0.1.x checks are historical and outside the supported range. See the [compatibility record](docs/host-compatibility.md).
 
 If startup reports **Ledger is busy** and the cost widgets are missing, see [ledger lock recovery](docs/ledger-lock-recovery.md#english).
 

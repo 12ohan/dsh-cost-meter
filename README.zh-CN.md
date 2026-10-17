@@ -21,7 +21,7 @@
 
 更新说明：[v1.8.35](docs/update-notes-1.8.35.md#中文)。更新后完全重启 DSH。
 
-声明范围内的宿主记录：DSH `0.2.0-rc.1` 与 `0.2.1-alpha.5` 已通过安装包安装、Web 启动、模块复用与合成计费。此前的 0.1.x 检查属历史记录，已不在支持范围内。见[兼容记录](docs/host-compatibility.md)。
+声明范围内的宿主记录：DSH `0.2.0-rc.1`、`0.2.1-alpha.5` 与 `0.2.1-rc.1` 已通过安装包安装、Web 启动、模块复用与合成计费。此前的 0.1.x 检查属历史记录，已不在支持范围内。见[兼容记录](docs/host-compatibility.md)。
 
 启动报 **Ledger is busy** 且费用卡片消失时，参见[账本锁恢复说明](docs/ledger-lock-recovery.md#简体中文)。
 

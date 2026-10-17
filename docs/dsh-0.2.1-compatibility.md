@@ -8,7 +8,7 @@
 
 | 字段 | 值 | 作用 |
 | --- | --- | --- |
-| `engines.dsh` | `>=0.2.0-rc.1 <0.3.0-0` | **宿主准入唯一有效字段**：安装、更新与启动加载都按它判定；存在时 `peerDependencies` 被完全忽略 |
+| `engines.dsh` | `>=0.2.0-rc.1 <0.3.0-0` | 0.2.1 起宿主准入的唯一有效字段：安装、更新与启动加载都按它判定，存在时 `peerDependencies` 被忽略；`0.2.0-rc.1`/`0.2.0-rc.2` 尚未实现该分支，其准入由下一行的 peer 决定 |
 | `dsh.compatibility.dsh` | `>=0.2.0-rc.1 <0.3.0-0` | DSH STORE 商城口径，宿主不读 |
 | `dshhub.compatibility.dsh` | `>=0.2.0-rc.1 <0.3.0-0` | 同上 |
 | `dsh.compatibility.dshReleases` | 只保留 0.2.x 逐版本记录 | 仅商城逐版本证据，宿主不读 |
@@ -17,7 +17,7 @@
 
 三点必须一起看：
 
-- **真正生效的闸门是 `engines.dsh`。** 只改 `dsh.compatibility.dsh` 不会改变任何行为——宿主闭包里没有读取该字段的代码。旧版声明只有 `engines.node`，等于没有下限。
+- **真正生效的闸门是 `engines.dsh`（0.2.1 起）与收紧后的 `peerDependencies`（`0.2.0-rc.1`/`rc.2`）。** 只改 `dsh.compatibility.dsh` 不会改变任何行为——宿主闭包里没有读取该字段的代码。旧版声明只有 `engines.node`，等于没有下限；两条路径本轮都实测过（`test/host-peer-compatibility.mjs` 同时覆盖 engines 与 peer 两条准入路径）。
 - **范围必须同时带 prerelease 下限与上界。** `>=0.2.0` 会拒绝 `0.2.0-rc.1` / `0.2.0-rc.2`，却放行 `0.3.0`；`>=0.2.0-rc.1 <0.3.0-0` 接受 `0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.1-alpha.5`、`0.2.1-rc.1`，拒绝全部 `0.1.x`（含此前被放行的 `0.1.5-alpha.1`）与 `0.3.0`。
 - **peer 的第二段 `|| >=0.2.1-0 <0.3.0-0` 是有意保留的，不要“优化”掉。** 宿主判定强制 `includePrerelease`，只用第一段就够了；但标准 npm 默认语义下第一段会拒绝 `0.2.1-rc.1`，第二段负责让清单在 npm/pnpm 工具链眼里自洽。
 
@@ -37,7 +37,7 @@
 
 This round raises the plugin's minimum host requirement from DSH `0.1.x` to **0.2.0**, targeting the npm `next` release **0.2.1-rc.1**. Daily billing, pricing, historical amounts and UI layout are unchanged.
 
-- `engines.dsh` (`>=0.2.0-rc.1 <0.3.0-0`) is the only field the host reads when admitting a plugin, and when it is present `peerDependencies` is ignored entirely. `dsh.compatibility.*`, `dshhub.compatibility.*` and `dsh.compatibility.dshReleases` are store-facing metadata that do not affect host behaviour; before this round the plugin declared no `dsh` floor at all.
+- `engines.dsh` (`>=0.2.0-rc.1 <0.3.0-0`) is the only field a 0.2.1+ host reads when admitting a plugin, and when it is present `peerDependencies` is ignored entirely. `0.2.0-rc.1`/`0.2.0-rc.2` predate that branch and admit plugins by the peer ranges below instead. `dsh.compatibility.*`, `dshhub.compatibility.*` and `dsh.compatibility.dshReleases` are store-facing metadata that do not affect host behaviour; before this round the plugin declared no `dsh` floor at all. Both admission paths are covered by `test/host-peer-compatibility.mjs`.
 - The range needs both a prerelease floor and an upper bound: `>=0.2.0` rejects `0.2.0-rc.1`/`0.2.0-rc.2` yet admits `0.3.0`, while `>=0.2.0-rc.1 <0.3.0-0` accepts `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-alpha.5` and `0.2.1-rc.1` and rejects all `0.1.x` (including `0.1.5-alpha.1`, which the previous range let through) and `0.3.0`.
 - The second peer alternative `>=0.2.1-0 <0.3.0-0` is intentional and should not be removed: the host evaluates with `includePrerelease`, so the first alternative alone satisfies it, but standard npm semantics would otherwise reject `0.2.1-rc.1`.
 - Runtime surface: the plugin imports only `credentialRef()` from `@deepseek-ai/dsh-credentials`, `resolveDshHome()` from `@deepseek-ai/dsh-home-paths` and `Tooltip` from `@deepseek-ai/dsh-client-ui-primitives`; all three keep their signatures and exports in 0.2.1-rc.1. None of the 11 `@deepseek-ai/*` packages dropped from the host closure are referenced, and no `--dsw-*` design token disappeared.

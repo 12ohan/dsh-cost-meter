@@ -38,7 +38,7 @@ DSH Desktop 0.2.0-rc.2 在 `pnpm add` 成功后，通过 `package.json` 的依�
 
 [#250](https://github.com/Han-1413141/dsh-cost-meter/issues/250) 的节选显示 pnpm 已输出 `done` 和 `Done in 5s`，随后安装程序报 `[timed out]`。这段日志没有包含依赖安装失败的错误，尚不能确定超时发生在 CLI 退出、宿主加载还是市场等待阶段。
 
-先查看当前 Profile 的插件列表，确认是否已写入安装记录；再保留 `hub.log` 中 pnpm 完成之后到超时之间的内容，以及相同操作的 `.plugin-manager/logs/operation-*/pnpm.log`。不要据此删除 Profile 或账本。DSH 0.1.5-rc.1 的市场热安装与当前 Windows 安装检查已有覆盖；报告机器上的原因仍需完整日志确认。
+先查看当前 Profile 的插件列表，确认是否已写入安装记录；再保留 `hub.log` 中 pnpm 完成之后到超时之间的内容，以及相同操作的 `.plugin-manager/logs/operation-*/pnpm.log`。不要据此删除 Profile 或账本。DSH 0.2.0-rc.2 宿主的市场热安装与当前 Windows 安装检查已有覆盖；报告机器上的原因仍需完整日志确认。
 
 ## 重装后仍不加载：检查禁用状态
 
