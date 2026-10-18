@@ -16,6 +16,7 @@ import {
   CODEX_SUBSCRIPTION_PACKAGE,
   applyCodexCompatHistory,
   codexCompatStatus,
+  codexRuntimeEnabled,
   codexUsageOf,
   detectCodexSubscription,
   dismissCodexCompatPrompt,
@@ -315,6 +316,7 @@ try {
   const statusDefault = codexCompatStatus(fakeLedger(), installed)
   assert.deepEqual(statusDefault, {
     installed: true,
+    enabled: true,
     version: '1.2.3',
     detection: 'package',
     planClass: 'auto',
@@ -423,7 +425,7 @@ try {
     apply({
       on: () => () => {},
       inject() {},
-      get: name => name === 'settings' ? { get: () => ({}) } : undefined,
+      get: name => name === 'settings' ? { get: () => ({}) } : name === 'loader' ? { entries: () => [{ options: { name: CODEX_SUBSCRIPTION_PACKAGE }, disabled: false, fiber: { state: 2 } }] } : undefined,
       effect: fn => { const dispose = fn(); if (typeof dispose === 'function') disposers.push(dispose) },
       provide: (name, value) => { if (name === 'costMeter') service = value },
       logger: console,

@@ -452,9 +452,10 @@
             el('label', null, t('peakStyleLabel')),
             el('select', {
               className: 'cm-input',
-              value: draft?.peakStyle === 'classic' ? 'classic' : 'compact',
+              value: draft?.peakStyle ?? 'compact',
               onChange: event => setField('peakStyle', event.target.value),
             },
+              el('option', { value: 'progress' }, resolveLocale(draft) === 'en' ? 'Time progress' : '时间进度条'),
               el('option', { value: 'compact' }, t('peakStyleCompact')),
               el('option', { value: 'classic' }, t('peakStyleClassic'))))),
         el('div', { className: 'cm-grid' },
@@ -749,7 +750,7 @@
             blended: tokens > 0 && b.cost > 0 ? b.cost / tokens * 1e6 : null,
             perUsd: b.cost > 0 ? tokens / b.cost : null,
           }
-        }).filter(r => r.tokens > 0 || r.cost > 0)
+        }).filter(r => (r.tokens > 0 || r.cost > 0) && config.modelStatistics?.[r.key]?.[source === 'today' ? 'today' : 'summary'] !== false)
       }
       return aggregate(source).sort((a, b) => b.cost - a.cost || b.tokens - a.tokens)
     }
@@ -1139,11 +1140,13 @@
 
     /** 统一卡片外壳。入参见下方各 XxxQuotaCard 的调用。 */
     function QuotaCard(props) {
+      const card = useRef(null)
+      useEffect(() => { if (props.targeted) { card.current?.scrollIntoView({ block: 'start' }); card.current?.focus({ preventScroll: true }) } }, [props.targeted])
       const { name, enabled, saved, busy, open, statusNode, configNode, errorMsg, onToggle, onRefresh, onLogin, loginRequired, onRemove, onToggleOpen, t } = props
       const expandable = configNode != null
       const buttonAction = loginRequired ? onLogin : onRefresh
       const buttonText = busy === true ? t(loginRequired ? 'loggingIn' : 'refreshing') : loginRequired ? t('loginCodingPlan') : t('refresh')
-      return el('div', { className: 'cm-budget cm-quota-card' },
+      return el('div', { ref: card, 'data-quota-plan': props.planId, tabIndex: props.targeted ? -1 : undefined, className: 'cm-budget cm-quota-card' },
         el('div', { className: 'cm-budget-head' },
           el('label', { className: 'cm-check' },
             el('input', { type: 'checkbox', 'aria-label': t('enable') + ': ' + name, checked: enabled === true, onChange: event => onToggle(event.target.checked) })),
@@ -1522,7 +1525,7 @@
       const cfgEntry = draft?.codingPlans?.[planId] ?? config.codingPlans?.[planId] ?? {}
       const live = plansState[planId] ?? { status: 'off', message: '', fetchedAt: 0, windows: {} }
       const enabled = cfgEntry.enabled === true
-      const [open, setOpen] = useState(false)
+      const [open, setOpen] = useState(props.targeted === true)
       const loginRequired = planId === 'qwen' && config.codingPlans?.qwen?.quotaSource === 'bailian'
         && cfgEntry.quotaSource === 'bailian' && live.quotaSource === 'bailian' && live.loginRequired === true
       const [busy, msg, doRefresh] = useQuotaRefresh(t, () => loginRequired ? api.loginCodingPlan(planId) : api.refreshCodingPlan(planId))
@@ -1720,6 +1723,7 @@
                 placeholder: planId === 'mimo' ? 'api-platform_serviceToken=…; userId=…' : planId === 'factory' ? 'FACTORY_API_KEY' : planId === 'opendesign' ? 'OPENDESIGN_CONTROL_KEY' : 'sk-…',
               })))
       return el(QuotaCard, {
+        planId, targeted: props.targeted,
         name: t(labelKey), enabled, saved: config.codingPlans?.[planId], busy, open, errorMsg: msg,
         statusNode, configNode,
         onToggle: value => setPlan('enabled', value),
@@ -1790,7 +1794,7 @@
         ...entries.map((entry, index) => ({ kind: 'custom', key: 'cb-' + identities.keys[index], index, enabled: entry.enabled === true })),
       ]
       const cardOf = item => {
-        if (item.kind === 'plan') return el(PlanQuotaCard, { key: item.key, planId: item.planId, labelKey: item.labelKey, state, api, t, draft, setDraft })
+        if (item.kind === 'plan') return el(PlanQuotaCard, { key: item.key, planId: item.planId, labelKey: item.labelKey, targeted: item.planId === props.targetPlan, state, api, t, draft, setDraft })
         if (item.kind === 'go') return el(GoQuotaCard, { key: item.key, state, api, t, draft, setDraft })
         if (item.kind === 'gateway') return el(GatewayQuotaCard, { key: item.key, index: item.index, state, api, t, draft, setDraft })
         return el(CustomBalanceEntryPanel, {
@@ -1907,7 +1911,7 @@
     function CodexCompatPromptSlot(props) {
       const snapshot = props.useCost?.(s => s)
       const state = snapshot?.state
-      return el(CodexLazy, { ...props, state, view: 'prompt', ready: state?.codexCompat?.promptDue, locale: snapshot?.locale })
+      return el(CodexLazy, { ...props, state, view: 'prompt', ready: state?.codexCompat?.enabled === true && state?.codexCompat?.promptDue, locale: snapshot?.locale })
     }
 
     function CostSection(props) {
@@ -1923,7 +1927,11 @@
       // 只渲染当前价格分区；模型定价为首屏，价格表和同步操作按需挂载。
       const [pricingView, setPricingView] = useState('models')
       // 设置页当前标签(issue #29):概览/额度/用量/价格/显示;仅切可见分区,不拆配置与保存逻辑。
-      const [tab, setTab] = useState('overview')
+      const [activeTab, setTab] = useState('overview')
+      const codexInstalled = state?.codexCompat?.installed === true && state?.codexCompat?.enabled === true
+      const tab = activeTab === 'codex' && !codexInstalled ? 'overview' : activeTab
+      useEffect(() => { if (!codexInstalled) setTab(current => current === 'codex' ? 'overview' : current) }, [codexInstalled])
+      const [quotaTarget, setQuotaTarget] = useState(null)
       // 自动保存状态:idle(无改动) | saving | saved | error。
       const [saveState, setSaveState] = useState({ status: 'idle', at: 0, error: null })
       const savedRef = React.useRef(null)
@@ -2078,8 +2086,8 @@
         ['quotas', t('tabQuotas')],
         ['usage', t('tabUsage')],
         ['pricing', t('tabPricing')],
-        // Codex 订阅兼容(契约 E):仅宿主检出 Codex(installed===true)时出现,旧宿主保持原 6 标签。
-        ...(state?.codexCompat?.installed === true ? [['codex', 'Codex']] : []),
+        // Codex 订阅兼容只在宿主确认插件已安装且启用时显示。
+        ...(codexInstalled ? [['codex', 'Codex']] : []),
         ['display', t('tabDisplay')],
       ]
       const warmTab = id => warmPage(({ statistics: api.loadStatistics, pricing: api.loadOpenRouter, codex: api.loadCodex })[id], { state })
@@ -2173,7 +2181,7 @@
           : null)
         : null,
         // ── 额度:订阅 / OpenCode Go / 网关 / 自定义余额统一成一串卡片 ──
-        tab === 'quotas' ? el(QuotasSection, { key: 'quotas', state, api, t, draft, setDraft })
+        tab === 'quotas' ? el(QuotasSection, { key: 'quotas', state, api, t, draft, setDraft, targetPlan: quotaTarget })
         : null,
         // ── 用量:热图、按模型统计、历史、按会话统计、历史数据操作 ──
         tab === 'usage' ? el(Fragment, { key: 'usage' },
@@ -2208,7 +2216,7 @@
           el('p', { className: 'cm-note' }, t('legacyImportNote'))))
         : null,
         // ── Codex:订阅兼容检出与历史用量并入(契约 E,组件在按需 chunk client.codex.js) ──
-        tab === 'codex' ? el(CodexLazy, { key: 'codex', state, api, t, locale, view: 'panel', ready: true })
+        tab === 'codex' ? el(CodexLazy, { key: 'codex', state, api, t, locale, view: 'panel', ready: codexInstalled })
         : null,
         // ── 显示:界面语言、徽章/侧边栏位置、图框开关等 ──
         tab === 'display' ? el(Fragment, { key: 'display' },
@@ -2218,7 +2226,9 @@
           : null,
         // 显示设置：独立加载的交互预览，共用草稿与自动保存。
         el(BillingStatistics, { state, api, load: api.loadDisplay, draft, setDraft, t, locale,
-          numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, formatMoneyUsd, onNavigate: setTab,
+          numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, formatMoneyUsd,
+          planOptions: CODING_PLAN_ROWS.map(row => [row.id, t(row.labelKey)]),
+          onNavigate: (page, plan) => { setQuotaTarget(plan); setTab(page) },
           renderSidebar: (preview, data = state) => renderSidebarFooter({ ...data, config: preview }, true, undefined, true),
           renderStyleSample: (preview, data = state, examples = true) => {
             if (!examples) return renderSidebarFooter({ ...data, config: preview }, true, undefined, true)
@@ -2231,7 +2241,7 @@
               el(BudgetBoxContent, { state: sampleState, wide: true, summary: simple }),
               el(MiniMaxPlanCard, { five: windows.five ?? { percent: 24 }, seven: windows.seven ?? { percent: 18 }, fetchedAt: 0, t, wide: true, direction: barDirectionOf(preview, 'plan') }))
           },
-          renderModelsSettings: () => el(ModelSidebarSettings, { draft, setDraft, t }) }))
+          renderModelsSettings: options => el(ModelSidebarSettings, { draft, setDraft, t, ...options }) }))
         : null,
         // ── 价格:峰谷计价、价格表、模型名匹配、官方价格同步、OpenRouter 公开报价 ──
         tab === 'pricing' ? el('div', { key: 'pricing', className: 'cm-pricing-page' },
@@ -2535,6 +2545,8 @@
         { name: 'sidebar.footer.action', id: 'cost-meter-simple-guide', order: 1, inject: injected }, SidebarSimpleGuide))
       slots.inject('sidebar.footer.action', () => slots.register(
         { name: 'sidebar.footer.action', id: 'cost-meter-billion-compatibility', order: 2, inject: injected }, BillionCompatibilityGuide))
+      slots.inject('sidebar.footer.action', () => slots.register(
+        { name: 'sidebar.footer.action', id: 'cost-meter-peak-progress-guide', order: 1, inject: injected }, PeakProgressGuide))
       // 首次更新引导:常驻 sidebar.footer.action 挂载,组件内部按 promptSeen 门控。
       slots.inject('sidebar.footer.action', () => {
         const dispose = slots.register(
@@ -2602,9 +2614,14 @@
         const showToday = state?.config?.sidebar !== false && state?.config?.hideTodayCost !== true
         const balanceDisplay = state?.config?.balance?.display ?? 'both'
         const showBalance = (balanceDisplay === 'sidebar' || balanceDisplay === 'both') && state?.config?.hideOfficialBalance !== true
+        const side = entry => entry?.enabled === true && ['sidebar', 'both'].includes(entry.display)
         const footer = showToday || showBalance || state?.config?.codexQuotaEnabled === true || state?.config?.sidebarModels?.enabled === true
           || (state?.config?.budget?.enabled === true && state?.config?.hideBudget !== true)
           || (state?.config?.goQuota?.enabled === true && ['sidebar', 'both'].includes(state.config.goQuota.display))
+          || (state?.config?.peakEnabled === true && state.config.peakNotice !== false)
+          || Object.values(state?.config?.codingPlans ?? {}).some(side)
+          || (state?.config?.gatewayQuotas?.sources ?? []).some(side)
+          || visibleCustomEntries(state, state?.config).length > 0
         const cornerEnabled = state?.config?.corner?.enabled === true || state?.config?.sidebarModels?.dock === true
         const sectionLocale = resolveLocale(state?.config || { activeLocale: store.getSnapshot().locale })
         const usagePosition = state?.config?.usage?.position ?? 'cost'

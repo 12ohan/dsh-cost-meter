@@ -15,7 +15,7 @@ for (const path of ['../src/codex/index.js', '../lib/client.codex.js']) {
   const page = factory(() => React).mount()
   assert.equal(typeof page, 'function', `${path}: mount returns a renderable component, as other lazy chunks do`)
   const text = node => node == null ? '' : typeof node === 'object' ? node.children.map(text).join('') : String(node)
-  const state = { codexCompat: { installed: true, version: '3.0.0', planClass: 'plan', promptDue: false,
+  const state = { codexCompat: { installed: true, enabled: true, version: '3.0.0', planClass: 'plan', promptDue: false,
     usage: { calls: 22, cost: 2, tokens: 15000, days: 2 }, historyAppliedAt: 0 } }
   const props = { state, view: 'panel', t: key => key, api: {}, locale: 'zh' }
   const render = value => { const element = page(value); return element.type(element.props) }
@@ -23,6 +23,8 @@ for (const path of ['../src/codex/index.js', '../lib/client.codex.js']) {
   assert.ok(text(render(props)).includes('22 次调用'))
   assert.ok(text(render({ ...props, locale: 'en' })).includes('Detected version: v3.0.0'))
   assert.equal(render({ ...props, state: { codexCompat: { installed: false } } }), null)
+  assert.equal(render({ ...props, state: { codexCompat: { ...state.codexCompat, enabled: false } } }), null, 'installed but disabled plugin has no settings panel')
+  assert.equal(render({ ...props, view: 'prompt', state: { codexCompat: { ...state.codexCompat, enabled: false, promptDue: true } } }), null, 'disabled plugin cannot show a stale prompt')
   assert.equal(render({ ...props, view: 'prompt' }), null, 'dismissed prompt does not render or reclassify anything')
   const prompt = render({ ...props, view: 'prompt', state: { codexCompat: { ...state.codexCompat, promptDue: true } } })
   assert.equal(prompt.type, 'dialog')
@@ -54,7 +56,7 @@ function fixture(path, storage = new Map(), blocked = false) {
   })
   const page = factory(() => React).mount()
   const props = { view: 'prompt', locale: 'zh', t: key => key,
-    state: { codexCompat: { installed: true, promptDue: true, usage: {} } }, api: {} }
+    state: { codexCompat: { installed: true, enabled: true, promptDue: true, usage: {} } }, api: {} }
   return {
     props,
     render() {

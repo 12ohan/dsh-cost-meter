@@ -89,14 +89,13 @@ const simple = footer(true)
 assert.match(simple.props.className, /simple/)
 assert.doesNotMatch(simple.props.className, /compact/)
 assert.equal(simple.props.tabIndex, 0, '可用键盘进入并滚动')
-const countCards = tree => nodes(tree).filter(n => typeof n.type === 'function').length
-assert.equal(nodes(simple).filter(n => n.props.summary === true).length, 1, '预算与今日合并为一个摘要')
+assert.equal(nodes(simple).filter(n => n.props.summary === true).length, 1, '预算使用独立摘要')
+assert.equal(nodes(simple).filter(n => n.props['data-cm-display'] === 'today').length, 1, '今日用量单独显示')
 assert.match(footer(false).props.className, /rail.*simple/)
 state.config = { ...config, sidebarSimple: false }
 const standard = footer(true)
 assert.match(standard.props.className, /compact/)
 assert.doesNotMatch(standard.props.className, /simple/)
-assert.equal(countCards(standard) + 1, countCards(simple), '简化模式保留预算与额度，并独立挂载峰谷条')
 console.log('[ok] #118 简化显示：选择/拒绝、保存失败重试、防重入、RPC 与重启持久化、引导串行、布局恢复及键盘滚动')
 
 // 保存被拒绝或长期等待时，关闭提示不伪装成已保存设置。
