@@ -13,21 +13,38 @@ window.__ModuleLoader__.load({
     const DIALOG_CLASS = 'cm-stat-dialog cm-codex-compat-dialog'
     if (typeof document !== 'undefined') {
       const style = document.createElement('style')
-      style.textContent = '.cm-codex-compat-dialog{width:min(560px,94vw)}.cm-codex-compat{display:flex;flex-direction:column;gap:8px;font-size:13px}'
+      style.textContent = '.cm-codex-compat-dialog{width:min(560px,94vw)}.cm-codex-compat{display:flex;flex-direction:column;gap:8px;font-size:13px}.cm-codex-compat :is(h3,p){margin:0}.cm-codex-compat h3{font-size:14px;font-weight:600}'
       // dsh-pocket 手机端适配(task-10):弹窗铺满窄屏、安全区内边距;桌面端规则不变。
       style.textContent += '@media (max-width:1023px){.cm-codex-compat-dialog{width:calc(100vw - 32px)}.cm-codex-compat{padding:0 2px}}body[data-dsh-pocket-layout="mobile"] .cm-codex-compat-dialog{width:calc(100vw - 32px)}'
       document.head.appendChild(style)
     }
 
-    // Shared pending/error state for the two api writes (apply / dismiss).
+    // Keep dismissal independent of the host, including during a pending write.
+    const DISMISSED_KEY = 'dsh-cost-meter:codex-compat-prompt-dismissed'
+    const dismissalListeners = new Set()
+    let dismissed = false
+    function wasDismissed() {
+      if (dismissed) return true
+      try { return window.localStorage.getItem(DISMISSED_KEY) === '1' } catch (_) { return false }
+    }
+    function rememberDismissal() {
+      dismissed = true
+      try { window.localStorage.setItem(DISMISSED_KEY, '1') } catch (_) { /* Closing works without browser storage. */ }
+      for (const update of dismissalListeners) update(true)
+    }
+
+    // Pending/error state belongs to reclassification, never to closing the dialog.
     function useCodexAction() {
       const [busy, setBusy] = useState(false)
       const [error, setError] = useState(null)
+      const pending = useRef(false)
       const run = action => {
-        if (busy) return
+        if (pending.current) return
+        pending.current = true
         setBusy(true)
         setError(null)
-        action().catch(failure => setError(failure?.message ?? String(failure))).finally(() => setBusy(false))
+        Promise.resolve().then(action).catch(failure => setError(failure?.message ?? String(failure)))
+          .finally(() => { pending.current = false; setBusy(false) })
       }
       return [busy, error, run]
     }
@@ -43,14 +60,25 @@ window.__ModuleLoader__.load({
       const text = (zh, english) => en ? english : zh
       const dialog = useRef(null)
       const [busy, error, run] = useCodexAction()
-      const show = compat?.promptDue === true
+      const [closed, setClosed] = useState(wasDismissed)
+      const show = compat?.promptDue === true && !closed
+      useEffect(() => {
+        dismissalListeners.add(setClosed)
+        return () => dismissalListeners.delete(setClosed)
+      }, [])
       // Native modal: browser owns backdrop/focus; ESC is routed to onCancel.
       useEffect(() => {
         if (show && dialog.current && !dialog.current.open) dialog.current.showModal()
       }, [show])
       if (!show) return null
       const usage = compat.usage ?? {}
-      const dismiss = () => run(api.dismissCodexCompat)
+      const dismiss = () => {
+        dialog.current?.close()
+        setClosed(true)
+        rememberDismissal()
+        // A failed or missing RPC must not keep the modal open or show it again.
+        Promise.resolve().then(() => api.dismissCodexCompat()).catch(() => {})
+      }
       return el('dialog', {
         ref: dialog,
         className: DIALOG_CLASS,
@@ -59,7 +87,7 @@ window.__ModuleLoader__.load({
       },
         el('header', { className: 'cm-stat-dialog-head' },
           text('兼容修复', 'Compatibility fix'),
-          el('button', { type: 'button', className: 'cm-btn', 'aria-label': text('关闭', 'Close'), disabled: busy, onClick: dismiss }, '×')),
+          el('button', { type: 'button', className: 'cm-btn', 'aria-label': text('关闭', 'Close'), onClick: dismiss }, '×')),
         el('div', { className: 'cm-stat-dialog-body' },
           el('p', null, text(
             '检测到 dsh-codex-subscription {version}。Codex 订阅用量不计入 API 费用；为兼容本插件，新产生的 Codex 用量已自动归类为 Plan。是否将历史 codex 类模型的计费统一归类为 Plan（订阅额度，不计入 API 费用）？',
@@ -73,7 +101,7 @@ window.__ModuleLoader__.load({
             ? el('div', { className: 'cm-msg err' }, text('失败：', 'Failed: ') + error)
             : null,
           el('div', { className: 'cm-buttons' },
-            el('button', { type: 'button', className: 'cm-btn', disabled: busy, onClick: dismiss }, text('保持现状', 'Keep status quo')),
+            el('button', { type: 'button', className: 'cm-btn', onClick: dismiss }, text('保持现状', 'Keep status quo')),
             el('button', { type: 'button', className: 'cm-btn primary', disabled: busy, onClick: () => run(api.applyCodexCompatHistory) }, text('统一归类为 Plan', 'Reclassify as Plan'))),
           el('p', { className: 'cm-note' }, text('之后可在 设置 → 费用 → Codex 订阅兼容 中处理。', 'You can change this later in Settings → Cost → Codex subscription compatibility.'))))
     }
@@ -82,6 +110,7 @@ window.__ModuleLoader__.load({
     function CodexCompatPanel(props) {
       const state = props.state
       const compat = state?.codexCompat
+      const [busy, error, run] = useCodexAction()
       // Legacy hosts have no codexCompat; CostSection hides the tab, this guard is a backstop.
       if (compat?.installed !== true) return null
       const api = props.api
@@ -98,6 +127,7 @@ window.__ModuleLoader__.load({
         el('p', null, text('历史用量：{calls} 次调用 · {cost} · {tokens} tokens · {days} 天', 'Historical usage: {calls} calls · {cost} · {tokens} tokens · {days} days')
           .replace('{calls}', usage.calls).replace('{cost}', '$' + Number(usage.cost ?? 0).toFixed(2))
           .replace('{tokens}', Number(usage.tokens ?? 0).toLocaleString(en ? 'en-US' : 'zh-CN')).replace('{days}', usage.days)),
+        error ? el('div', { className: 'cm-msg err', role: 'alert' }, text('失败：', 'Failed: ') + error) : null,
         applied
           ? el('p', { className: 'cm-note' }, text('已归类于 {time}', 'Reclassified at {time}').replace('{time}', new Date(compat.historyAppliedAt).toLocaleString()))
           : el('p', null, text('历史用量未归类。', 'Historical usage is not reclassified yet.')),
@@ -107,7 +137,7 @@ window.__ModuleLoader__.load({
         applied
           ? null
           : el('div', { className: 'cm-buttons' },
-            el('button', { type: 'button', className: 'cm-btn primary', onClick: () => api.applyCodexCompatHistory().catch(() => {}) }, text('统一归类为 Plan', 'Reclassify as Plan'))),
+            el('button', { type: 'button', className: 'cm-btn primary', disabled: busy, onClick: () => run(api.applyCodexCompatHistory) }, text('统一归类为 Plan', 'Reclassify as Plan'))),
         // Dismissed before applying: keep a note that applying remains available anytime.
         !applied && compat.promptDismissed === true
           ? el('p', { className: 'cm-note' }, text('此前选择保持现状，可随时统一归类。', 'You chose Keep status quo earlier; you can reclassify anytime.'))
@@ -115,7 +145,7 @@ window.__ModuleLoader__.load({
     }
 
     function mount() {
-      return { CodexCompatPrompt, CodexCompatPanel }
+      return props => el(props.view === 'prompt' ? CodexCompatPrompt : CodexCompatPanel, props)
     }
     return { mount, CodexCompatPrompt, CodexCompatPanel }
   },

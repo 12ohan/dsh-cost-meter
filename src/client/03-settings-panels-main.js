@@ -1899,12 +1899,7 @@
     // 一次性提示与设置页 Codex 分区体积较大,整体搬到按需 chunk client.codex.js;
     // 主包只留懒加载骨架:宿主未检出 Codex(installed/promptDue 非 true)时不加载 chunk。
     function CodexLazy(props) {
-      const [page, setPage] = useState(null)
-      useEffect(() => {
-        if (props.ready) props.api.loadCodex().then(setPage, () => {})
-      }, [props.ready])
-      const View = page && page[props.view]
-      return View && el(View, props)
+      return props.ready ? el(BillingStatistics, { ...props, load: props.api.loadCodex, quiet: props.view === 'prompt' }) : null
     }
 
     // 常驻 sidebar.footer.action 的挂载点:仅 promptDue 为 true 时挂 CodexCompatPrompt。
@@ -2086,6 +2081,7 @@
         ...(state?.codexCompat?.installed === true ? [['codex', 'Codex']] : []),
         ['display', t('tabDisplay')],
       ]
+      const warmTab = id => warmPage(({ statistics: api.loadStatistics, pricing: api.loadOpenRouter, codex: api.loadCodex })[id], { state })
       // 自动保存状态常驻标签栏右侧:在任意标签页改动配置都能看到保存反馈。
       const saveBadge = saveState.status === 'saving'
         ? el('span', { className: 'cm-hint' }, t('saving'))
@@ -2099,8 +2095,8 @@
             tabItems.map(([id, label]) => el('button', {
               key: id, type: 'button', role: 'tab', 'aria-selected': String(tab === id),
               className: 'cm-tab' + (tab === id ? ' active' : ''),
-              onMouseEnter: () => { if (id === 'statistics' || id === 'pricing') warmPage(id === 'statistics' ? api.loadStatistics : api.loadOpenRouter, { state }) },
-              onFocus: () => { if (id === 'statistics' || id === 'pricing') warmPage(id === 'statistics' ? api.loadStatistics : api.loadOpenRouter, { state }) },
+              onMouseEnter: () => warmTab(id),
+              onFocus: () => warmTab(id),
               onClick: () => setTab(id),
             }, label))),
           saveBadge),

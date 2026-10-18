@@ -111,6 +111,7 @@ window.__ModuleLoader__.load({
       .cm-stat{background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base,#fff)) r g b / 1);--cm-label:var(--dsw-alias-label-primary,#25262b);--cm-bg:var(--dsw-alias-bg-base,#fff);--cm-accent:var(--dsw-alias-state-business-primary,#4d6bfe);--cm-plan:var(--dsw-alias-label-tertiary,#8b9099);--cm-muted:var(--dsw-alias-label-tertiary,#858a94);--cm-border:var(--dsw-alias-border-l3,#e9eaed);--cm-surface:var(--dsw-alias-bg-layer-1,#f7f8fa);color:var(--dsw-alias-label-primary,#25262b);font-family:var(--ds-font-family-sans,inherit);font-size:13px;line-height:1.55;container-type:inline-size}
       .cm-stat *{box-sizing:border-box}.cm-stat h2,.cm-stat h3,.cm-stat p{margin:0}.cm-stat h2{font-size:18px;font-weight:600;letter-spacing:0}.cm-stat h3{font-size:14px;font-weight:500}
       .cm-stat-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 18px}.cm-stat-sub{font-size:12px;color:var(--cm-muted)}
+      .cm-stat-options{font-size:12px;color:var(--cm-muted);margin:8px 0 14px}.cm-stat-options>summary{cursor:pointer;list-style-position:inside;padding:3px 0}.cm-stat-options[open]>summary{margin-bottom:8px}.cm-stat-options .cm-stat-note{margin:0 0 8px!important;padding:8px 10px}.cm-stat-options .cm-context-setting{padding:8px 10px;margin:0}
       .cm-stat button,.cm-stat select,.cm-stat input{font:inherit;color:inherit}.cm-stat button{cursor:pointer}.cm-stat button:disabled{cursor:default;opacity:.45}.cm-stat button:focus-visible,.cm-stat select:focus-visible,.cm-stat input:focus-visible{outline:2px solid var(--cm-accent);outline-offset:3px}
       .cm-stat-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:14px 0}.cm-stat-controls label{display:grid;gap:4px;font-size:11px;color:var(--cm-muted)}
       .cm-stat input,.cm-stat select{background:var(--dsw-alias-bg-base,#fff);border:.5px solid var(--cm-border);border-radius:var(--dsw-radius-sm,8px);padding:6px 9px;max-width:210px;min-width:0}
@@ -1317,10 +1318,12 @@ window.__ModuleLoader__.load({
       const top = data?.totals
       const metric = (label, value, sub) => el('div', { className: 'cm-stat-metric', key: label }, el('div', { className: 'cm-stat-sub' }, label), el('div', { className: 'cm-stat-value' }, value), el('div', { className: 'cm-stat-sub' }, sub))
       return el('div', { className: 'cm-stat' }, el('style', null, css),
-        compressionBillingNotice(text, state.billionContext),
-        contextIntegration ? el(ContextIntegrationSettings, contextIntegration) : null,
         el('header', { className: 'cm-stat-head' }, el('div', null, el('h2', null, text('计费统计', 'Cost statistics')), el('p', { className: 'cm-stat-sub' }, scope.id ? text('单对话 · ', 'Conversation · ') + (scope.title === scope.id ? data?.sessions[0]?.title || scope.title : scope.title) : text('全部对话 · 从总额查看每一笔调用', 'All conversations · from totals to individual calls'))),
           button(text('刷新', 'Refresh'), () => setRevision(n => n + 1))),
+        (contextIntegration || window.__BILI__ || state.billionContext?.connected) ? el('details', { className: 'cm-stat-options' },
+          el('summary', null, text('计费与联动设置', 'Billing and integration settings')),
+          compressionBillingNotice(text, state.billionContext),
+          contextIntegration ? el(ContextIntegrationSettings, contextIntegration) : null) : null,
         scope.id ? button(text('← 全部对话', '← All conversations'), () => chooseScope({ id: '', title: '' })) : null,
         el('div', { className: 'cm-stat-controls' }, el('div', { className: 'cm-stat-periods' }, ...[['today', text('今天', 'Today')], ['week', text('近 7 天', 'Last 7 days')], ['month', text('近 30 天', 'Last 30 days')], ['all', text('全部记录', 'All retained')], ['custom', text('自定义', 'Custom')]].map(([id, label]) => button(label, () => choosePeriod(id), { key: id, 'aria-pressed': period === id })))),
         period === 'custom' ? el('div', { className: 'cm-stat-controls' }, ...['from', 'to'].map(key => el('label', { key }, key === 'from' ? text('开始日期', 'From') : text('结束日期', 'To'), el('input', { type: 'date', value: key === 'from' ? from : to, onChange: e => { setCustom({ from, to, [key]: e.target.value }); setOffset(0) } })))) : null,

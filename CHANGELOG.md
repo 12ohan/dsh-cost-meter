@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.3] - 2026-10-18
+
+- 费用概览卡片去掉说明文字底部的多余边距；计费统计先显示标题和数据，计费兼容说明及 dsh-context 设置合并为默认折叠的一行。
+- 修复 Codex 标签页加载后未渲染组件的问题；复用按需页面加载、预加载缓存和失败重试，恢复订阅兼容信息与历史归类入口。
+
+- Codex 兼容提示的 ×、Esc 与“保持现状”立即关闭，不再等待接口；请求中、接口失败或浏览器存储不可用时仍可关闭，关闭状态在本地保存。设置页显示归类失败信息并防止重复提交。
+- 热更新保留旧宿主接口清单时，补齐缺失的 Codex 历史归类与关闭接口，修复 HTTP 404；归类结果直接返回本地快照，不等待远程额度刷新。
+
 ## [1.9.2] - 2026-10-18
 
 - OpenDesign 直接查询接受 Control Key 的 `/billing/preflight`，省去先失败的请求；保留钱包独立查询和身份校验，补充只使用 DSH API 时的配置说明。感谢 @playgithub、@codeforker654、@yunjuanhuakai 在 [#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274) 的需求、复现与端点定位，以及 @unifilitence 在 [#313](https://github.com/Han-1413141/dsh-cost-meter/issues/313) 的独立验证。
