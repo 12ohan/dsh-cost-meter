@@ -2651,7 +2651,7 @@
 
     // ── ChatGPT PLUS(Codex)额度(issue #59 / dsh-codex-subscription)──────────
     // 数据源二选一:dsh-codex-connect 的只读状态路由,或 dsh-codex-subscription 的
-    // 宿主 Connection RPC。两条均只读,插件不在/未登录时相关 UI 自动隐藏。
+    // 宿主 Connection RPC。两条均只读,启用后查询失败保留提示与重试入口。
 
     const CODEX_STATUS_PATH = '/plugins/dsh-openai-codex/auth/status'
     const CODEX_WINDOWS = { 18000: 'five', 604800: 'weekly' }
@@ -2703,12 +2703,12 @@
 
     /**
      * 探测 Codex 额度。auto 优先 subscription,失败回退 connect;非 force 且同一数据源
-     * 5 分钟内直接用缓存(404/未登录/网络错误都按 unavailable 缓存)。
+     * 成功缓存 5 分钟,失败 1 分钟后可重试。
      */
     async function fetchCodexQuota(force = false, enabled = false, source = 'auto') {
       if (!enabled) return
       if (codexQuotaCache.inFlight !== null && codexQuotaCache.source === source) return codexQuotaCache.inFlight
-      if (!force && codexQuotaCache.source === source && codexQuotaCache.fetchedAt > 0 && Date.now() - codexQuotaCache.fetchedAt < 5 * 60_000) return undefined
+      if (!force && codexQuotaCache.source === source && codexQuotaCache.fetchedAt > 0 && Date.now() - codexQuotaCache.fetchedAt < (codexQuotaCache.status === 'ok' ? 5 : 1) * 60_000) return undefined
       const request = {}
       codexQuotaCache.request = request
       if (codexQuotaCache.source !== source) Object.assign(codexQuotaCache, { status: 'idle', windows: {}, fetchedAt: 0, source })
@@ -2746,7 +2746,8 @@
         const unsubscribe = subscribeCodexQuota(sync)
         sync()
         void fetchCodexQuota(false, true, source)
-        return () => { mounted = false; unsubscribe() }
+        const timer = setInterval(() => { void fetchCodexQuota(false, true, source) }, 60_000)
+        return () => { mounted = false; clearInterval(timer); unsubscribe() }
       }, [enabled, source])
       return snap.source === source ? snap : { status: 'idle', windows: {}, fetchedAt: 0 }
     }
@@ -2759,9 +2760,14 @@
       const enabled = state.config?.codexQuotaEnabled === true && state.config?.codexQuotaSidebar !== false
       const source = state.config?.codexQuotaSource ?? 'auto'
       const cached = useCodexQuota(enabled && !props.preview, source)
-      const snap = props.preview && state.displayPreviewCodex ? state.displayPreviewCodex : cached
+      const snap = props.preview ? state.displayPreviewCodex ?? (codexQuotaCache.source === source ? codexQuotaCache : { status: 'idle' }) : cached
       const refresh = useClickRefresh(props.preview ? null : () => fetchCodexQuota(true, enabled, source))
-      if (!enabled || snap.status !== 'ok') return null
+      if (!enabled) return null
+      if (snap.status !== 'ok') return el('div', {
+        'data-cm-display': 'codex', className: 'cm-bbox cm-mm clickable' + (wide === false ? ' rail' : ''),
+        title: t('codexQuotaUnavailable'), ...clickableRefreshProps(refresh.busy, refresh.run),
+      }, el('div', { className: 'cm-mm-title' }, wide === false ? 'Codex' : t('codexQuotaTitle')),
+      el('span', { className: 'cm-hint' }, wide === false ? '—' : t(snap.status === 'idle' || refresh.busy ? 'refreshing' : 'codexQuotaUnavailable')))
       const five = snap.windows.five ?? null
       const weekly = snap.windows.weekly ?? null
       if (five === null && weekly === null) return null
@@ -3390,12 +3396,8 @@
       const plansOn = sidebarPlanIds.length > 0
       // 网关额度侧边栏卡片(issue #96):按来源 display 门控,卡片本体见 GatewayQuotaBox。
       const gatewayNodes = gatewaySidebarCards(state, config, wide, api)
-      // Codex 周额度(issue #59):客户端探测 dsh-codex-connect,ok 时并入侧边栏;
-      // 其余显示全关时也要为它保留渲染入口(模块装载即有被动探测,快照同步读)。
-      const codexSnapshot = preview && state.displayPreviewCodex ? state.displayPreviewCodex : codexQuotaCache
-      const codexOn = config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false && codexSnapshot.status === 'ok'
-        && (preview || codexSnapshot.source === (config.codexQuotaSource ?? 'auto'))
-        && (codexSnapshot.windows.five !== null || codexSnapshot.windows.weekly !== null)
+      // 启用后始终保留卡片,避免未登录/接口失败时没有提示和手动重试入口。
+      const codexOn = config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false
       const budgetOn = (config.budget ?? {}).enabled === true && config.hideBudget !== true
       const showToday = config.sidebar !== false && config.hideTodayCost !== true
       const peakOn = peakView(config, Date.now()) !== null

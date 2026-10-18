@@ -10,7 +10,7 @@ const expose = ['mergeSessionUsage', 'useSessionUsage', 'SessionCost', 'DockLine
 const element = (type, props, ...children) => ({ type, props: props ?? {}, children })
 expose.push('TurnCost')
 expose.push('QuotaStrip')
-expose.push('CONTRIBUTION')
+expose.push('CONTRIBUTION', 'resetCodexQuota')
 const nodes = value => Array.isArray(value) ? value.flatMap(nodes) : value && typeof value === 'object' ? [value, ...nodes(value.children)] : []
 const textOf = value => Array.isArray(value) ? value.map(textOf).join('') : value && typeof value === 'object' ? textOf(value.children) : typeof value === 'string' || typeof value === 'number' ? String(value) : ''
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
@@ -366,13 +366,68 @@ assert.equal(rpcCalls[1].payload.force, true, 'manual refresh reaches the host R
 subHook.render({ enabled: false, source: 'subscription' })
 subscription.dispose()
 
+const subscriptionReply = remainingPercent => ({ ok: true, value: {
+  rateLimits: [{ id: 'codex', windows: [{ windowSeconds: 18000, remainingPercent }] }],
+} })
+// Starting while logged out must leave a retry entry and recover after login.
+for (const locale of ['en', 'zh']) {
+  let signedIn = false
+  const recovery = environment()
+  let calls = 0
+  recovery.ui.codexQuotaCache.rpc = { async call() { calls++; return signedIn ? subscriptionReply(80) : { ok: false } } }
+  const state = { config: { ...config, locale, codexQuotaEnabled: true, codexQuotaSource: 'subscription' } }
+  const footer = recovery.mount(recovery.ui.SidebarFooter, { wide: true, useCost: pick => pick({ state }) })
+  const card = recovery.mount(recovery.ui.CodexPlanBox, { state, wide: true })
+  assert.match(textOf(card.tree), locale === 'en' ? /Refreshing/ : /刷新中/)
+  await recovery.flush()
+  assert.ok(nodes(footer.tree).some(node => node.type === recovery.ui.CodexPlanBox), 'Codex alone mounts even before quota is available')
+  assert.match(textOf(card.tree), locale === 'en' ? /sign in.*retry/ : /登录.*重试/)
+  assert.equal(card.tree.props.role, 'button')
+  assert.doesNotMatch(textOf(card.tree), /\d+%/, 'missing quota is never shown as an invented percentage')
+  assert.equal(calls, 1, 'sidebar and card share one request')
+  signedIn = true
+  recovery.ui.codexQuotaCache.fetchedAt -= 61_000
+  await recovery.tick(60_000)
+  assert.equal(calls, 2, 'the minute retry recovers without remounting or toggling settings')
+  assert.match(textOf(card.tree), /20%/)
+  await recovery.tick(60_000)
+  assert.equal(calls, 2, 'successful data remains cached for five minutes')
+  recovery.ui.codexQuotaCache.fetchedAt -= 301_000
+  await recovery.tick(60_000)
+  assert.equal(calls, 3, 'successful quota is refreshed after its cache expires')
+  signedIn = false
+  await recovery.ui.fetchCodexQuota(true, true, 'subscription'); await recovery.flush()
+  assert.match(textOf(card.tree), locale === 'en' ? /sign in.*retry/ : /登录.*重试/)
+  signedIn = true
+  card.tree.props.onClick(); await recovery.flush()
+  assert.match(textOf(card.tree), /20%/, 'clicking the fallback retries immediately, bypassing the failure cache')
+  recovery.dispose()
+  assert.equal(recovery.timers.size, 0, 'unmount removes all quota timers')
+}
+
+// Both display preview modes are render-only; neither queries a real account.
+{
+  const preview = environment()
+  let calls = 0
+  preview.ui.codexQuotaCache.rpc = { call() { calls++; throw Error('preview queried account') } }
+  const state = { config: { ...config, codexQuotaEnabled: true } }
+  const card = preview.mount(preview.ui.CodexPlanBox, { state, wide: true, preview: true })
+  card.render({ state: { ...state, displayPreviewCodex: { status: 'ok', windows: { weekly: { percent: 42 } } } }, wide: true, preview: true })
+  assert.match(textOf(card.tree), /42%/)
+  card.tree.children[0].props.onClick(); await preview.flush(); await preview.tick(60_000)
+  Object.assign(preview.ui.codexQuotaCache, { status: 'ok', windows: { weekly: { percent: 75 } } })
+  card.render({ state, wide: true, preview: true })
+  assert.match(textOf(card.tree), /75%/, 'current-data preview reads the current cache without mounting a query')
+  card.render({ state: { config: { ...state.config, codexQuotaSource: 'subscription' } }, wide: true, preview: true })
+  assert.doesNotMatch(textOf(card.tree), /75%/, 'a preview cannot show quota belonging to a previously selected source')
+  assert.equal(calls, 0); assert.equal(preview.requests.length, 0); assert.equal(preview.timers.size, 0)
+  preview.dispose()
+}
+
 // Source changes start their own request and discard late replies in both orders.
 const connectReply = remainingPercent => ({ ok: true, json: async () => ({ status: 'signed-in', usage: {
   rateLimits: [{ id: 'codex', windows: [{ windowSeconds: 604800, remainingPercent }] }],
 } }) })
-const subscriptionReply = remainingPercent => ({ ok: true, value: {
-  rateLimits: [{ id: 'codex', windows: [{ windowSeconds: 18000, remainingPercent }] }],
-} })
 const oldConnect = deferred(), newSubscription = deferred()
 const race = environment(() => oldConnect.promise)
 let raceRpcCalls = 0
