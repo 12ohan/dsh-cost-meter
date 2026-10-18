@@ -265,6 +265,7 @@ try {
   assert.deepEqual(await page.locator('dialog').evaluate(skinPixels), [238, 232, 246, 255], 'opaque skin colour is preserved')
   await page.evaluate(()=>document.documentElement.style.setProperty('--dsw-alias-bg-layer-2','rgba(238,232,246,.92)'))
   assert.deepEqual(await page.locator('dialog').evaluate(skinPixels), [238, 232, 246, 255], 'translucent skin retains RGB channels with opaque alpha')
+  assert.deepEqual(await page.locator('.cm-stat').evaluate(skinPixels), [238, 232, 246, 255], 'statistics content uses the popup surface instead of the dark wallpaper wash')
   await page.screenshot({path:join(output,'04-theme-popup-opacity.png')})
   await page.locator('.cm-stat-dialog-body').evaluate(n=>{n.scrollTop=0})
   await page.evaluate(()=>{window.refreshFails=true})
