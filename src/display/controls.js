@@ -86,12 +86,14 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
       el('button', { type: 'button', className: 'cm-btn small', onClick: openQuota }, text('账户与额度设置 →', 'Account and quota settings →')),
     ]
   }
-  if (selected === 'codex') controls = [check(t('codexQuotaEnabled'), config.codexQuotaEnabled === true, value => set({ codexQuotaEnabled: value })),
+  if (selected === 'codex' || selected === 'strip-codex') controls = [check(t('codexQuotaEnabled'), config.codexQuotaEnabled === true, value => set({ codexQuotaEnabled: value })),
     choice(text('数据源', 'Data source'), config.codexQuotaSource ?? 'auto',
       [['auto', text('自动检测', 'Auto-detect')], ['connect', 'dsh-codex-connect'], ['subscription', 'dsh-codex-subscription']],
       value => set({ codexQuotaSource: value })),
     el('p', { className: 'cm-inspector-note cm-inspector-help' }, text('自动检测优先 dsh-codex-subscription，失败回退 dsh-codex-connect。', 'Auto prefers dsh-codex-subscription, then falls back to dsh-codex-connect.')),
-    check(t('codexQuotaSidebar'), config.codexQuotaSidebar !== false, value => set({ codexQuotaSidebar: value }))]
+    check(t('codexQuotaSidebar'), config.codexQuotaSidebar !== false, value => set({ codexQuotaSidebar: value })),
+    check(t('codexQuotaStrip'), config.codexQuotaStrip !== false, value => set({ codexQuotaStrip: value })),
+    ...(selected === 'strip-codex' ? [check(t('quotaStripEnable'), config.quotaStrip?.enabled === true, value => nested('quotaStrip', { enabled: value, promptSeen: true }))] : [])]
   if (selected === 'general') controls = [
     choice(t('languageLabel'), config.locale ?? 'auto', [['auto', t('localeAuto')], ['zh', '简体中文'], ['en', 'English']], value => set({ locale: value })),
     choice(t('currencyLabel'), config.currency ?? 'CNY', [['CNY', t('currencyCny')], ['USD', t('currencyUsd')], ['EUR', t('currencyEur')]], value => set({ currency: value, ...CURRENCY_PRESETS[value], exchangeRate: config.exchangeRateAuto !== false ? config.fxRates?.[value] ?? CURRENCY_PRESETS[value].exchangeRate : CURRENCY_PRESETS[value].exchangeRate })),
@@ -120,8 +122,8 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
     region === 'sidebar' ? el('div', { className: 'cm-inspector-divider' }) : null,
     field(text('调整组件', 'Customize'), el('select', { className: 'cm-input', value: selected ?? '', onChange: event => select(event.target.value) },
       !selected ? el('option', { value: '', disabled: true, hidden: true }, text('选择组件', 'Choose a component')) : null,
-      ...(region === 'sidebar' ? ['budget','balance','today','peak','models','go','plan','customBalance','codex'] : region === 'composer' ? ['strip-budget','strip-go','strip-plans','session-dock','badge','corner','models'] : ['session-header','badge','turn']).map(key => el('option', { key, value: key }, labels[key])))),
+      ...(region === 'sidebar' ? ['budget','balance','today','peak','models','go','plan','customBalance','codex'] : region === 'composer' ? ['strip-budget','strip-go','strip-plans','strip-codex','session-dock','badge','corner','models'] : ['session-header','badge','turn']).map(key => el('option', { key, value: key }, labels[key])))),
     selected ? el('div', { className: 'cm-inspector-controls', key: selected, 'data-inspector': selected },
-      selection && !['models', 'today', 'budget', 'peak', 'balance', 'go', 'plan', 'customBalance'].includes(selected) ? check(text('显示此组件', 'Show this component'), selection.on, () => set(selection.patch)) : null,
+      selection && !['models', 'today', 'budget', 'peak', 'balance', 'go', 'plan', 'customBalance', 'codex', 'strip-codex'].includes(selected) ? check(text('显示此组件', 'Show this component'), selection.on, () => set(selection.patch)) : null,
       ...controls) : null)
 }

@@ -153,6 +153,7 @@
         sidebarModels: Object.fromEntries(Object.entries(MODEL_SIDEBAR_DEFAULTS).map(([k, v0]) => [k, v.sidebarModels?.[k] ?? v0])),
         codexQuotaEnabled: v.codexQuotaEnabled === true,
         codexQuotaSidebar: v.codexQuotaSidebar !== false,
+        codexQuotaStrip: v.codexQuotaStrip !== false,
         codexQuotaSource: ['connect', 'subscription'].includes(v.codexQuotaSource) ? v.codexQuotaSource : 'auto',
         // Codex 订阅兼容(契约 B-5):用户已关闭一次性提示 / 已应用历史归类的时点。
         // 直通白名单缺失会导致关闭后重开页面又弹提示,或应用后状态行回落「未应用」。
@@ -2651,7 +2652,7 @@
 
     // ── ChatGPT PLUS(Codex)额度(issue #59 / dsh-codex-subscription)──────────
     // 数据源二选一:dsh-codex-connect 的只读状态路由,或 dsh-codex-subscription 的
-    // 宿主 Connection RPC。两条均只读,插件不在/未登录时相关 UI 自动隐藏。
+    // 宿主 Connection RPC。两条均只读,启用后查询失败保留提示与重试入口。
 
     const CODEX_STATUS_PATH = '/plugins/dsh-openai-codex/auth/status'
     const CODEX_WINDOWS = { 18000: 'five', 604800: 'weekly' }
@@ -2703,12 +2704,12 @@
 
     /**
      * 探测 Codex 额度。auto 优先 subscription,失败回退 connect;非 force 且同一数据源
-     * 5 分钟内直接用缓存(404/未登录/网络错误都按 unavailable 缓存)。
+     * 成功缓存 5 分钟,失败 1 分钟后可重试。
      */
     async function fetchCodexQuota(force = false, enabled = false, source = 'auto') {
       if (!enabled) return
       if (codexQuotaCache.inFlight !== null && codexQuotaCache.source === source) return codexQuotaCache.inFlight
-      if (!force && codexQuotaCache.source === source && codexQuotaCache.fetchedAt > 0 && Date.now() - codexQuotaCache.fetchedAt < 5 * 60_000) return undefined
+      if (!force && codexQuotaCache.source === source && codexQuotaCache.fetchedAt > 0 && Date.now() - codexQuotaCache.fetchedAt < (codexQuotaCache.status === 'ok' ? 5 : 1) * 60_000) return undefined
       const request = {}
       codexQuotaCache.request = request
       if (codexQuotaCache.source !== source) Object.assign(codexQuotaCache, { status: 'idle', windows: {}, fetchedAt: 0, source })
@@ -2746,12 +2747,13 @@
         const unsubscribe = subscribeCodexQuota(sync)
         sync()
         void fetchCodexQuota(false, true, source)
-        return () => { mounted = false; unsubscribe() }
+        const timer = setInterval(() => { void fetchCodexQuota(false, true, source) }, 60_000)
+        return () => { mounted = false; clearInterval(timer); unsubscribe() }
       }, [enabled, source])
       return snap.source === source ? snap : { status: 'idle', windows: {}, fetchedAt: 0 }
     }
 
-    /** Codex 额度侧边栏卡片:复用 MiniMax 行渲染(已用口径,5h + 7d 双窗口)。 */
+    /** Codex 额度侧边栏卡片:明确显示剩余额度和本机时区的重置时间。 */
     function CodexPlanBox(props) {
       const hoverProps = useQuotaHoverRefresh()
       const { state, wide } = props
@@ -2759,29 +2761,35 @@
       const enabled = state.config?.codexQuotaEnabled === true && state.config?.codexQuotaSidebar !== false
       const source = state.config?.codexQuotaSource ?? 'auto'
       const cached = useCodexQuota(enabled && !props.preview, source)
-      const snap = props.preview && state.displayPreviewCodex ? state.displayPreviewCodex : cached
+      const snap = props.preview ? state.displayPreviewCodex ?? (codexQuotaCache.source === source ? codexQuotaCache : { status: 'idle' }) : cached
       const refresh = useClickRefresh(props.preview ? null : () => fetchCodexQuota(true, enabled, source))
-      if (!enabled || snap.status !== 'ok') return null
-      const five = snap.windows.five ?? null
-      const weekly = snap.windows.weekly ?? null
-      if (five === null && weekly === null) return null
-      const direction = barDirectionOf(state.config, 'plan')
-      const fiveView = five === null ? null : miniMaxRow(t('codingPlanRemain5h'), five, direction, t)
-      const weekView = weekly === null ? null : miniMaxRow(t('codingPlanRemain7d'), weekly, direction, t)
-      const views = [fiveView, weekView].filter(Boolean)
-      const level = views.some(v => v.level === 'over') ? 'over' : views.some(v => v.level === 'warn') ? 'warn' : 'ok'
-      const lineOf = (label, win, view) => { const reset = miniMaxResetText(win, t); return label + ' ' + quotaValueText(view.label, direction, t) + (reset ? ' · ' + reset : '') }
+      if (!enabled) return null
+      if (snap.status !== 'ok') return el('div', {
+        'data-cm-display': 'codex', className: 'cm-bbox cm-mm clickable' + (wide === false ? ' rail' : ''),
+        title: t('codexQuotaUnavailable'), ...clickableRefreshProps(refresh.busy, refresh.run),
+      }, el('div', { className: 'cm-mm-title' }, wide === false ? 'Codex' : t('codexQuotaTitle')),
+      el('span', { className: 'cm-hint' }, wide === false ? '—' : t(snap.status === 'idle' || refresh.busy ? 'refreshing' : 'codexQuotaUnavailable')))
+      const views = [['five', 'codexQuotaFive'], ['weekly', 'codexQuotaWeek']].flatMap(([key, label]) => {
+        const win = snap.windows[key]
+        if (!win) return []
+        const text = quotaValueText(simpleBarByDirection(win.percent, 'remaining').label, 'remaining', t)
+        const date = new Date(typeof win.resetsAt === 'string' ? win.resetsAt : NaN)
+        const reset = Number.isFinite(date.getTime()) ? t('codexQuotaReset', { time: date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) }) : ''
+        return [{ key, label: t(label), text, reset, win }]
+      })
+      if (!views.length) return null
+      const level = views.some(v => v.win.percent >= 100) ? 'over' : views.some(v => v.win.percent >= 80) ? 'warn' : 'ok'
       const detail = [
         t('codexQuotaTitle'),
-        fiveView === null ? null : lineOf(t('codingPlanRemain5h'), five, fiveView),
-        weekView === null ? null : lineOf(t('codingPlanRemain7d'), weekly, weekView),
+        ...views.map(view => view.label + ' · ' + view.text + (view.reset ? ' · ' + miniMaxResetText(view.win, t) : '')),
         snap.fetchedAt > 0 ? t('goQuotaFetchedAt', { time: new Date(snap.fetchedAt).toLocaleTimeString() }) : null,
         ...clickRefreshTipLines(t, refresh),
       ].filter(Boolean).join('\n')
       const body = el(Fragment, null,
         el('div', { className: 'cm-mm-title' }, t('codexQuotaTitle')),
-        fiveView?.row,
-        weekView?.row)
+        ...views.map(view => el('div', { key: view.key, className: 'cm-codex-window' },
+          el('span', null, view.label + ' ·'), el('strong', null, view.text),
+          view.reset ? el('span', { className: 'cm-mm-reset' }, '· ' + view.reset) : null)))
       const rail = el(Fragment, null, ...views.map(view => el('div', { className: 'cm-bbox-rail cm-num' }, view.text)))
       return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
@@ -2986,7 +2994,8 @@
 
     function QuotaStrip(props) {
       const costStore = props.useCost ? props.useCost(s => s) : undefined
-      useCodexQuota(costStore?.state?.config?.codexQuotaEnabled === true, costStore?.state?.config?.codexQuotaSource)
+      const cfg = costStore?.state?.config
+      useCodexQuota(cfg?.codexQuotaEnabled === true && cfg.codexQuotaStrip !== false && cfg.quotaStrip?.enabled === true, cfg?.codexQuotaSource)
       // Hook 先于一切条件返回(React 规则):横条会因 state 缺失/开关关闭随时提前 return null。
       const [busyKey, setBusyKey] = useState(null)
       const [errs, setErrs] = useState({})
@@ -3096,7 +3105,7 @@
       }
       // Codex chip(issue #59):connect / subscription 在位且已登录时出现;5h + 周双窗口。
       // 独立于 Coding Plan 开关:即使 strip.plans 为 false,Codex chip 仍应渲染。
-      const codexWins = config.codexQuotaEnabled === true && codexQuotaCache.source === (config.codexQuotaSource ?? 'auto') && codexQuotaCache.status === 'ok' ? codexQuotaCache.windows : {}
+      const codexWins = config.codexQuotaEnabled === true && config.codexQuotaStrip !== false && codexQuotaCache.source === (config.codexQuotaSource ?? 'auto') && codexQuotaCache.status === 'ok' ? codexQuotaCache.windows : {}
       const fiveWin = codexWins.five ?? null
       const weekWin = codexWins.weekly ?? null
       const pctOf = win => Math.max(0, Math.min(100, Math.round(Number(win.percent) || 0)))
@@ -3109,12 +3118,12 @@
           label: 'Codex',
           level: worst >= 100 ? 'over' : worst >= 80 ? 'warn' : 'ok',
           tip: t('codexQuotaTitle') + ': ' + [
-            fivePct === null ? null : '5h ' + fivePct + '%',
-            weekPct === null ? null : t('codingPlanRemain7d') + ' ' + weekPct + '%',
+            fivePct === null ? null : '5h ' + quotaValueText(100 - fivePct, 'remaining', t),
+            weekPct === null ? null : t('codingPlanRemain7d') + ' ' + quotaValueText(100 - weekPct, 'remaining', t),
           ].filter(Boolean).join(' · '),
           segs: [
-            fivePct === null ? null : { name: '5h', pct: Math.round(simpleBarByDirection(fivePct, barDirectionOf(config, 'plan')).width) },
-            weekPct === null ? null : { name: 'weekly', pct: Math.round(simpleBarByDirection(weekPct, barDirectionOf(config, 'plan')).width) },
+            fivePct === null ? null : { name: '5h', pct: 100 - fivePct },
+            weekPct === null ? null : { name: 'weekly', pct: 100 - weekPct },
           ].filter(Boolean),
         })
       }
@@ -3149,7 +3158,7 @@
               } else {
                 kids.push(el('span', { className: 'cm-qseg', key: s.name },
                   el('span', { className: 'cm-qbar' }, el('span', { className: 'cm-qfill', style: { width: s.pct + '%' } })),
-                  el('span', null, s.pct + '%')))
+                  el('span', null, c.key === 'codex' ? (c.segs.length > 1 ? (s.name === '5h' ? '5h' : t('goShortWeekly')) + ' ' : '') + quotaValueText(s.pct, 'remaining', t) : s.pct + '%')))
               }
             })
           }
@@ -3390,12 +3399,8 @@
       const plansOn = sidebarPlanIds.length > 0
       // 网关额度侧边栏卡片(issue #96):按来源 display 门控,卡片本体见 GatewayQuotaBox。
       const gatewayNodes = gatewaySidebarCards(state, config, wide, api)
-      // Codex 周额度(issue #59):客户端探测 dsh-codex-connect,ok 时并入侧边栏;
-      // 其余显示全关时也要为它保留渲染入口(模块装载即有被动探测,快照同步读)。
-      const codexSnapshot = preview && state.displayPreviewCodex ? state.displayPreviewCodex : codexQuotaCache
-      const codexOn = config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false && codexSnapshot.status === 'ok'
-        && (preview || codexSnapshot.source === (config.codexQuotaSource ?? 'auto'))
-        && (codexSnapshot.windows.five !== null || codexSnapshot.windows.weekly !== null)
+      // 启用后始终保留卡片,避免未登录/接口失败时没有提示和手动重试入口。
+      const codexOn = config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false
       const budgetOn = (config.budget ?? {}).enabled === true && config.hideBudget !== true
       const showToday = config.sidebar !== false && config.hideTodayCost !== true
       const peakOn = peakView(config, Date.now()) !== null

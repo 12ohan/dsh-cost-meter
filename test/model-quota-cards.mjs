@@ -340,7 +340,7 @@ let live = { ...state, config: { ...base, sidebarModels: { ...base.sidebarModels
 const remote = new Proxy({ getState: async () => { getCalls++; return { ok: true, value: live } } }, {
   get: (obj, key) => obj[key] ?? (async (...args) => { remoteArgs = [key, ...args]; return remoteResult }) })
 remote.getLocalState = remote.getState
-const stop = await activation.apply({ remote: { $mount: async () => () => {} }, get: key => key === 'remote.costMeter' ? remote : {
+const stop = await activation.apply({ remote: { $mount: async () => () => {} }, inject() {}, get: key => key === 'remote.costMeter' ? remote : {
   inject: (_, fn) => { const cleanup = fn(); if (cleanup) cleanups.push(cleanup) },
   register: (options, component) => { const key = options.name + ':' + options.id; registered.set(key, { options, component }); return () => registered.delete(key) },
 }, effect: fn => { const cleanup = fn(); if (cleanup) cleanups.push(cleanup) }, on: () => () => {} })
@@ -396,7 +396,7 @@ const startupRemote = { getState: async () => {
   return available ? { ok: true, value: startupState } : { ok: false, error: { message: 'gateway/invocation-unavailable' } }
 } }
 startupRemote.getLocalState = startupRemote.getState
-const stopStartup = await startup.apply({ remote: { $mount: async () => () => {} },
+const stopStartup = await startup.apply({ remote: { $mount: async () => () => {} }, inject() {},
   get: key => key === 'remote.costMeter' ? startupRemote : {
     inject: (_, fn) => { const cleanup = fn(); if (cleanup) startupCleanups.push(cleanup) },
     register: (options, component) => { startupSlots.set(options.id, { options, component }); return () => {} },

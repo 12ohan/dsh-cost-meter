@@ -90,6 +90,7 @@ const roundTrip = config => ui.parseConfig(sanitizeConfig(config), 'config')
  assert.equal(config.priceOverrides[key], '__custom__')
 }
 assert.equal(roundTrip({}).codexQuotaSidebar, true, 'old configs retain the sidebar card')
+assert.equal(roundTrip({}).codexQuotaStrip, true, 'old configs retain the composer quota strip')
 for (const key of ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'sessionCostCompact']) {
   assert.equal(roundTrip({})[key], false)
   for (const enabled of [true, false]) {
@@ -99,13 +100,14 @@ for (const key of ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost
   }
   assert.ok(applyConfigPatch(sanitizeConfig({}), { [key]: 'true' }).errors.length)
 }
-for (const enabled of [true, false]) {
-  const patch = applyConfigPatch(sanitizeConfig({}), { codexQuotaSidebar: enabled })
+for (const key of ['codexQuotaSidebar', 'codexQuotaStrip']) for (const enabled of [true, false]) {
+  const patch = applyConfigPatch(sanitizeConfig({}), { [key]: enabled })
   assert.deepEqual(patch.errors, [])
   const wire = stateSchema.shape.config.parse(patch.config)
-  assert.equal(ui.parseConfig(wire, 'config').codexQuotaSidebar, enabled, 'strict RPC and client readers preserve the new field')
+  assert.equal(ui.parseConfig(wire, 'config')[key], enabled, 'strict RPC and client readers preserve both display switches')
 }
 assert.ok(applyConfigPatch(sanitizeConfig({}), { codexQuotaSidebar: 'false' }).errors.length > 0)
+assert.ok(applyConfigPatch(sanitizeConfig({}), { codexQuotaStrip: 'false' }).errors.length > 0)
 
 for (const locale of ['zh', 'en']) {
   const t = ui.makeT(locale)

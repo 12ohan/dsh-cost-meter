@@ -241,6 +241,7 @@ jobs:
           node test/verify.mjs
           node test/market-hot-install.mjs
           node test/codex-compat-http.mjs
+          node test/plugin-compatibility-watch.mjs
       - name: Verify next-host context calibration and published peer UI
         run: |
           export DSH_TEST_NODE_MODULES="$PWD/.tmp-next-host/node_modules"
@@ -254,6 +255,7 @@ jobs:
           node test/context-costs-regression-browser.mjs
           node test/native-search-host.mjs
           node test/web-request-host.mjs
+          node test/codex-quota-browser.mjs
       - name: Install the packed plugin and start the real Web host
         run: |
           export DSH_TEST_NODE_MODULES="$PWD/.tmp-next-host/node_modules"

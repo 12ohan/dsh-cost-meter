@@ -70,7 +70,7 @@ const packedMessages = Object.entries(messages).map(([locale, dict]) => [locale,
 // restore them before exposing dictionaries. All translations round-trip below.
 const phraseCounts = new Map()
 for (const value of Object.values(messages).flatMap(Object.values)) {
-  for (const match of value.matchAll(/[A-Za-z][A-Za-z0-9'-]{3,}/g)) {
+  for (const match of value.matchAll(/[A-Za-z][A-Za-z0-9'-]{2,}/g)) {
     phraseCounts.set(match[0], (phraseCounts.get(match[0]) ?? 0) + 1)
   }
   const words = [...value.matchAll(/[A-Za-z][A-Za-z0-9'-]*(?: [A-Za-z][A-Za-z0-9'-]*)+/g)]
@@ -81,8 +81,8 @@ for (const value of Object.values(messages).flatMap(Object.values)) {
       if (phrase.length >= 8) phraseCounts.set(phrase, (phraseCounts.get(phrase) ?? 0) + 1)
     }
   }
-  for (const match of value.matchAll(/[\u3400-\u9fff]{3,}/g)) {
-    for (let i = 0; i < match[0].length; i++) for (let n = 3; n <= 16 && i + n <= match[0].length; n++) {
+  for (const match of value.matchAll(/[\u3400-\u9fff]{2,}/g)) {
+    for (let i = 0; i < match[0].length; i++) for (let n = 2; n <= 16 && i + n <= match[0].length; n++) {
       const phrase = match[0].slice(i, i + n)
       phraseCounts.set(phrase, (phraseCounts.get(phrase) ?? 0) + 1)
     }
