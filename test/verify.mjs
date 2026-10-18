@@ -232,7 +232,7 @@ console.log('[ok] 浏览器端 bundle 语法门禁(client.js vm 编译)通过')
   assert.ok(src96.includes("live.status !== 'ok' && live.status !== 'partial' && live.status !== 'stale'"), 'issue #96:仅 ok/partial/stale(有数据)状态出卡,error/loading/off 留在设置页')
   assert.ok(src96.includes('live.accounts.length === 0') && src96.includes("if (rows.length === 0) rows.push({ name: t('gatewayQuotaEmpty')"), '无账号的来源隐藏；空额度账号保留切换入口')
   // 挂载:SidebarFooter 早退条件与节点插入都包含网关卡片(此前整条路径无 gateway 分支)。
-  assert.ok(src96.includes('!showToday && gatewayNodes.length === 0) return null'), 'issue #96:SidebarFooter 早退条件纳入网关卡片')
+  assert.ok(src96.includes('!showToday && !peakOn && gatewayNodes.length === 0) return null'), 'issue #96:SidebarFooter 早退条件纳入网关卡片与独立峰谷条')
   assert.ok(src96.includes('nodes.push(...gatewayNodes)'), 'issue #96:SidebarFooter 节点序列插入网关卡片(计划卡之后、Codex 之前)')
   assert.ok(src96.indexOf('nodes.push(...gatewayNodes)') > src96.indexOf('MiniMaxPlanBox, { state, wide, api: api }') && src96.indexOf('nodes.push(...gatewayNodes)') < src96.indexOf('el(CodexPlanBox'), 'issue #96:网关卡片排序在计划卡之后、Codex 探测卡之前')
   // 行渲染:复用 MiniMax 行(已用口径/告警阈值一致),Provider 前缀与 credits 兜底都在。
@@ -1327,8 +1327,8 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   // 概览卡片 / BalancePanel / 预算明细今日行。
   assert.ok(clientSource.includes('config.hideTodayCost === true ? null : el(Card,'), '概览今日卡片可整体隐藏')
   assert.ok(clientSource.includes("&& config.hideOfficialBalance !== true\n          ? el(BalancePanel"), '设置页官方余额面板可整体隐藏')
-  assert.ok(clientSource.includes('config.hideTodayCost === true ? null : el(\'div\', { \'data-cm-display\': \'today\', className: \'cm-bbox-line cm-num\' }'), '预算盒明细今日金额行可隐藏')
-  assert.ok(clientSource.includes("...(config.hideTodayCost === true ? [] : [config.sidebarTodayMetric === 'tokens'"), '预算 tooltip 今日金额行可隐藏')
+  const budgetBody = clientSource.slice(clientSource.indexOf('function budgetBoxBody('), clientSource.indexOf('function goBoxBody('))
+  assert.ok(!budgetBody.includes("'data-cm-display': 'today'") && !budgetBody.includes('peakNoticeEl('), '预算容器不再包裹今日用量或峰谷组件；独立显示由运行时组合回归覆盖')
   // 设置开关与读侧白名单。
   assert.ok(displaySource.includes("setField('hideOfficialBalance'"), '独立显示页含隐藏官方余额开关')
   assert.ok(displaySource.includes("setField('hideTodayCost'"), '独立显示页含隐藏今日消耗开关')
@@ -1860,8 +1860,8 @@ console.log('[ok] 宽泛匹配与跨厂商兑底(路由 provider 费用为零修
 // 实际已正确计价的模型不再误报「未命中」,仅默认价兜底与完全未命中者列入。
 {
   const matchClientSource = readClientSource() + readFileSync(new URL('../src/pricing/index.js', import.meta.url), 'utf8')
-  assert.ok(matchClientSource.includes('resolveClientPrice(provider, modelId, matchPrices).matched !== true'), '未命中判定走 resolveClientPrice 完整解析链(与计费口径一致)')
-  assert.ok(matchClientSource.includes('if (overrides[key] !== undefined) return false'), '已手动指定的键不重复列入未命中(rows 仍展示)')
+  assert.ok(matchClientSource.includes('resolved = resolveClientPrice(') && matchClientSource.includes('const automatic = !source && resolved.matched === true'), '价格来源状态走 resolveClientPrice 完整解析链(与计费口径一致)')
+  assert.ok(matchClientSource.includes('Object.keys(byProvider), ...Object.keys(overrides)') && matchClientSource.includes("'data-model-key': key"), '自动匹配与手动价格共用稳定模型行，切换来源不会移动模型')
   assert.ok(matchClientSource.includes('matched: true') && matchClientSource.includes('matched: false'), 'resolveClientPrice 区分显式命中与默认价兜底(matched 标志)')
   assert.ok(matchClientSource.includes('待匹配与手动设置') && matchClientSource.includes('Unmatched and manually configured models'), '未命中与手动价格区提供双语标题')
   console.log('[ok] 未命中列表判定与计费口径一致断言通过')
@@ -3760,7 +3760,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
 {
   const tabsSrc = readClientSource()
   // 标签状态:默认落在概览。
-  assert.ok(tabsSrc.includes("const [tab, setTab] = useState('overview')"), '默认标签为概览')
+  assert.ok(tabsSrc.includes("const [activeTab, setTab] = useState('overview')"), '默认标签为概览')
   // 五个标签项 + 中英双语文案(zh 区与 en 区各一份)。
   for (const key of ['tabOverview', 'tabQuotas', 'tabUsage', 'tabPricing', 'tabDisplay']) {
     const count = [...tabsSrc.matchAll(new RegExp(key + ":", 'g'))].length
@@ -3797,7 +3797,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   between('el(BalancePanel, { state, api, t, draft, setDraft })', branch.overview, branch.quotas, '官方余额面板在概览标签')
   between('el(TodaySessions, { state, t })', branch.overview, branch.quotas, '今日会话在概览标签')
   // 额度:四类来源(订阅 / Go / 网关 / 自定义余额)统一由 QuotasSection 总装,仍落在同一标签分支。
-  between("el(QuotasSection, { key: 'quotas', state, api, t, draft, setDraft })", branch.quotas, branch.usage, '统一额度区(QuotasSection)在额度标签')
+  between("el(QuotasSection, { key: 'quotas'", branch.quotas, branch.usage, '统一额度区(QuotasSection)在额度标签')
   // 用量:用量统计 + 按模型 + 历史 + 会话排行 + 历史数据操作。
   between('el(ModelStatsPanel, { state, config: draft ?? config, t, draft, setDraft })', branch.usage, branch.display, '按模型统计在用量标签')
   between('el(HistoryPanel, { state, api })', branch.usage, branch.display, '历史面板在用量标签')
@@ -6889,6 +6889,8 @@ await import('./custom-balance-host.mjs')
 await import('./custom-balance-post.mjs')
 await import('./balance-display-currency.mjs')
 await import('./settings-regressions.mjs')
+await import('./model-statistics.mjs')
+await import('./display-controls.mjs')
 await import('./settings-poll-race.mjs')
 await import('./plan-provider-matching.mjs')
 await import('./community-client.mjs')

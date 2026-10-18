@@ -303,7 +303,7 @@ for (const locale of ['zh', 'en']) {
   for (const [enabled, saved, busy, disabled] of [[false, { enabled: false }, false, true],
     [true, { enabled: false }, false, true], [true, { enabled: true, display: 'off' }, false, true],
     [true, { enabled: true, display: 'settings' }, false, false], [true, { enabled: true }, true, true]]) {
-    const tree = e.ui.QuotaCard({ name: 'Gateway', enabled, saved, busy, onRemove() {}, t: tx })
+    const tree = e.mount(e.ui.QuotaCard, { name: 'Gateway', enabled, saved, busy, onRemove() {}, t: tx }).tree
     assert.ok(input(tree, tx('enable') + ': Gateway'))
     const buttons = nodes(tree).filter(n => n.type === 'button')
     assert.equal(textOf(buttons.at(-1)), tx(busy ? 'refreshing' : 'refresh'), '刷新按钮位于最右')
@@ -369,6 +369,21 @@ assert.equal(injected.hooks.cost.getSnapshot().state.config.sidebarModels.enable
 assert.equal(registered.has('sidebar.footer.action:cost-meter'), false)
 assert.equal(registered.has('conversation.composer.dock:cost-meter-corner'), false)
 activation.setNow(30000); await activation.tick(1000); assert.equal(getCalls, 4, '关闭后恢复默认 60 秒轮询')
+for (const [name, patch] of [
+  ['peak', { peakEnabled: true, peakNotice: true }],
+  ['plan', { codingPlans: { minimax: { enabled: true, display: 'sidebar' } } }],
+  ['custom balance', { customBalances: [{ enabled: true, display: 'sidebar', label: 'Test', request: { url: 'https://example.com/balance' }, extract: { remaining: 'balance' } }] }],
+  ['gateway', { gatewayQuotas: { sources: [{ id: 'solo', enabled: true, display: 'sidebar', type: 'cliproxyapi', baseURL: 'https://example.com' }] } }],
+  ['budget', { budget: { enabled: true } }], ['today', { sidebar: true, hideTodayCost: false }],
+  ['Go', { goQuota: { enabled: true, display: 'sidebar' } }],
+]) {
+  live = { ...state, config: sanitizeConfig({ ...base, ...patch }) }
+  await api.reload()
+  assert.equal(registered.has('sidebar.footer.action:cost-meter'), true, name + ' alone registers the real sidebar slot')
+  live = { ...state, config: base }
+  await api.reload()
+  assert.equal(registered.has('sidebar.footer.action:cost-meter'), false, 'all disabled removes the sidebar slot')
+}
 stop(); for (const cleanup of cleanups.reverse()) cleanup()
 assert.equal(activation.timers.size, 0, '卸载清理轮询')
 // #154: first RPC can race hot installation. Real client apply/store + fake clock.

@@ -1,5 +1,5 @@
 // Local presentation data only. This object is never sent to updateConfig or a store.
-function displayPreviewData(state, config, examples, selected) {
+function displayPreviewData(state, config, examples, selected, planId = 'minimax') {
   if (!examples) return { state, config }
   const rate = Number(config.exchangeRate) > 0 ? Number(config.exchangeRate) : 1
   const amount = Number(config.budget?.amount) > 0 ? Number(config.budget.amount) : 200
@@ -15,7 +15,7 @@ function displayPreviewData(state, config, examples, selected) {
     budget: { ...config.budget, enabled: true, amount },
     goQuota: { ...config.goQuota, enabled: true, display: 'both' },
     sidebarModels: { ...config.sidebarModels, enabled: true }, peakEnabled: true, peakNotice: true,
-    codingPlans: { minimax: { ...config.codingPlans?.minimax, enabled: true, display: 'both' } },
+    codingPlans: { [planId]: { ...config.codingPlans?.[planId], enabled: true, display: 'both' } },
     customBalances: [], customBalance: { ...config.customBalance, enabled: selected === 'customBalance', display: 'both' },
     codexQuotaEnabled: selected === 'codex', codexQuotaSidebar: true, gatewayQuotas: { sources: [] } }
   const dayKey = new Date().toISOString().slice(0, 10)
@@ -24,7 +24,7 @@ function displayPreviewData(state, config, examples, selected) {
     budgetUsed: amount * .57 / rate, history: [{ date: dayKey, ...today }], meta: { dayKey },
     balance: { status: 'ok', totalBalance: 68, grantedBalance: 8, toppedUpBalance: 60, currency: config.currency ?? 'CNY', fetchedAt: 0 },
     goQuota: { status: 'ok', rolling: { percent: 24 }, weekly: { percent: 18 }, monthly: { percent: 12 }, fetchedAt: 0 },
-    codingPlans: { minimax: { status: 'ok', windows: { '5h': { percent: 35 }, weekly: { percent: 62 } }, fetchedAt: 0 } },
+    codingPlans: { [planId]: { status: 'ok', windows: { '5h': { percent: 35 }, weekly: { percent: 62 } }, fetchedAt: 0 } },
     customBalances: [], customBalance: { status: 'ok', remaining: 68, spend: 32, maxBudget: 100, unit: 'USD', fetchedAt: 0 },
     displayPreviewCodex: { status: 'ok', windows: { five: { percent: 35 }, weekly: { percent: 42 } }, fetchedAt: 0 }, gatewayQuotas: { sources: [] },
   } }

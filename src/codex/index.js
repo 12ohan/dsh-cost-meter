@@ -61,7 +61,7 @@ window.__ModuleLoader__.load({
       const dialog = useRef(null)
       const [busy, error, run] = useCodexAction()
       const [closed, setClosed] = useState(wasDismissed)
-      const show = compat?.promptDue === true && !closed
+      const show = compat?.enabled === true && compat?.promptDue === true && !closed
       useEffect(() => {
         dismissalListeners.add(setClosed)
         return () => dismissalListeners.delete(setClosed)
@@ -112,7 +112,7 @@ window.__ModuleLoader__.load({
       const compat = state?.codexCompat
       const [busy, error, run] = useCodexAction()
       // Legacy hosts have no codexCompat; CostSection hides the tab, this guard is a backstop.
-      if (compat?.installed !== true) return null
+      if (compat?.installed !== true || compat?.enabled !== true) return null
       const api = props.api
       const t = props.t
       const en = props.locale === 'en'

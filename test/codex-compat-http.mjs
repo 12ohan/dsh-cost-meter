@@ -38,6 +38,8 @@ try {
     host.logger = { error: error => errors.push(error), warn() {}, info() {} }
     try {
       await host.plugin(Registry).await()
+      const subscription = host.plugin({ name: 'codex-subscription', apply() {} })
+      await subscription.await()
       host.typert.register({ ...TYPERT, invocations: TYPERT.invocations.filter(def => !missing.includes(def.method)) })
       const original = host.typert.getPackage('dsh-cost-meter')
       // Fixture identity only: the production authentication policy is unchanged.
@@ -77,6 +79,11 @@ try {
         if (method === methods[0]) assert.ok(result.value.codexCompat.historyAppliedAt > 0)
         else assert.equal(result.value.codexCompat.promptDismissed, true)
       }
+      await subscription.dispose()
+      const disabled = await host.costMeter.getLocalState()
+      assert.equal(disabled.codexCompat.installed, true, 'package remains installed')
+      assert.equal(disabled.codexCompat.enabled, false, 'stopping the actual peer runtime hides its settings')
+      assert.equal(disabled.codexCompat.promptDue, false, 'stopped peers never prompt')
       await plugin.dispose()
       assert.equal(host.typert.getPackage('dsh-cost-meter'), original, 'does not replace the host-owned base manifest')
       assert.equal(host.typert.getPackage('dsh-cost-meter-codex-compat'), undefined, 'supplementary routes belong to the plugin lifetime')

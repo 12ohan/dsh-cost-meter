@@ -140,6 +140,7 @@
         hideOfficialBalance: v.hideOfficialBalance === true,
         hideBudget: v.hideBudget === true,
         hideTodayCost: v.hideTodayCost === true,
+        modelStatistics: v.modelStatistics ?? {},
         ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost'], value => value === true),
         sessionCostCompact: v.sessionCostCompact === true,
         contextCostsEnabled: v.contextCostsEnabled === true,
@@ -180,7 +181,9 @@
         peakAlertTarget: v.peakAlertTarget === 'peak' || v.peakAlertTarget === 'offpeak' ? v.peakAlertTarget : 'both',
         peakAlertPosition: v.peakAlertPosition === 'center' ? 'center' : 'corner',
         peakAlertWebNotify: v.peakAlertWebNotify === true,
-        peakStyle: v.peakStyle === 'classic' ? 'classic' : 'compact',
+        peakStyle: ['classic', 'progress'].includes(v.peakStyle) ? v.peakStyle : 'compact',
+        peakTimeDisplay: ['countdown', 'switch'].includes(v.peakTimeDisplay) ? v.peakTimeDisplay : 'both',
+        peakProgressPromptSeen: v.peakProgressPromptSeen === true,
         priceMatch: v.priceMatch === 'exact' ? 'exact' : 'auto',
         priceOverrides: (() => {
           const out = {}
@@ -427,6 +430,7 @@
       const u = v.usage && typeof v.usage === 'object' ? v.usage : {}
       return {
         installed: v.installed === true,
+        enabled: v.enabled === true,
         version: typeof v.version === 'string' ? v.version : '',
         detection: oneOf(v.detection, ['package', 'profile', 'none'], 'none'),
         planClass: oneOf(v.planClass, ['auto', 'plan', 'api'], 'auto'),
@@ -2367,8 +2371,22 @@
             el('div', { className: 'cm-peak-segment cm-peak-low' })),
           el('span', { className: 'cm-peak-classic-chip' }, t(keys.chip) + ' · ' + chipText)))
     }
+    // 进度条与首次介绍共用按需模块，不增加旧样式的定时器和主包体积。
+    let peakPage
+    function loadPeakPage() {
+      return peakPage ??= require.async('./client.peak.js').then(module => module.mount({ peakView, peakPhaseAt, phaseLabelKeys, countdownText, resolveLocale, makeT, Tooltip }))
+        .catch(error => { peakPage = null; throw error })
+    }
+    function PeakProgress(props) {
+      return el(BillingStatistics, { ...props, load: loadPeakPage, quiet: true })
+    }
+    function PeakProgressGuide(props) {
+      const state = props.useCost?.(s => s)?.state, config = state?.config
+      return config?.peakEnabled && config.peakNotice !== false && !config.peakProgressPromptSeen
+        ? el(PeakProgress, { ...props, state, config, view: 'guide' }) : null
+    }
     function peakNoticeEl(state, config, t) {
-      return el(config?.peakStyle === 'classic' ? PeakStripClassic : PeakStrip, { config, t })
+      return el(config?.peakStyle === 'progress' ? PeakProgress : config?.peakStyle === 'classic' ? PeakStripClassic : PeakStrip, { config, t })
     }
 
     /** 收起(rail)态简洁样式:竖向同构时段条 + 横排短词(「峰时/平价」),倒计时与完整文案在悬停提示中。 */
@@ -2419,12 +2437,11 @@
           el('span', { className: 'cm-peak-rail-classic-label' }, t(keys.short))))
     }
     function peakNoticeRailEl(state, config, t) {
-      return el(config?.peakStyle === 'classic' ? PeakRailStripClassic : PeakRailStrip, { config, t })
+      return el(config?.peakStyle === 'progress' ? PeakProgress : config?.peakStyle === 'classic' ? PeakRailStripClassic : PeakRailStrip, { config, t, rail: true })
     }
 
     /** 预算图框内容(不含外框),供单独显示与「Go+预算」合并卡片复用;详细信息按 budget.detail 开关。 */
     function budgetBoxBody(state, config, t) {
-      const today = state.today
       const budget = config.budget ?? { enabled: false, amount: 100, period: 'month' }
       const rate = Number(config.exchangeRate)
       const budgetUsedUsd = state.budgetUsed ?? (
@@ -2436,8 +2453,6 @@
       const pct = amount > 0 ? Math.min(999, used / amount * 100) : null
       // 条形方向(issue #67):默认已用方向(#57 口径);剩余方向时填充与标签显示剩余%。
       const barView = simpleBarByDirection(pct === null ? null : Math.min(100, pct), barDirectionOf(config, 'budget'))
-      const todayUsed = displayCostOf(today, config) * (Number.isFinite(rate) && rate > 0 ? rate : 1)
-      const todayPct = amount > 0 ? Math.min(999, todayUsed / amount * 100) : null
       const detail = budget.detail !== false
       return {
         level: pct === null ? 'ok' : pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok',
@@ -2450,18 +2465,9 @@
             el('div', { className: 'cm-bbox-fill', style: { width: barView.width + '%' } })),
           detail
             ? el(Fragment, null,
-              // 今日金额行受 hideTodayCost 门控(issue #46);金额为真金白银口径(issue #64)。
-              config.hideTodayCost === true ? null : el('div', { 'data-cm-display': 'today', className: 'cm-bbox-line cm-num' },
-                config.sidebarTodayMetric === 'tokens'
-                  ? t('today') + ' ' + sidebarTodayValue(today, config, t)
-                  : t('todayShare', {
-                    amount: formatMoneyUsd(displayCostOf(today, config), config),
-                    pct: todayPct === null ? '—' : todayPct.toFixed(1) + '%',
-                  })),
               el('div', { className: 'cm-bbox-line cm-num' },
                 t('usedOf', { used: formatMoneyValue(used, config), amount: formatMoneyValue(amount, config) })))
-            : null,
-          peakNoticeEl(state, config, t)),
+            : null),
       }
     }
 
@@ -2625,7 +2631,7 @@
         el('div', { className: 'cm-bbox-rail cm-num' }, sevenView.text))
       return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
-          ...hoverProps, 'data-cm-display': 'plan', className: 'cm-bbox cm-mm' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '')
+          ...hoverProps, 'data-cm-display': 'plan', 'data-cm-plan': 'minimax', className: 'cm-bbox cm-mm' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '')
             + (refresh ? ' clickable' + (refresh.busy ? ' busy' : '') : ''),
           ...(refresh ? clickableRefreshProps(refresh.busy, refresh.run) : {}),
         },
@@ -2845,7 +2851,7 @@
         ? pcts.slice(0, 2).map(p => simpleBarByDirection(p, planDirection).label + '%').join(' ')
         : (typeof entries[0][1]?.text === 'string' ? entries[0][1].text : '—')
       return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
-        el('div', { ...hoverProps, 'data-cm-display': 'plan', className: 'cm-bbox cm-mm clickable' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
+        el('div', { ...hoverProps, 'data-cm-display': 'plan', 'data-cm-plan': id, className: 'cm-bbox cm-mm clickable' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
           wide === false
             ? el('div', { className: 'cm-bbox-rail cm-num' }, railText)
             : el(Fragment, null,
@@ -3301,19 +3307,12 @@
       const pct = amount > 0 ? Math.min(999, used / amount * 100) : null
       const level = pct === null ? 'ok' : pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok'
 
-      if (budget.enabled === true && config.hideBudget !== true) {
+      if (budget.enabled === true && config.hideBudget !== true && props.todayOnly !== true) {
         // 预算圆角方形图框(渲染在设置按钮上方、余额行下方)。
-        const todayApi = displayCostOf(today, config)
-        const todayUsed = todayApi * (Number.isFinite(rate) && rate > 0 ? rate : 1)
-        const todayPct = amount > 0 ? Math.min(999, todayUsed / amount * 100) : null
         const detail = [
           t('budgetOf', { period: t(PERIOD_KEYS[budget.period] ?? 'periodMonth') }),
           t('usedOf', { used: formatMoneyValue(used, config), amount: formatMoneyValue(amount, config) })
             + ' · ' + (pct === null ? '—' : pct.toFixed(1) + '%'),
-          // 今日金额行受 hideTodayCost 门控(issue #46)。
-          ...(config.hideTodayCost === true ? [] : [config.sidebarTodayMetric === 'tokens'
-            ? t('today') + ' ' + todayValue
-            : t('todayShare', { amount: todayValue, pct: todayPct === null ? '—' : todayPct.toFixed(1) + '%' })]),
           t('monthTotal', {
             month: formatMoneyUsd(displayCostOf(state.month, config), config),
             total: formatMoneyUsd(displayCostOf(state.total, config), config),
@@ -3321,8 +3320,8 @@
         ].join('; ')
         if (props.summary === true) return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
           el('div', { 'data-cm-display': 'budget', className: 'cm-simple-summary' + (level === 'ok' ? '' : ' ' + level), tabIndex: 0 },
-            el('span', null, t('todayBudget', { period: t(PERIOD_KEYS[budget.period] ?? 'periodMonth') })),
-            el('span', { className: 'cm-num' }, todayValue + ' / ' + formatMoneyValue(amount, config))))
+            el('span', null, t('budgetOf', { period: t(PERIOD_KEYS[budget.period] ?? 'periodMonth') })),
+            el('span', { className: 'cm-num' }, formatMoneyValue(used, config) + ' / ' + formatMoneyValue(amount, config))))
         const view = budgetBoxBody(state, config, t)
         return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
           el('div', { 'data-cm-display': 'budget', className: 'cm-bbox' + (level === 'ok' ? '' : ' ' + level) + (wide ? '' : ' rail') },
@@ -3341,10 +3340,8 @@
         t('totalCost', { amount: formatMoneyUsd(displayCostOf(state.total, config), config) }),
       ].join('; ')
       return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
-        el(Fragment, null,
-          el('div', { 'data-cm-display': 'today', className: 'cm-foot' + (wide ? '' : ' cm-foot-rail') },
-            wide ? el(Fragment, null, t('today'), ' ', el('span', { className: 'cm-num' }, todayValue)) : el(WalletIcon, { size: 16 })),
-          wide ? peakNoticeEl(state, config, t) : null))
+        el('div', { 'data-cm-display': 'today', className: 'cm-foot' + (wide ? '' : ' cm-foot-rail') },
+          wide ? el(Fragment, null, t('today'), ' ', el('span', { className: 'cm-num' }, todayValue)) : el(WalletIcon, { size: 16 })))
     }
 
     function SidebarFooter(props) {
@@ -3401,16 +3398,15 @@
         && (codexSnapshot.windows.five !== null || codexSnapshot.windows.weekly !== null)
       const budgetOn = (config.budget ?? {}).enabled === true && config.hideBudget !== true
       const showToday = config.sidebar !== false && config.hideTodayCost !== true
+      const peakOn = peakView(config, Date.now()) !== null
       const modelsOn = config.sidebarModels?.enabled === true
-      if (!modelsOn && !showBalance && !showCustomBalance && !goOk && !plansOn && !codexOn && !budgetOn && !showToday && gatewayNodes.length === 0) return null
+      if (!modelsOn && !showBalance && !showCustomBalance && !goOk && !plansOn && !codexOn && !budgetOn && !showToday && !peakOn && gatewayNodes.length === 0) return null
       // 紧凑模式(侧边栏进度条样式):宽栏下各额度卡内部的时间段进度行排两列
       // (CSS 于 .cm-footer-stack.compact 生效);卡片本身与收起(rail)态维持原样。
       const simple = config.sidebarSimple === true
       const compactWide = !simple && wide && config.sidebarStyle === 'compact'
-      const mergedBudget = simple && wide && showToday && budgetOn
       const nodes = []
-      if (mergedBudget) nodes.push(el(BudgetBoxContent, { state, wide, summary: true }))
-      else if (simple && wide && showToday) nodes.push(el('div', { 'data-cm-display': 'today', className: 'cm-simple-summary' },
+      if (simple && wide && showToday) nodes.push(el('div', { 'data-cm-display': 'today', className: 'cm-simple-summary' },
         el('span', null, t('today')), el('span', { className: 'cm-num' }, sidebarTodayValue(state.today, config, t))))
       if (showBalanceBar) nodes.push(el(BalanceBox, { state, wide, api: api }))
       else if (showBalance) nodes.push(el(BalanceRowContent, { state, wide, api: api }))
@@ -3434,13 +3430,11 @@
           el('div', { 'data-cm-display': 'budget', className: 'cm-bbox-section' + (budgetView.level === 'ok' ? '' : ' ' + budgetView.level) }, budgetView.body)))
       } else {
         if (goOk) nodes.push(el(GoQuotaBox, { state, wide }))
-        if (budgetOn && !mergedBudget) nodes.push(el(BudgetBoxContent, { state, wide }))
+        if (budgetOn) nodes.push(el(BudgetBoxContent, { state, wide, summary: simple && wide }))
       }
-      if (!budgetOn && showToday && !(simple && wide)) nodes.push(el(BudgetBoxContent, { state, wide }))
-      // 简化摘要不再承载峰谷条；单独渲染宽栏条，避免漏掉无预算配置或合并后重复。
-      if (simple && wide && showToday) nodes.push(peakNoticeEl(state, config, t))
-      // 收起(rail)态:无论预算/Go 额度开关状态,统一在图框下方追加竖向峰谷进度条(受 peakNotice 等门控,内部自行返回 null)。
-      if (!wide) nodes.push(peakNoticeRailEl(state, config, t))
+      if (showToday && !(simple && wide)) nodes.push(el(BudgetBoxContent, { state, wide, todayOnly: true }))
+      // Each display target owns its visibility; hiding another card cannot hide it.
+      if (peakOn) nodes.push(wide ? peakNoticeEl(state, config, t) : peakNoticeRailEl(state, config, t))
       if (modelsOn) nodes.splice(config.sidebarModels.position === 'first' ? 0 : config.sidebarModels.position === 'afterBalance' ? afterBalance : nodes.length, 0,
         el(SidebarModelCosts, { key: 'models', state, wide, preview }))
       return el('div', { ...(simple ? { tabIndex: 0, role: 'region', 'aria-label': t('sidebarSimple') } : {}), className: 'cm-footer-stack' + (wide ? '' : ' rail') + (compactWide ? ' compact' : '') + (simple ? ' simple' : '') }, ...nodes)

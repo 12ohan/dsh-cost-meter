@@ -83,6 +83,8 @@ jobs:
           node test/model-stats-browser.mjs
           node test/factory-quota-browser.mjs
           node test/display-settings-browser.mjs
+          node test/peak-progress-browser.mjs
+          node test/peak-style-picker-browser.mjs
           git fetch --depth=1 origin tag v1.8.29
           node test/idle-performance-browser.mjs
       - name: Save context regression browser evidence
@@ -107,6 +109,7 @@ jobs:
             .tmp-model-stats-browser/report.json
             .tmp-factory-quota-browser/*.png
             .tmp-factory-quota-browser/report.json
+            .tmp-peak-progress-preview/
           if-no-files-found: ignore
           retention-days: 7
           include-hidden-files: true

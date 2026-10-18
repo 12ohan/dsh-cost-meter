@@ -255,6 +255,19 @@ for (const locale of ['zh', 'en']) {
   tree = openPrices()
   row = rowFor(tree, 'unknown-model')
   assert.ok(row)
+  const scopeSwitch = scope => nodes(rowFor(section(), 'unknown-model')).find(node => node.type === 'input' && node.props['aria-label']?.endsWith(' · ' + scope))
+  for (const [scope, label] of [['today', locale === 'en' ? 'Today' : '今日费用'], ['summary', locale === 'en' ? 'Monthly / all-time' : '月度与累计'], ['budget', locale === 'en' ? 'Budget' : '预算']]) {
+    scopeSwitch(label).props.onChange({ target: { checked: false } }); section()
+    for (const fn of [...timers.values()]) fn(); timers.clear()
+    for(let tick=0;tick<8;tick++) await Promise.resolve()
+    assert.equal(current.config.modelStatistics[key][scope], false)
+    scopeSwitch(label).props.onChange({ target: { checked: true } }); section()
+    for (const fn of [...timers.values()]) fn(); timers.clear()
+    for(let tick=0;tick<8;tick++) await Promise.resolve()
+    assert.deepEqual(current.config.modelStatistics, {}, 'restoring the model removes the exclusion')
+  }
+  assert.equal(JSON.stringify(today), originalUsage, 'statistics switches never alter the original usage')
+  tree = section(); row = rowFor(tree, 'unknown-model')
   nodes(row).find(n => n.props['aria-expanded'] === false && n.type === 'button').props.onClick(); tree = section(); row = rowFor(tree, 'unknown-model')
   button(row, t('overrideRemove')).props.onClick()
   tree = section()
@@ -432,3 +445,30 @@ console.log('[ok] #275: hidden price editors, on-demand catalog and model restor
  timers.clear()
 }
 console.log('[ok] #282 channel-price filtering and serialized autosave races')
+
+// Optional Codex settings follow detected installation, including removal while open.
+{
+ const current = { config: roundTrip({ locale: 'zh' }), today: zeroDay('2026-10-18'), month: zeroDay('2026-10'), total: zeroDay(''), history: [] }
+ const section = renderer(ui.CostSection, () => ({ useCost: () => ({ state: current, status: 'ready' }), api: {} }))
+ const tabs = tree => nodes(tree).filter(node => node.props.role === 'tab')
+ const selected = tree => tabs(tree).find(node => node.props['aria-selected'] === 'true')
+ for (const missing of [undefined, { installed: false }, { installed: true, enabled: false }]) {
+   current.codexCompat = missing
+   const tree = section()
+   assert.equal(button(tree, 'Codex'), undefined, 'no Codex tab without an installed plugin')
+   assert.equal(tabs(tree).length, 6)
+ }
+ current.codexCompat = { installed: true, enabled: true }
+ let tree = section()
+ button(tree, 'Codex').props.onClick()
+ assert.equal(textOf(selected(section())), 'Codex')
+ current.codexCompat = { installed: false }
+ tree = section()
+ assert.equal(button(tree, 'Codex'), undefined)
+ assert.equal(textOf(selected(tree)), '概览', 'removing the current plugin restores a visible page')
+ assert.ok(!nodes(tree).some(node => node.type?.name === 'CodexLazy'), 'hidden plugin page is unmounted')
+ current.codexCompat = { installed: true, enabled: true }
+ assert.equal(textOf(selected(section())), '概览', 'reinstallation does not reopen the previous optional tab')
+ timers.clear()
+}
+console.log('[ok] Codex settings: hidden without plugin, uninstall fallback and stable selection after reinstall')
