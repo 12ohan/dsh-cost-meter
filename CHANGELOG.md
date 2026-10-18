@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- 修复 OpenDesign Control Key 无法从凭据编辑器保存的问题，并补齐旧配置迁移。感谢 @unifilitence 在 [#317](https://github.com/Han-1413141/dsh-cost-meter/issues/317) 的问题报告与根因定位。
+- OpenDesign 整体修正：`VELA_CONTROL_KEY` 别名与环境变量正确显示凭据状态；额度／钱包部分失败的原因在卡片及提示中显示；无生效套餐时仍保留经过校验的 preflight 余额，成员身份不一致时拒绝混用。补充保存、读取、清除、工作区／密钥切换、凭据库与查询链路验证。
+
 - 修复 Codex 数据源切换时复用旧请求、显示旧来源额度的问题；订阅查询沿用宿主 Connection RPC，支持自定义连接传输。
 
 - **Codex 额度双窗口与可配置数据源**：Codex 额度卡片、输入框横条与窄栏现在同时读取 `dsh-codex-subscription` 的 5 小时（18000s）和 7 天（604800s）窗口；新增 `codexQuotaSource`（`auto` / `subscription` / `connect`），`auto` 优先订阅插件的 `/api/codex-subscription/usage`，读取失败时回退既有的 `dsh-codex-connect` 周额度路由，显式选择则只读对应来源。保留仅提供周窗口的旧路由兼容，不影响 Plan/API 计费归类。

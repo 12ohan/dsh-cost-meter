@@ -1568,6 +1568,7 @@
         ? el('p', { className: 'cm-note' }, t('codingPlanDisabledNote'))
         : live.status === 'ok'
           ? el('div', { className: 'cm-go-list' },
+            live.message ? el('p', { className: 'cm-note' }, live.message) : null,
             Object.keys(windows).length > 0
               ? (planId === 'minimax' && (miniMaxWindowsOf(windows).five != null || miniMaxWindowsOf(windows).seven != null)
                 ? el(MiniMaxPlanCard, {

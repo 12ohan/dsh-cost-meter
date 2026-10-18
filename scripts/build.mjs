@@ -70,7 +70,7 @@ const packedMessages = Object.entries(messages).map(([locale, dict]) => [locale,
 // restore them before exposing dictionaries. All translations round-trip below.
 const phraseCounts = new Map()
 for (const value of Object.values(messages).flatMap(Object.values)) {
-  for (const match of value.matchAll(/[A-Za-z][A-Za-z0-9'-]{6,}/g)) {
+  for (const match of value.matchAll(/[A-Za-z][A-Za-z0-9'-]{3,}/g)) {
     phraseCounts.set(match[0], (phraseCounts.get(match[0]) ?? 0) + 1)
   }
   const words = [...value.matchAll(/[A-Za-z][A-Za-z0-9'-]*(?: [A-Za-z][A-Za-z0-9'-]*)+/g)]
