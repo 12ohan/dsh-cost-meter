@@ -153,6 +153,7 @@
         sidebarModels: Object.fromEntries(Object.entries(MODEL_SIDEBAR_DEFAULTS).map(([k, v0]) => [k, v.sidebarModels?.[k] ?? v0])),
         codexQuotaEnabled: v.codexQuotaEnabled === true,
         codexQuotaSidebar: v.codexQuotaSidebar !== false,
+        codexQuotaStrip: v.codexQuotaStrip !== false,
         codexQuotaSource: ['connect', 'subscription'].includes(v.codexQuotaSource) ? v.codexQuotaSource : 'auto',
         // Codex 订阅兼容(契约 B-5):用户已关闭一次性提示 / 已应用历史归类的时点。
         // 直通白名单缺失会导致关闭后重开页面又弹提示,或应用后状态行回落「未应用」。
@@ -2993,7 +2994,8 @@
 
     function QuotaStrip(props) {
       const costStore = props.useCost ? props.useCost(s => s) : undefined
-      useCodexQuota(costStore?.state?.config?.codexQuotaEnabled === true, costStore?.state?.config?.codexQuotaSource)
+      const cfg = costStore?.state?.config
+      useCodexQuota(cfg?.codexQuotaEnabled === true && cfg.codexQuotaStrip !== false && cfg.quotaStrip?.enabled === true, cfg?.codexQuotaSource)
       // Hook 先于一切条件返回(React 规则):横条会因 state 缺失/开关关闭随时提前 return null。
       const [busyKey, setBusyKey] = useState(null)
       const [errs, setErrs] = useState({})
@@ -3103,7 +3105,7 @@
       }
       // Codex chip(issue #59):connect / subscription 在位且已登录时出现;5h + 周双窗口。
       // 独立于 Coding Plan 开关:即使 strip.plans 为 false,Codex chip 仍应渲染。
-      const codexWins = config.codexQuotaEnabled === true && codexQuotaCache.source === (config.codexQuotaSource ?? 'auto') && codexQuotaCache.status === 'ok' ? codexQuotaCache.windows : {}
+      const codexWins = config.codexQuotaEnabled === true && config.codexQuotaStrip !== false && codexQuotaCache.source === (config.codexQuotaSource ?? 'auto') && codexQuotaCache.status === 'ok' ? codexQuotaCache.windows : {}
       const fiveWin = codexWins.five ?? null
       const weekWin = codexWins.weekly ?? null
       const pctOf = win => Math.max(0, Math.min(100, Math.round(Number(win.percent) || 0)))

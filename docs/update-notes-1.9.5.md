@@ -8,6 +8,8 @@
 
 额度改用简洁文字卡，例如“周额度 · 剩余 83% · 10/25 08:10 重置”，5h 窗口单列一行。统一使用剩余比例，重置时间按本机时区显示。会话额度条也明确标注“剩余”，避免把已用比例误解为剩余。
 
+在“设置 → 费用 → 显示 → 输入区”选择“Codex 额度”，可以单独关闭“在输入区显示 Codex 额度”，保留侧栏卡片。侧栏和输入区的开关相互独立，两个位置都隐藏时停止额度查询。
+
 “使用示例数据”的百分比仅用于预览。真实额度仍需要启用并登录对应 Codex 插件。修复当前数据预览使用旧快照的问题，预览本身不触发账户查询。
 
 ### 三个兼容插件的 GitHub 监控
@@ -25,6 +27,8 @@
 Enabled sidebar cards stay visible when quota reads fail or the account is signed out. The card explains how to recover and supports an immediate click-to-retry. Enabled views check once per minute, cache successful reads for five minutes, and retry failures after one minute. Disabling the view cleans up its checks.
 
 Compact text rows show the window, explicit remaining percentage and reset date/time in the device timezone, with a separate 5h row when available. The conversation strip also labels percentages as remaining.
+
+Display settings now include Codex in the composer component menu, with separate sidebar and composer switches. Hiding one keeps the other; hiding both stops quota reads.
 
 Example percentages remain preview-only. Real quota requires an enabled, signed-in Codex plugin. Current-data previews now read the current cache without querying the account.
 

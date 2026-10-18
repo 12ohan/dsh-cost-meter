@@ -2225,7 +2225,7 @@
           ? el(SecretMigrationNotice, { pending: state.secretMigration.pending, t })
           : null,
         // 显示设置：独立加载的交互预览，共用草稿与自动保存。
-        el(BillingStatistics, { state, api, load: api.loadDisplay, draft, setDraft, t, locale,
+        el(BillingStatistics, { state: { ...state, displayPreviewCodex: codexQuotaCache.source === (state.config.codexQuotaSource ?? 'auto') ? codexQuotaSnapshot() : { status: 'idle', windows: {} } }, api, load: api.loadDisplay, draft, setDraft, t, locale,
           numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, formatMoneyUsd,
           planOptions: CODING_PLAN_ROWS.map(row => [row.id, t(row.labelKey)]),
           onNavigate: (page, plan) => { setQuotaTarget(plan); setTab(page) },

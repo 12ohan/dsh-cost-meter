@@ -47,4 +47,14 @@ assert.ok(!budget.some(node => node.type === 'span' && node.children.includes('S
 assert.ok(!nodes(inspect('today')).some(node => node.type === 'input' && node.props.type === 'checkbox'), 'today visibility is a top-level display switch')
 control(inspect('today'), 'sidebarTodayMetric').props.onChange({ target: { value: 'tokens' } })
 assert.equal(config.sidebarTodayMetric, 'tokens', 'the inspector still controls the daily value format')
+for (const selected of ['codex', 'strip-codex']) {
+  const tree = inspect(selected)
+  const checkbox = label => nodes(tree).find(node => node.type === 'label' && node.children.some(child => child?.children?.includes(label)))?.children.find(child => child?.type === 'input')
+  checkbox('codexQuotaStrip').props.onChange({ target: { checked: false } })
+  assert.equal(config.codexQuotaStrip, false)
+  assert.equal(config.codexQuotaSidebar, true, 'composer display never hides the sidebar')
+  assert.equal(config.codexQuotaEnabled, false, 'display changes do not enable account queries')
+  checkbox('codexQuotaStrip').props.onChange({ target: { checked: true } })
+  assert.equal(config.codexQuotaStrip, true)
+}
 console.log('[ok] display controls: per-account visibility/placement, no query enablement, independent selection, targeted navigation and separate today control')

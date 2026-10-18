@@ -322,6 +322,13 @@ assert.match(textOf(strip.tree), /Codex/)
 quotaConfig = { ...quotaConfig, codexQuotaSidebar: true }
 sidebar.render(quotaProps())
 assert.ok(nodes(sidebar.tree).some(n => n.type === quota.ui.CodexPlanBox), 're-enabling restores the sidebar card')
+quotaConfig = { ...quotaConfig, codexQuotaStrip: false }
+sidebar.render(quotaProps()); strip.render(quotaProps())
+assert.ok(nodes(sidebar.tree).some(n => n.type === quota.ui.CodexPlanBox), 'hiding the composer Codex strip preserves the sidebar card')
+assert.equal(strip.tree, null, 'the independent composer switch hides Codex even when the shared strip is enabled')
+quotaConfig = { ...quotaConfig, codexQuotaStrip: true }
+strip.render(quotaProps())
+assert.match(textOf(strip.tree), /remaining/, 're-enabling restores the explicitly labelled remaining quota')
 quotaConfig = { ...quotaConfig, codexQuotaEnabled: false }
 sidebar.render(quotaProps()); strip.render(quotaProps())
 assert.equal(sidebar.tree, null)

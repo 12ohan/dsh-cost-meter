@@ -14,7 +14,7 @@ const { chromium } = req('playwright-core')
 const executablePath = process.env.CM_TEST_BROWSER ?? ['C:/Program Files/Google/Chrome/Application/chrome.exe', '/usr/bin/google-chrome', '/usr/bin/chromium'].find(existsSync)
 const connectionSource = readFileSync(join(host.resolve('@deepseek-ai/dsh-client-connection/package.json'), '..', 'lib/client.js'), 'utf8')
 const state = { config: sanitizeConfig({ locale: 'zh', codexQuotaEnabled: true, codexQuotaSource: 'subscription', peakEnabled: false,
-  hideOfficialBalance: true, sidebar: false, hideTodayCost: true, goQuota: { enabled: false }, budget: { enabled: false } }),
+  hideOfficialBalance: true, sidebar: false, hideTodayCost: true, goQuota: { enabled: false }, budget: { enabled: false }, quotaStrip: { enabled: true, budget: false, go: false, plans: false } }),
   today: zeroDay(), month: zeroDay(), total: zeroDay(), history: [] }
 const code = `
 import React from ${JSON.stringify(req.resolve('react'))};
@@ -32,11 +32,11 @@ services['remote.costMeter']={getLocalState:async()=>({ok:true,value:state}),get
 services.slots={entries:()=>[],inject:(name,fn)=>fn(),register:(options,component)=>{entries.set(options.name+':'+options.id,{options,component});return()=>{}}};
 await costUI.apply(context);
 await new Promise(resolve=>setTimeout(resolve,0));
-const slot=entries.get('sidebar.footer.action:cost-meter'),injected=slot.options.inject(),store=injected.hooks.cost;
+const slot=entries.get('sidebar.footer.action:cost-meter'),stripSlot=entries.get('conversation.input.dock:cost-meter-qstrip'),injected=slot.options.inject(),store=injected.hooks.cost;
 function useCost(pick){return pick(React.useSyncExternalStore(store.subscribe,store.getSnapshot))}
 window.configure=patch=>injected.api.updateConfig(patch);
 window.dispose=()=>{root.unmount();for(const fn of disposers.reverse())fn()};
-function App(){const[wide,setWide]=React.useState(true);window.setWide=setWide;return React.createElement(slot.component,{...injected,useCost,wide})}
+function App(){const[wide,setWide]=React.useState(true);window.setWide=setWide;return React.createElement(React.Fragment,null,React.createElement(slot.component,{...injected,useCost,wide}),React.createElement('div',{id:'composer'},React.createElement(stripSlot.component,{...injected,useCost})))}
 const root=createRoot(document.getElementById('root'));root.render(React.createElement(App));
 `
 const compiled = await build({ stdin: { contents: code, resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'esm', platform: 'browser' })
@@ -79,6 +79,7 @@ try {
   await page.clock.fastForward(61_000)
   await card.getByText('剩余 60%', { exact: true }).waitFor()
   await card.getByText('剩余 83%', { exact: true }).waitFor()
+  await page.locator('#composer').getByText('剩余 83%', { exact: true }).waitFor()
   await card.getByText('· 10/25 08:10 重置', { exact: true }).waitFor()
   assert.equal(calls.length, 2, 'sign-in recovers through the real RPC without remounting')
   await card.click(); await page.waitForFunction(() => document.querySelector('[data-cm-display="codex"]').getAttribute('aria-busy') === 'false')
@@ -96,11 +97,17 @@ try {
   await page.evaluate(() => window.setWide(false))
   await card.getByText('83% remaining', { exact: true }).waitFor()
   assert.equal(await card.evaluate(node => node.scrollWidth <= node.clientWidth), true)
-  await page.evaluate(() => window.configure({ codexQuotaEnabled: false }))
+  await page.evaluate(() => window.configure({ codexQuotaStrip: false }))
+  await page.locator('#composer .cm-qchip').waitFor({ state: 'detached' })
+  assert.equal(await card.count(), 1, 'composer switch keeps the sidebar')
+  await page.evaluate(() => window.configure({ codexQuotaStrip: true, codexQuotaSidebar: false }))
   await card.waitFor({ state: 'detached' })
+  await page.locator('#composer').getByText('83% remaining', { exact: true }).waitFor()
+  await page.evaluate(() => window.configure({ codexQuotaStrip: false }))
+  await page.locator('#composer .cm-qchip').waitFor({ state: 'detached' })
   const count = calls.length
   await page.clock.fastForward(360_000)
-  assert.equal(calls.length, count, 'turning off stops quota reads')
+  assert.equal(calls.length, count, 'hiding both surfaces stops quota reads without changing the enabled account')
   assert.deepEqual(errors, []); assert.deepEqual(external, [])
   writeFileSync(join(output, 'result.json'), JSON.stringify({ passed: true, calls: calls.length, externalRequests: 0, browserErrors: errors }, null, 2))
   await page.evaluate(() => window.dispose())
