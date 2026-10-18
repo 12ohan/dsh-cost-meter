@@ -1386,7 +1386,7 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   const qstripBody = clientSource.slice(clientSource.indexOf('function QuotaStrip('), clientSource.indexOf('function QuotaStripGuide('))
   assert.ok(qstripBody.indexOf('const [busyKey, setBusyKey] = useState(null)') < qstripBody.indexOf('if (!state) return null'), 'Hook 先于条件返回(React 规则)')
   assert.ok(clientSource.includes("key === 'budget' ? api.reload()") && clientSource.includes("key === 'go' ? api.refreshGoQuota()") && clientSource.includes("api.refreshCodingPlan(key)"), '点击按 key 多路分发刷新')
-  assert.ok(clientSource.includes("key === 'codex' ? fetchCodexQuota(true, config.codexQuotaEnabled === true)"), 'Codex chip 点击仅在开启后重探')
+  assert.ok(clientSource.includes("key === 'codex' ? fetchCodexQuota(true, config.codexQuotaEnabled === true, config.codexQuotaSource)"), 'Codex chip 点击仅在开启后重探')
   assert.ok(clientSource.includes('clickableRefreshProps(busy, () => doRefresh(c.key))'), 'chip 复用可点击属性 helper(role/tabIndex/aria-busy/键盘)')
   assert.ok(clientSource.includes("'cm-qseg'") && clientSource.includes("'cm-qsep'"), '厂商多窗口分段渲染与竖分隔线样式类存在')
   console.log('[ok] 输入框上方额度横条(默认值/校验/清洗/双端声明/接线/首次引导/点击刷新与厂商融合)通过')
@@ -3860,7 +3860,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   // issue #59-2:Codex 周额度客户端探测模块。
   assert.ok(src.includes("'/plugins/dsh-openai-codex/auth/status'"), 'issue #59: dsh-codex-connect 状态路由在册')
   assert.ok(src.includes('function parseCodexStatus(data)'), 'issue #59: auth/status 解析器存在')
-  assert.ok(src.includes("data.status !== 'signed-in'") && src.includes('Number(w.windowSeconds) === CODEX_WEEK_SECONDS'), 'issue #59: 仅接受已登录的 codex 周窗口')
+  assert.ok(src.includes("data.status !== 'signed-in'") && src.includes('CODEX_WINDOWS[Number(win.windowSeconds)]'), 'issue #59: 仅接受已登录的 codex 5h/7d 窗口')
   assert.ok(src.includes('100 - Number(win.remainingPercent)'), 'issue #59: remainingPercent 折算为已用口径(与 #57 一致)')
   assert.ok(src.includes('function CodexPlanBox(props)'), 'issue #59: Codex 侧边栏卡片组件存在')
   assert.ok(src.includes('!codexOn && !budgetOn'), 'issue #59: SidebarFooter 门控纳入 codexOn')
@@ -4630,7 +4630,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   // 额度区统一后 Go/Plan 的窗口行共用 quotaWindowRow(方向由调用方传入),断言改指统一函数内的
   // 换算点 + Go/Plan 卡片各自传入的方向配置,覆盖语义不变。
   assert.ok(clientSrcV16.includes("BalanceBar, { segments, direction: barDirectionOf") && clientSrcV16.includes("simpleBarByDirection(pct === null") && clientSrcV16.includes("simpleBarByDirection(percent, direction)") && clientSrcV16.includes("barDirectionOf(config, 'go')") && clientSrcV16.includes("barDirectionOf(config, 'plan')"), '余额/预算/Go 条按方向换算填色与标签')
-  assert.ok(clientSrcV16.includes("barDirectionOf(state.config, 'plan')") && clientSrcV16.includes("miniMaxRow(t('goShortWeekly'), win, direction"), 'Plan/Codex/MiniMax 额度条按 plan 方向换算')
+  assert.ok(clientSrcV16.includes("barDirectionOf(state.config, 'plan')") && clientSrcV16.includes("miniMaxRow(t('codingPlanRemain5h'), five, direction") && clientSrcV16.includes("miniMaxRow(t('codingPlanRemain7d'), weekly, direction"), 'Plan/Codex/MiniMax 额度条按 plan 方向换算')
   assert.ok(clientSrcV16.includes("barDirectionRemaining") && clientSrcV16.includes("barDirectionUsed") && clientSrcV16.includes("barDirectionsTitle"), '条方向中英文案存在')
   assert.ok(clientSrcV16.includes("segments.rev") && clientSrcV16.includes("cm-dir-row"), '条方向 CSS 与设置 UI 存在')
   console.log('[ok] 一致性重建/路由归类/含 Plan 总额开关(v1.6.0)通过')

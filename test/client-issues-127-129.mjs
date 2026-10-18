@@ -45,7 +45,7 @@ function environment(fetchImpl = async () => ({ ok: false })) {
     },
   }
   vm.runInNewContext(source.replace('exports.apply = apply', `exports.test = { ${expose.join(', ')} }; exports.apply = apply`), {
-    navigator: { language: 'en' }, console, AbortSignal,
+    navigator: { language: 'en' }, console, AbortSignal, crypto: globalThis.crypto,
     window: { __ModuleLoader__: { load: value => { factory = value.factory } }, localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, String(value)) } },
     fetch: (...args) => { requests.push(args); return fetchImpl(...args) },
     setTimeout: (fn, delay) => schedule(fn, delay, false), clearTimeout: id => timers.delete(id),
@@ -287,12 +287,12 @@ for (const locale of ['en', 'zh']) {
 // Codex 插件查询是显式选择:关闭状态不探测,开启才查询同源路由,关闭解除订阅。
 const quotaRequest = deferred()
 const quota = environment(() => quotaRequest.promise)
-const disabled = quota.mount(p => quota.ui.useCodexQuota(p.enabled), { enabled: false })
+const disabled = quota.mount(p => quota.ui.useCodexQuota(p.enabled, p.source), { enabled: false, source: 'connect' })
 await quota.flush()
 assert.equal(quota.requests.length, 0)
 await quota.ui.fetchCodexQuota(true, false)
 assert.equal(quota.requests.length, 0, '强制刷新也不能绕过禁用开关')
-disabled.render({ enabled: true })
+disabled.render({ enabled: true, source: 'connect' })
 assert.equal(quota.requests.length, 1)
 assert.equal(quota.requests[0][0], '/plugins/dsh-openai-codex/auth/status')
 assert.equal(quota.requests[0][1].credentials, 'same-origin')
@@ -301,15 +301,15 @@ assert.equal(quota.ui.codexQuotaCache.listeners.length, 0)
 quotaRequest.resolve({ ok: true, json: async () => ({ status: 'signed-in', usage: { rateLimits: [{ id: 'codex', windows: [{ windowSeconds: 604800, remainingPercent: 72, resetAt: 1800000000 }] }] } }) })
 await quota.flush()
 assert.equal(disabled.tree.status, 'idle', '关闭后进行中的返回不写已取消订阅的hook')
-disabled.render({ enabled: true }); await quota.flush()
+disabled.render({ enabled: true, source: 'connect' }); await quota.flush()
 assert.equal(disabled.tree.status, 'ok', '重新启用可恢复在关闭期间完成的缓存')
 assert.equal(disabled.tree.windows.weekly.percent, 28)
 assert.equal(quota.requests.length, 1, '有效缓存无需重复查询')
-const visible = quota.mount(quota.ui.CodexPlanBox, { state: { config: { ...config, codexQuotaEnabled: true } }, wide: true })
+const visible = quota.mount(quota.ui.CodexPlanBox, { state: { config: { ...config, codexQuotaEnabled: true, codexQuotaSource: 'connect' } }, wide: true })
 await quota.flush()
 assert.ok(visible.tree)
 // #207: sidebar display is independent of the conversation's quota strip.
-let quotaConfig = { ...config, codexQuotaEnabled: true, codexQuotaSidebar: false, quotaStrip: { enabled: true, budget: false, go: false, plans: false } }
+let quotaConfig = { ...config, codexQuotaEnabled: true, codexQuotaSidebar: false, codexQuotaSource: 'connect', quotaStrip: { enabled: true, budget: false, go: false, plans: false } }
 const quotaProps = () => ({ wide: true, useCost: pick => pick({ state: { config: quotaConfig } }) })
 visible.render({ state: { config: quotaConfig }, wide: true })
 assert.equal(visible.tree, null)
@@ -326,15 +326,45 @@ sidebar.render(quotaProps()); strip.render(quotaProps())
 assert.equal(sidebar.tree, null)
 assert.equal(strip.tree, null, 'the global toggle still hides both surfaces')
 sidebar.dispose(); strip.dispose()
-visible.render({ state: { config: { ...config, codexQuotaEnabled: false } }, wide: true })
+visible.render({ state: { config: { ...config, codexQuotaEnabled: false, codexQuotaSource: 'connect' } }, wide: true })
 assert.equal(visible.tree, null, '禁用后即使缓存是ok也隐藏卡片')
 disabled.render({ enabled: false })
 await quota.tick(60000); await quota.tick(300000)
 assert.equal(quota.requests.length, 1, '关闭后不重试、不轮询')
 quota.dispose()
 
+// codex-subscription:显式数据源时 POST /api/codex-subscription/usage,读 5h + 7d 双窗口。
+const subscription = environment(async (url, init) => {
+  assert.equal(url, '/api/codex-subscription/usage')
+  assert.equal(init.method, 'POST')
+  assert.equal(init.headers['content-type'], 'application/json')
+  const envelope = JSON.parse(init.body)
+  assert.equal(envelope.type, 'client-request')
+  assert.equal(envelope.method, 'codex-subscription/usage')
+  assert.equal(envelope.payload.force, false)
+  return { ok: true, json: async () => ({ type: 'server-response', rpcId: envelope.rpcId, result: { ok: true,
+    value: { rateLimits: [
+      { id: 'codex', windows: [{ windowSeconds: 18000, remainingPercent: 60, resetsAt: 1800000001 }, { windowSeconds: 604800, remainingPercent: 20, resetsAt: 1800000002 }] },
+      { id: 'code_review', windows: [{ windowSeconds: 604800, remainingPercent: 5 }] },
+    ] } } }) }
+})
+const subHook = subscription.mount(p => subscription.ui.useCodexQuota(p.enabled, p.source), { enabled: true, source: 'subscription' })
+await subscription.flush()
+assert.equal(subscription.requests.length, 1)
+assert.equal(subHook.tree.status, 'ok')
+assert.equal(subHook.tree.windows.five.percent, 40)
+assert.equal(subHook.tree.windows.weekly.percent, 80)
+assert.equal(subHook.tree.windows.five.resetsAt, new Date(1800000001 * 1000).toISOString())
+const subCard = subscription.mount(subscription.ui.CodexPlanBox, { state: { config: { ...config, codexQuotaEnabled: true, codexQuotaSource: 'subscription' } }, wide: true })
+assert.ok(subCard.tree)
+assert.match(textOf(subCard.tree), /5h/)
+assert.match(textOf(subCard.tree), /7d/)
+subCard.dispose()
+subHook.render({ enabled: false, source: 'subscription' })
+subscription.dispose()
+
 const missing = environment(async () => ({ ok: false, status: 404 }))
-const missingHook = missing.mount(p => missing.ui.useCodexQuota(p.enabled), { enabled: true })
+const missingHook = missing.mount(p => missing.ui.useCodexQuota(p.enabled, p.source), { enabled: true, source: 'connect' })
 await missing.flush()
 assert.equal(missingHook.tree.status, 'unavailable')
 missingHook.render({ enabled: false })

@@ -152,6 +152,7 @@
         sidebarModels: Object.fromEntries(Object.entries(MODEL_SIDEBAR_DEFAULTS).map(([k, v0]) => [k, v.sidebarModels?.[k] ?? v0])),
         codexQuotaEnabled: v.codexQuotaEnabled === true,
         codexQuotaSidebar: v.codexQuotaSidebar !== false,
+        codexQuotaSource: ['connect', 'subscription'].includes(v.codexQuotaSource) ? v.codexQuotaSource : 'auto',
         // Codex 订阅兼容(契约 B-5):用户已关闭一次性提示 / 已应用历史归类的时点。
         // 直通白名单缺失会导致关闭后重开页面又弹提示,或应用后状态行回落「未应用」。
         codexCompatPromptDismissed: v.codexCompatPromptDismissed === true,
@@ -2642,30 +2643,56 @@
       return el(MiniMaxPlanCard, { five, seven, fetchedAt: live.fetchedAt, t, wide, refresh, direction: barDirectionOf(state.config, 'plan') })
     }
 
-    // ── ChatGPT PLUS(Codex)周额度(issue #59)──────────────────────────────
-    // 数据源是 dsh-codex-connect 插件(dsh-openai-codex)暴露在 web 同源的只读状态路由,
-    // 不读凭据、不配置 Key;插件不在/未登录时探测失败,相关 UI 自动隐藏。
-    // 宿主进程无法感知 web 端口,故由浏览器端同源 fetch(与 .tmp 社区补丁同思路,收敛为独立模块)。
+    // ── ChatGPT PLUS(Codex)额度(issue #59 / dsh-codex-subscription)──────────
+    // 数据源二选一:dsh-codex-connect 的只读状态路由,或 dsh-codex-subscription 的
+    // DSH 同源认证 RPC。两条都只读、由浏览器同源请求,插件不在/未登录时相关 UI 自动隐藏。
 
     const CODEX_STATUS_PATH = '/plugins/dsh-openai-codex/auth/status'
-    const CODEX_WEEK_SECONDS = 7 * 24 * 3600
+    const CODEX_SUBSCRIPTION_PATH = '/api/codex-subscription/usage'
+    const CODEX_WINDOWS = { 18000: 'five', 604800: 'weekly' }
 
-    /** 解析 dsh-codex-connect 的 auth/status 响应 → 与 coding plan 同构的窗口对象(percent=已用)。 */
-    function parseCodexStatus(data) {
-      if (data === null || typeof data !== 'object' || data.status !== 'signed-in') return null
-      const limits = data.usage !== null && typeof data.usage === 'object' ? data.usage.rateLimits : null
+    /** 把 rateLimits[] 归一化为与 coding plan 同构的窗口对象(percent=已用)。 */
+    function parseCodexWindows(limits) {
       if (!Array.isArray(limits)) return null
       const bucket = limits.find(l => l !== null && typeof l === 'object' && l.id === 'codex')
       if (!bucket || !Array.isArray(bucket.windows)) return null
-      const win = bucket.windows.find(w => w !== null && typeof w === 'object' && Number(w.windowSeconds) === CODEX_WEEK_SECONDS)
-      if (!win || typeof win.remainingPercent !== 'number' || !Number.isFinite(Number(win.remainingPercent))) return null
-      const usedPct = Math.max(0, Math.min(100, Math.round((100 - Number(win.remainingPercent)) * 10) / 10))
-      const resetSec = Number(win.resetAt)
-      const resetsAt = Number.isFinite(resetSec) && resetSec > 0 ? new Date(resetSec * 1000).toISOString() : ''
-      return { weekly: { percent: usedPct, resetsAt } }
+      const out = {}
+      for (const win of bucket.windows) {
+        const key = win !== null && typeof win === 'object' ? CODEX_WINDOWS[Number(win.windowSeconds)] : null
+        if (!key || typeof win.remainingPercent !== 'number' || !Number.isFinite(Number(win.remainingPercent))) continue
+        const resetSec = Number(win.resetAt ?? win.resetsAt)
+        out[key] = {
+          percent: Math.max(0, Math.min(100, Math.round((100 - Number(win.remainingPercent)) * 10) / 10)),
+          resetsAt: Number.isFinite(resetSec) && resetSec > 0 ? new Date(resetSec * 1000).toISOString() : '',
+        }
+      }
+      return out
     }
 
-    const codexQuotaCache = { status: 'idle', windows: {}, fetchedAt: 0, inFlight: null, listeners: [] }
+    /** 解析 dsh-codex-connect 的 auth/status 响应。 */
+    function parseCodexStatus(data) {
+      if (data === null || typeof data !== 'object' || data.status !== 'signed-in') return null
+      return parseCodexWindows(data.usage?.rateLimits)
+    }
+
+    /** 读取 dsh-codex-subscription 的 DSH 同源认证 RPC;失败返回 null 以便 auto 回退。 */
+    async function fetchCodexSubscription(force) {
+      const rpcId = String(Date.now()) + Math.random().toString(36).slice(2)
+      try {
+        const resp = await fetch(CODEX_SUBSCRIPTION_PATH, {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({ type: 'client-request', rpcId, method: 'codex-subscription/usage', payload: { force } }),
+          signal: AbortSignal.timeout(8000),
+        })
+        if (!resp.ok) return null
+        const env = await resp.json().catch(() => null)
+        const value = env?.type === 'server-response' && env.rpcId === rpcId && env.result?.ok ? env.result.value : null
+        return value === null ? null : parseCodexWindows(value.rateLimits)
+      } catch { return null }
+    }
+
+    const codexQuotaCache = { status: 'idle', windows: {}, fetchedAt: 0, source: 'auto', inFlight: null, listeners: [] }
     const subscribeCodexQuota = fn => {
       codexQuotaCache.listeners.push(fn)
       return () => { codexQuotaCache.listeners = codexQuotaCache.listeners.filter(f => f !== fn) }
@@ -2673,20 +2700,20 @@
     const notifyCodexQuota = () => { for (const fn of codexQuotaCache.listeners) { try { fn() } catch { /* 订阅方异常不扩散 */ } } }
 
     /**
-     * 探测 Codex 周额度。结果写模块缓存并广播;非 force 时 5 分钟内直接用缓存
-     * (404/未登录/网络错误都按 unavailable 缓存,避免每次渲染反复打同一空路由)。
+     * 探测 Codex 额度。auto 优先 subscription,失败回退 connect;非 force 且同一数据源
+     * 5 分钟内直接用缓存(404/未登录/网络错误都按 unavailable 缓存)。
      */
-    async function fetchCodexQuota(force = false, enabled = false) {
+    async function fetchCodexQuota(force = false, enabled = false, source = 'auto') {
       if (!enabled) return
       if (codexQuotaCache.inFlight !== null) return codexQuotaCache.inFlight
-      if (!force && codexQuotaCache.fetchedAt > 0 && Date.now() - codexQuotaCache.fetchedAt < 5 * 60_000) return undefined
+      if (!force && codexQuotaCache.source === source && codexQuotaCache.fetchedAt > 0 && Date.now() - codexQuotaCache.fetchedAt < 5 * 60_000) return undefined
       const task = (async () => {
+        let windows = {}
         try {
-          const resp = await fetch(CODEX_STATUS_PATH, { credentials: 'same-origin', headers: { accept: 'application/json' }, signal: AbortSignal.timeout(8000) })
-          let windows = {}
-          if (resp.ok) {
-            const parsed = parseCodexStatus(await resp.json().catch(() => null))
-            if (parsed !== null) windows = parsed
+          if (source !== 'connect') windows = await fetchCodexSubscription(force) ?? {}
+          if (Object.keys(windows).length === 0 && source !== 'subscription') {
+            const resp = await fetch(CODEX_STATUS_PATH, { credentials: 'same-origin', headers: { accept: 'application/json' }, signal: AbortSignal.timeout(8000) })
+            if (resp.ok) windows = parseCodexStatus(await resp.json().catch(() => null)) ?? {}
           }
           codexQuotaCache.status = Object.keys(windows).length > 0 ? 'ok' : 'unavailable'
           codexQuotaCache.windows = windows
@@ -2694,6 +2721,7 @@
           codexQuotaCache.status = 'unavailable'
         } finally {
           codexQuotaCache.fetchedAt = Date.now()
+          codexQuotaCache.source = source
           codexQuotaCache.inFlight = null
           notifyCodexQuota()
         }
@@ -2702,7 +2730,7 @@
       return task
     }
 
-    function useCodexQuota(enabled) {
+    function useCodexQuota(enabled, source = 'auto') {
       const [snap, setSnap] = useState(() => ({
         status: codexQuotaCache.status,
         windows: codexQuotaCache.windows,
@@ -2716,40 +2744,47 @@
         }
         const unsubscribe = subscribeCodexQuota(sync)
         sync()
-        void fetchCodexQuota(false, true)
+        void fetchCodexQuota(false, true, source)
         return () => { mounted = false; unsubscribe() }
-      }, [enabled])
+      }, [enabled, source])
       return snap
     }
 
-    /** Codex 周额度侧边栏卡片:复用 MiniMax 行渲染(已用口径,issue #57 统一后的方向)。 */
+    /** Codex 额度侧边栏卡片:复用 MiniMax 行渲染(已用口径,5h + 7d 双窗口)。 */
     function CodexPlanBox(props) {
       const hoverProps = useQuotaHoverRefresh()
       const { state, wide } = props
       const t = makeT(resolveLocale(state.config))
       const enabled = state.config?.codexQuotaEnabled === true && state.config?.codexQuotaSidebar !== false
-      const cached = useCodexQuota(enabled && !props.preview)
+      const source = state.config?.codexQuotaSource ?? 'auto'
+      const cached = useCodexQuota(enabled && !props.preview, source)
       const snap = props.preview && state.displayPreviewCodex ? state.displayPreviewCodex : cached
-      const refresh = useClickRefresh(props.preview ? null : () => fetchCodexQuota(true, enabled))
+      const refresh = useClickRefresh(props.preview ? null : () => fetchCodexQuota(true, enabled, source))
       if (!enabled || snap.status !== 'ok') return null
-      const win = snap.windows.weekly ?? null
-      if (win === null) return null
+      const five = snap.windows.five ?? null
+      const weekly = snap.windows.weekly ?? null
+      if (five === null && weekly === null) return null
       const direction = barDirectionOf(state.config, 'plan')
-      const view = miniMaxRow(t('goShortWeekly'), win, direction, t)
+      const fiveView = five === null ? null : miniMaxRow(t('codingPlanRemain5h'), five, direction, t)
+      const weekView = weekly === null ? null : miniMaxRow(t('codingPlanRemain7d'), weekly, direction, t)
+      const views = [fiveView, weekView].filter(Boolean)
+      const level = views.some(v => v.level === 'over') ? 'over' : views.some(v => v.level === 'warn') ? 'warn' : 'ok'
+      const lineOf = (label, win, view) => { const reset = miniMaxResetText(win, t); return label + ' ' + quotaValueText(view.label, direction, t) + (reset ? ' · ' + reset : '') }
       const detail = [
         t('codexQuotaTitle'),
-        quotaValueText(view.label, direction, t),
-        miniMaxResetText(win, t),
+        fiveView === null ? null : lineOf(t('codingPlanRemain5h'), five, fiveView),
+        weekView === null ? null : lineOf(t('codingPlanRemain7d'), weekly, weekView),
         snap.fetchedAt > 0 ? t('goQuotaFetchedAt', { time: new Date(snap.fetchedAt).toLocaleTimeString() }) : null,
         ...clickRefreshTipLines(t, refresh),
       ].filter(Boolean).join('\n')
       const body = el(Fragment, null,
         el('div', { className: 'cm-mm-title' }, t('codexQuotaTitle')),
-        view.row)
-      const rail = el('div', { className: 'cm-bbox-rail cm-num' }, view.label === null ? '—' : view.label + '%')
+        fiveView?.row,
+        weekView?.row)
+      const rail = el(Fragment, null, ...views.map(view => el('div', { className: 'cm-bbox-rail cm-num' }, view.text)))
       return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
-          ...hoverProps, 'data-cm-display': 'codex', className: 'cm-bbox cm-mm clickable' + (view.level === 'ok' ? '' : ' ' + view.level)
+          ...hoverProps, 'data-cm-display': 'codex', className: 'cm-bbox cm-mm clickable' + (level === 'ok' ? '' : ' ' + level)
             + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''),
           ...clickableRefreshProps(refresh.busy, refresh.run),
         },
@@ -2949,7 +2984,7 @@
 
     function QuotaStrip(props) {
       const costStore = props.useCost ? props.useCost(s => s) : undefined
-      useCodexQuota(costStore?.state?.config?.codexQuotaEnabled === true)
+      useCodexQuota(costStore?.state?.config?.codexQuotaEnabled === true, costStore?.state?.config?.codexQuotaSource)
       // Hook 先于一切条件返回(React 规则):横条会因 state 缺失/开关关闭随时提前 return null。
       const [busyKey, setBusyKey] = useState(null)
       const [errs, setErrs] = useState({})
@@ -3056,19 +3091,28 @@
           }
         }
       }
-      // Codex chip(issue #59):dsh-codex-connect 在位且已登录时出现;已用口径与各家一致。
+      // Codex chip(issue #59):connect / subscription 在位且已登录时出现;5h + 周双窗口。
       // 独立于 Coding Plan 开关:即使 strip.plans 为 false,Codex chip 仍应渲染。
-      const codexWin = config.codexQuotaEnabled === true && codexQuotaCache.status === 'ok' ? codexQuotaCache.windows.weekly ?? null : null
-      if (codexWin !== null && typeof codexWin.percent === 'number') {
-        const pct = Math.max(0, Math.min(100, Math.round(Number(codexWin.percent) || 0)))
-        const resets = typeof codexWin.resetsAt === 'string' && codexWin.resetsAt.length > 0
-          ? ' · ' + t('goResetAt', { time: new Date(codexWin.resetsAt).toLocaleString() }) : ''
+      const codexWins = config.codexQuotaEnabled === true && codexQuotaCache.status === 'ok' ? codexQuotaCache.windows : {}
+      const fiveWin = codexWins.five ?? null
+      const weekWin = codexWins.weekly ?? null
+      const pctOf = win => Math.max(0, Math.min(100, Math.round(Number(win.percent) || 0)))
+      if (fiveWin !== null || weekWin !== null) {
+        const fivePct = fiveWin === null ? null : pctOf(fiveWin)
+        const weekPct = weekWin === null ? null : pctOf(weekWin)
+        const worst = Math.max(fivePct ?? 0, weekPct ?? 0)
         chips.push({
           key: 'codex',
           label: 'Codex',
-          level: pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok',
-          tip: t('codexQuotaTitle') + ': ' + pct + '%' + resets,
-          segs: [{ name: 'weekly', pct: Math.round(simpleBarByDirection(pct, barDirectionOf(config, 'plan')).width) }],
+          level: worst >= 100 ? 'over' : worst >= 80 ? 'warn' : 'ok',
+          tip: t('codexQuotaTitle') + ': ' + [
+            fivePct === null ? null : '5h ' + fivePct + '%',
+            weekPct === null ? null : t('codingPlanRemain7d') + ' ' + weekPct + '%',
+          ].filter(Boolean).join(' · '),
+          segs: [
+            fivePct === null ? null : { name: '5h', pct: Math.round(simpleBarByDirection(fivePct, barDirectionOf(config, 'plan')).width) },
+            weekPct === null ? null : { name: 'weekly', pct: Math.round(simpleBarByDirection(weekPct, barDirectionOf(config, 'plan')).width) },
+          ].filter(Boolean),
         })
       }
       if (chips.length === 0) return null
@@ -3082,7 +3126,7 @@
         Promise.resolve()
           .then(() => (key === 'budget' ? api.reload()
             : key === 'go' ? api.refreshGoQuota()
-              : key === 'codex' ? fetchCodexQuota(true, config.codexQuotaEnabled === true)
+              : key === 'codex' ? fetchCodexQuota(true, config.codexQuotaEnabled === true, config.codexQuotaSource)
                 : key === 'factory:core' ? api.refreshCodingPlan('factory') : api.refreshCodingPlan(key)))
           .catch(error => { setErrs(m => ({ ...m, [key]: error?.message ?? String(error) })) })
           .finally(() => setBusyKey(null))
@@ -3308,7 +3352,7 @@
 
     function SidebarFooter(props) {
       const costStore = props.useCost ? props.useCost(s => s) : undefined
-      useCodexQuota(costStore?.state?.config?.codexQuotaEnabled === true && costStore?.state?.config?.codexQuotaSidebar !== false)
+      useCodexQuota(costStore?.state?.config?.codexQuotaEnabled === true && costStore?.state?.config?.codexQuotaSidebar !== false, costStore?.state?.config?.codexQuotaSource)
       // 侧边栏页脚非会话作用域插槽:useProjection 在部分宿主/页面可能不可用或
       // 抛错(无活跃会话),try/catch 退化,联动刷新随之失效(60s 轮询兜底)。
       let projectionUsage
@@ -3356,7 +3400,7 @@
       // 其余显示全关时也要为它保留渲染入口(模块装载即有被动探测,快照同步读)。
       const codexSnapshot = preview && state.displayPreviewCodex ? state.displayPreviewCodex : codexQuotaCache
       const codexOn = config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false && codexSnapshot.status === 'ok'
-        && codexSnapshot.windows.weekly !== null
+        && (codexSnapshot.windows.five !== null || codexSnapshot.windows.weekly !== null)
       const budgetOn = (config.budget ?? {}).enabled === true && config.hideBudget !== true
       const showToday = config.sidebar !== false && config.hideTodayCost !== true
       const modelsOn = config.sidebarModels?.enabled === true
