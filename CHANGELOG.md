@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.9.0] - 2026-10-18
+
+- 新增 **Codex 订阅插件兼容**（`dsh-codex-subscription`）：启动时从 Profile 的 `node_modules` 检测插件，把其产生的 Codex 订阅调用归为 Plan 订阅额度，不再计入 API 按量花费；首次检测到该插件时弹出一次性「兼容修复」提示，可关闭并永久记住选择，也可随时在「设置 → 费用 → Codex」重新操作；历史 Codex 计费仅在用户确认后重算（`apiCost` 归零、Plan 等值保留，幂等）。显式 plan/api 配置不被覆盖。详见[更新说明](docs/update-notes-1.9.0.md)。
+- 新增 **ChatGPT 订阅插件兼容**（`@eddyskywalker/dsh-chatgpt-subscription`）：识别九条订阅线路 `codex-chatgpt` / `kimi-code` / `command-code` / `workbuddy-subscription` / `claude-subscription` / `minimax-code` / `antigravity` / `glm-coding-plan` / `step-code`，映射到 Codex / Kimi / CommandCode / WorkBuddy / Anthropic / MiniMax / Antigravity / Z.AI / StepFun，并在 `plan-billing` 新增 `workbuddy`、`antigravity`、`stepfun` 三个 Plan 厂商；启动时把分类仍为「自动」的对应厂商归为 Plan，不覆盖用户显式选择。
+- 新增 **better-session SQLite 会话存储兼容**（`@morlay/better-session` / `@morlay/session-rdb`）：新增会话存储适配层，自动探测宿主会话后端；当 better-session 接管会话存储、不再产生 JSONL 日志时，历史回填、旧账本导入、按模型历史重定价、小时桶修复、fork 种子清洗、逐会话费用/轨迹/调用详情/标题与统计缓存仍可正常工作。JSONL 路径逐字节不变；RDB 模式走宿主 `sessionPersistence`/`sessionQuery` 接口，不直接读 SQLite 文件，也不自动合并旧 JSONL 与 RDB 历史。修正 5 个一次性迁移标记在 RDB 空扫描时被误消费的问题；启动日志打印会话存储后端，会话修复 CLI 检测到 RDB 时明确提示不支持并以退出码 2 结束。详见[兼容说明](docs/better-session.md)。
+- 全部费用界面适配 **dsh-pocket 手机端**：主设置面板、侧栏卡片、额度横条、预算框、统计页、显示设置、定价页、OpenRouter 与社区面板、Codex 兼容面板在 `≤1023px` 窄屏与 `body[data-dsh-pocket-layout="mobile"]` 移动布局下单列排列、标签横向滚动、按钮/标签 36px 触控高度、对话框不超过 90vh 并避开安全区、宽表横向滚动；桌面布局不变。
+- 修复 [@playgithub 反馈的 #274](https://github.com/Han-1413141/dsh-cost-meter/issues/274#issuecomment-6215322540) OpenDesign 额度查询：按 [@codeforker654 的 401 复现报告](https://github.com/Han-1413141/dsh-cost-meter/issues/274#issuecomment-6236228870) 与 [@yunjuanhuakai 的端点实测](https://github.com/Han-1413141/dsh-cost-meter/issues/274#issuecomment-6236591566)，Control Key 以 Bearer 调用主端点返回 401/403 时，保守回退一次 `/billing/preflight`（同 Bearer + `x-vela-workspace-id`、不发送 Cookie，仅回退一次；主端点其它失败不回退），恢复窗口查询。解析器支持解包 preflight 的 `codingPlan`，`balanceUsd` 仅在钱包接口不可读时兜底显示。
+- OpenDesign 窗口与钱包读取完全独立并行：单侧失败只降级该部分（窗口失败 → 仅显示钱包余额并标记 partial；钱包失败 → 保留窗口），两者都失败才报错；错误区分鉴权失败 / 无生效订阅 / 响应无效 / 网络失败，提示不再混同。文档补充端点权限、Control Key 适用范围、`workspaceId` 必须取 `GET /api/v1/workspaces` 的 `items[].workspaceId`（误用用户 id 会 403）以及 401 排查步骤，见[OpenDesign 计费与排查](docs/opendesign-billing.md)。
+- 测试：新增 Codex / ChatGPT 订阅插件兼容、OpenDesign preflight 与窗口/钱包独立降级、会话存储适配层与 RDB 读取路径、手机端静态适配等 fixture；全量 `node test/verify.mjs` 通过。账本格式、价格规则与历史金额口径不变；除用户主动确认的历史 Codex 归类外不自动重算历史金额。
+
 ## [1.8.36] - 2026-10-17
 
 - 修复 [@uahoi 报告并定位的 #302](https://github.com/Han-1413141/dsh-cost-meter/issues/302)：赠送余额「部分」减少（到期/回收）且充值余额未变、本地官方渠道费用远低于该减量时，不再把整块失效金额误报为消费对账偏差；改为重置对账基准并给出一次性「更可能是赠送余额到期/回收」的说明。#89 的赠送余额归零重置行为保留，本地费用能解释减量 1/4 以上时仍按真实 drift 提示。

@@ -137,7 +137,7 @@ const displaySource = readFileSync(new URL('../src/display/index.js', import.met
 // classic script 语法错误不触发 error 事件、宿主只报「loaded without registering」,
 // 而本套件此前只做字符串断言、从不解析该文件——语法错误一路溜到线上。
 // 这里用 vm.Script 整份编译(只编译不执行,window 引用无碍),任何语法错误当场失败。
-for (const browserBundle of ['../lib/client.js', '../lib/client.statistics.js', '../lib/client.openrouter.js', '../lib/client.community.js', '../lib/client.pricing.js', '../lib/client.display.js']) {
+for (const browserBundle of ['../lib/client.js', '../lib/client.codex.js', '../lib/client.statistics.js', '../lib/client.openrouter.js', '../lib/client.community.js', '../lib/client.pricing.js', '../lib/client.display.js']) {
   const src = readFileSync(new URL(browserBundle, import.meta.url), 'utf8')
   new vm.Script(src, { filename: browserBundle })
 }
@@ -3748,7 +3748,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   assert.ok(patched.config.legacyAutoImportedAt > 0, '配置补丁后标记保真')
   // 宿主接线:apply 的启动定时器调用 runStartupImports。
   const hostSource = readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8')
-  assert.ok(hostSource.includes('runStartupImports(ledger, join(resolveDshHome(), \'sessions\'))'), 'apply 启动定时器接线自动导入')
+  assert.ok(hostSource.includes('runStartupImports(ledger, join(resolveDshHome(), \'sessions\'), sessionSource)'), 'apply 启动定时器接线自动导入')
   rmSync(autoRoot, { recursive: true, force: true })
   if (prevHome === undefined) delete process.env.DSH_HOME
   else process.env.DSH_HOME = prevHome
@@ -6942,6 +6942,13 @@ await import('./billion-context-auto.mjs')
 await import('./billion-context-receipts.mjs')
 await import('./opendesign.mjs')
 await import('./prices-revision.mjs')
+await import('./codex-subscription-compat.mjs')
+await import('./chatgpt-subscription-compat.mjs')
+await import('./opendesign-quota-degradation.mjs')
+await import('./session-storage-compat.mjs')
+await import('./session-readpaths-rdb.mjs')
+await import('./opendesign-preflight.mjs')
+await import('./pocket-layout-static.mjs')
 console.log('[ok] 全部验证通过')
 
 await import('./exchange-rates.mjs')

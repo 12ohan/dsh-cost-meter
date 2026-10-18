@@ -151,6 +151,10 @@
         sidebarModels: Object.fromEntries(Object.entries(MODEL_SIDEBAR_DEFAULTS).map(([k, v0]) => [k, v.sidebarModels?.[k] ?? v0])),
         codexQuotaEnabled: v.codexQuotaEnabled === true,
         codexQuotaSidebar: v.codexQuotaSidebar !== false,
+        // Codex 订阅兼容(契约 B-5):用户已关闭一次性提示 / 已应用历史归类的时点。
+        // 直通白名单缺失会导致关闭后重开页面又弹提示,或应用后状态行回落「未应用」。
+        codexCompatPromptDismissed: v.codexCompatPromptDismissed === true,
+        codexCompatHistoryAppliedAt: num0(v.codexCompatHistoryAppliedAt),
         includeSubagentCost: v.includeSubagentCost === true,
         sidebarStyle: v.sidebarStyle === 'compact' ? 'compact' : 'standard',
         priceMatchDismissed: Array.isArray(v.priceMatchDismissed) ? v.priceMatchDismissed.filter(key => typeof key === 'string') : [],
@@ -415,6 +419,21 @@
       }
       return { generatedAt: num0(v.generatedAt), providers }
     }
+    // Codex 订阅兼容(契约 C/E):旧宿主无该键 → undefined;字段白名单收敛。
+    function parseCodexCompat(v) {
+      if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined
+      const u = v.usage && typeof v.usage === 'object' ? v.usage : {}
+      return {
+        installed: v.installed === true,
+        version: typeof v.version === 'string' ? v.version : '',
+        detection: oneOf(v.detection, ['package', 'profile', 'none'], 'none'),
+        planClass: oneOf(v.planClass, ['auto', 'plan', 'api'], 'auto'),
+        usage: { calls: num0(u.calls), cost: num0(u.cost), tokens: num0(u.tokens), days: num0(u.days), providers: (Array.isArray(u.providers) ? u.providers : []).filter(p => typeof p === 'string') },
+        historyAppliedAt: num0(v.historyAppliedAt),
+        promptDismissed: v.promptDismissed === true,
+        promptDue: v.promptDue === true,
+      }
+    }
     function parseState(v, path) {
       needObject(v, path)
       return {
@@ -442,6 +461,8 @@
         codingPlans: v.codingPlans !== null && typeof v.codingPlans === 'object' && !Array.isArray(v.codingPlans) ? v.codingPlans : {},
         // Token Plan 统计(issue #64):宽容解析,缺失/畸形回落 null(UI 隐藏面板)。
         planStats: parsePlanStats(v.planStats),
+        // Codex 订阅兼容(契约 C):宿主未检出插件/旧宿主时无此键,回落 undefined。
+        codexCompat: parseCodexCompat(v.codexCompat),
         history: Array.isArray(v.history) ? v.history.map((d, i) => parseDay(d, path + '.history[' + i + ']')) : [],
         billionContext: v.billionContext?.protocol === 1 ? { protocol: 1, connected: v.billionContext.connected === true, failed: v.billionContext.failed === true,
           requests: Number(v.billionContext.requests) || 0, unreported: Number(v.billionContext.unreported) || 0, partial: Number(v.billionContext.partial) || 0, uncovered: Number(v.billionContext.uncovered) || 0,
@@ -623,6 +644,8 @@
             rpcParam('target', 'CredentialTarget', credTargetCodec),
           ],
           },
+        // Codex 订阅兼容(契约 D/E):并入/忽略 Codex 历史用量,宿主回传完整 state。
+        ...['applyCodexCompatHistory', 'dismissCodexCompat'].map(method => ({ method, result: strictCodec('CostState', stateCodec) })),
       ].map(def => ({ id: 'dsh-cost-meter#costMeter/' + def.method, service: 'costMeter', namespace: 'costMeter',
         invocation: { kind: 'direct' }, parameters: [], result: strictCodec('FetchPricesResult', fetchCodec), ...def })),
     }
@@ -1102,7 +1125,16 @@
     const PLAN_PROVIDER_ALIASES_LOCAL = {
       opendesign: OPENDESIGN_PROVIDER_IDS,
       go: ['go', 'zen', 'opencode', 'opencode-go', 'opencode-go-plus'],
-      codex: ['codex', 'openai-codex', 'dsh-openai-codex'],
+      codex: ['codex', 'openai-codex', 'dsh-openai-codex', 'codex-chatgpt'],
+      // 以下别名来自 ChatGPT 订阅渠道的订阅线路(与 lib/plan-billing.js PLAN_PROVIDER_ALIASES 同步)。
+      anthropic: ['anthropic', 'claude-subscription'],
+      zai: ['zai', 'glm-coding-plan'],
+      minimax: ['minimax', 'minimax-code'],
+      kimi: ['kimi', 'kimi-code'],
+      commandcode: ['commandcode', 'command-code'],
+      workbuddy: ['workbuddy', 'workbuddy-subscription'],
+      antigravity: ['antigravity'],
+      stepfun: ['stepfun', 'step-code'],
       'volcengine-agent': ['volcengine-agent', 'ark-agent-plan', 'volcengine-agent-plan'],
       'tencent-coding': ['tencent-coding', 'tencent-coding-plan', 'tokenhub-coding-plan'],
       'tencent-token': ['tencent-token', 'tencent-token-plan', 'tokenhub-token-plan'],
@@ -1113,7 +1145,7 @@
       mimo: ['mimo', 'xiaomimimo', 'mimo-token-plan', 'xiaomi-token-plan', 'xiaomi-token-plan-cn', 'xiaomi-token-plan-sgp', 'xiaomi-token-plan-ams'],
       factory: ['factory', 'droid', 'factory-a', 'factory-g', 'factory-o'],
     }
-    const PLAN_PROVIDER_IDS_LOCAL = ['opendesign', 'anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'scnet', 'volcengine', 'qwen', 'mimo', 'factory', 'go', 'codex', 'volcengine-agent', 'tencent-coding', 'tencent-token', 'baidu-coding']
+    const PLAN_PROVIDER_IDS_LOCAL = ['opendesign', 'anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'scnet', 'volcengine', 'qwen', 'mimo', 'factory', 'go', 'codex', 'volcengine-agent', 'tencent-coding', 'tencent-token', 'baidu-coding', 'workbuddy', 'antigravity', 'stepfun']
     const PLAN_NAME_HINTS_LOCAL = {
       opendesign: 'opendesign|open[._-]?design',
       codex: 'codex|chatgpt', 'baidu-coding': 'baidu|qianfan|百度|千帆',

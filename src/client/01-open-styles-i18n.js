@@ -43,6 +43,8 @@ window.__ModuleLoader__.load({
       // initial-value,不会让 calc()/inset 在计算值阶段整条失效。
       '@property --cm-dialog-top{syntax:"<length>";inherits:true;initial-value:0px}',
       '.cm-stat-dialog{--cm-dialog-top:var(--dsh-frame-chrome-top,var(--dsh-frame-top-clearance,0px));inset:var(--cm-dialog-top) 0 0 0;margin:auto;width:min(1000px,94vw);max-width:calc(100vw - 32px);max-height:calc(100vh - var(--cm-dialog-top) - 32px);overflow:hidden;box-sizing:border-box;padding:0;border-radius:16px;border:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base,#fff))}.cm-stat-dialog[open]{display:flex;flex-direction:column}.cm-loading{padding:24px;min-height:160px;display:grid;gap:18px}.cm-loading i{height:18px;border-radius:5px;background:var(--dsw-alias-bg-layer-1,#f2f3f5)}.cm-loading i:first-child{width:35%}.cm-loading i:last-child{width:65%}.cm-stat-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;border-bottom:1px solid var(--dsw-alias-border-l3);flex:none}.cm-stat-dialog-head strong{font-size:15px;font-weight:500}.cm-stat-dialog-body{overflow:auto;min-height:0;padding:20px 24px;overscroll-behavior:contain}.cm-stat-dialog::backdrop{inset:var(--dsh-frame-chrome-top,var(--dsh-frame-top-clearance,0px)) 0 0;background:#0005}',
+      // Codex 订阅兼容(契约 E):弹窗几何/头部/正文复用 .cm-stat-dialog 系列类;
+      // 收窄宽度与面板排布由按需 chunk client.codex.js 自行注入(chunk 不计入本文件体积)。
       '.cm-root{flex:0 1 auto;min-width:0;max-width:100%;text-align:center;font-size:12px;line-height:20px;color:var(--dsw-alias-label-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cm-session-cost{display:grid;grid-template-columns:max-content minmax(0,1fr);min-width:min-content}.cm-session-amount{max-width:40vw;overflow:hidden;text-overflow:ellipsis}.cm-session-detail{min-width:0;overflow:hidden;text-overflow:ellipsis}',
       '.cm-chip{display:inline-flex;align-items:center;gap:4px;max-width:180px;padding:0 8px;height:22px;border-radius:6px;background:var(--dsw-alias-bg-layer-2);font-size:12px;line-height:22px;color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       '.cm-foot{display:flex;align-items:center;gap:6px;height:32px;padding:0 8px;border-radius:8px;font-size:12px;color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden}',
@@ -368,6 +370,14 @@ window.__ModuleLoader__.load({
       '.cm-footer-stack.simple.rail .cm-bbox{padding:4px 2px}',
       '.cm-footer-stack.simple .cm-peak-rail-track,.cm-footer-stack.simple .cm-peak-rail-classic-track{height:28px}',
       '@media (max-width:640px){.cm-cards{grid-template-columns:1fr}.cm-grid{grid-template-columns:1fr}.cm-budget-controls{grid-template-columns:1fr}}',
+      // ── dsh-pocket 手机端适配(task-10):双判据 —— @media (max-width:1023px) 覆盖真实窄屏,
+      //    data-dsh-pocket-layout="mobile" 覆盖宽屏强制移动布局;两条判据都只新增覆盖,桌面不变。──
+      '@media (max-width:1023px){.cm-section{padding-bottom:calc(16px + env(safe-area-inset-bottom))}.cm-cards,.cm-overview-grid>.cm-cards,.cm-grid,.cm-budget-controls{grid-template-columns:1fr;gap:8px}.cm-card{padding:10px 12px}.cm-card-value{font-size:17px}.cm-card-sub,.cm-bal-line,.cm-bal-amt{overflow-wrap:anywhere}.cm-buttons,.cm-toolbar,.cm-row,.cm-budget-head{flex-wrap:wrap}.cm-btn,.cm-tab,.cm-foot,.cm-corner-chip{min-height:36px;height:auto}.cm-tabs{flex-wrap:nowrap;overflow-x:auto}.cm-tab{flex:none}.cm-qstrip{padding:0 8px}.cm-qguide{max-width:calc(100vw - 24px);top:calc(10px + env(safe-area-inset-top))}.cm-peak-alert{max-width:calc(100vw - 24px)}.cm-peak-alert.cm-peak-alert-corner{right:12px;left:12px;bottom:calc(12px + env(safe-area-inset-bottom));width:auto}.cm-footer-stack{padding-bottom:env(safe-area-inset-bottom)}.cm-stat-dialog{max-width:calc(100vw - 24px);max-height:90vh;overflow:auto}.cm-stat-dialog-body{padding:14px;padding-bottom:calc(14px + env(safe-area-inset-bottom))}}',
+      'body[data-dsh-pocket-layout="mobile"] :is(.cm-cards,.cm-overview-grid>.cm-cards,.cm-grid,.cm-budget-controls){grid-template-columns:1fr;gap:8px}',
+      'body[data-dsh-pocket-layout="mobile"] .cm-tabs{flex-wrap:nowrap;overflow-x:auto}',
+      'body[data-dsh-pocket-layout="mobile"] .cm-stat-dialog{max-width:calc(100vw - 24px);max-height:90vh;overflow:auto}',
+      'body[data-dsh-pocket-layout="mobile"] .cm-footer-stack{padding-bottom:env(safe-area-inset-bottom)}',
+      'body[data-dsh-pocket-layout="mobile"] :is(.cm-peak-alert,.cm-qguide){max-width:calc(100vw - 24px)}',
     ].join('\n')
     // 样式表注入。**按内容比对,不按 id 去重**:客户端插件热更新(DSH 的 client HMR,不刷新
     // 页面就换掉插件代码)时,页面上留着的是上一版的 <style>,旧写法只看 id 存不存在就跳过

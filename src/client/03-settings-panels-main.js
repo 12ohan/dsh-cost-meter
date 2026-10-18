@@ -1884,6 +1884,25 @@
           monthLabels.map((m, i) => el('span', { key: 'm' + String(i), className: 'cm-ug-monthc' }, m))))
     }
 
+    // ── Codex 订阅兼容(契约 E) ────────────────────────────────────────────────
+    // 一次性提示与设置页 Codex 分区体积较大,整体搬到按需 chunk client.codex.js;
+    // 主包只留懒加载骨架:宿主未检出 Codex(installed/promptDue 非 true)时不加载 chunk。
+    function CodexLazy(props) {
+      const [page, setPage] = useState(null)
+      useEffect(() => {
+        if (props.ready) props.api.loadCodex().then(setPage, () => {})
+      }, [props.ready])
+      const View = page && page[props.view]
+      return View && el(View, props)
+    }
+
+    // 常驻 sidebar.footer.action 的挂载点:仅 promptDue 为 true 时挂 CodexCompatPrompt。
+    function CodexCompatPromptSlot(props) {
+      const snapshot = props.useCost?.(s => s)
+      const state = snapshot?.state
+      return el(CodexLazy, { ...props, state, view: 'prompt', ready: state?.codexCompat?.promptDue, locale: snapshot?.locale })
+    }
+
     function CostSection(props) {
       const costStore = props.useCost ? props.useCost(s => s) : undefined
       const api = props.api
@@ -2052,6 +2071,8 @@
         ['quotas', t('tabQuotas')],
         ['usage', t('tabUsage')],
         ['pricing', t('tabPricing')],
+        // Codex 订阅兼容(契约 E):仅宿主检出 Codex(installed===true)时出现,旧宿主保持原 6 标签。
+        ...(state?.codexCompat?.installed === true ? [['codex', 'Codex']] : []),
         ['display', t('tabDisplay')],
       ]
       // 自动保存状态常驻标签栏右侧:在任意标签页改动配置都能看到保存反馈。
@@ -2178,6 +2199,9 @@
               : el('button', { className: 'cm-btn danger', onClick: () => setConfirmReset(true), disabled: busy }, t('clearAllHistory'))),
           el('p', { className: 'cm-note' }, t('legacyImportNote'))))
         : null,
+        // ── Codex:订阅兼容检出与历史用量并入(契约 E,组件在按需 chunk client.codex.js) ──
+        tab === 'codex' ? el(CodexLazy, { key: 'codex', state, api, t, locale, view: 'panel', ready: true })
+        : null,
         // ── 显示:界面语言、徽章/侧边栏位置、图框开关等 ──
         tab === 'display' ? el(Fragment, { key: 'display' },
         // 存量明文密钥未迁出提示(v1.6.8):仅在确有密钥无法自动导入凭据库时出现。
@@ -2291,6 +2315,8 @@
         }
         return result.value
       }
+      // 宿主 RPC 返回完整 state 的统一落点(ready + 清错误)。
+      const refreshState = state => { store.set({ status: 'ready', error: null, state }); return state }
       let lastPoll = Date.now()
       let reloading = false
       let active = true, retrySeconds = 1
@@ -2378,6 +2404,7 @@
         loadCommunity: () => loadPage('community'),
         loadPricing: () => loadPage('pricing'),
         loadDisplay: () => loadPage('display'),
+        loadCodex: () => loadPage('codex'),
         reload,
         updateConfig: async patch => {
           const { activeLocale: _local, ...savedPatch } = patch
@@ -2402,6 +2429,9 @@
           store.set({ status: 'ready', error: null, state })
           return state
         },
+        // Codex 订阅兼容(契约 D/E):并入/忽略 Codex 历史用量,宿主返回完整 state。
+        applyCodexCompatHistory: async () => refreshState(await call('applyCodexCompatHistory')),
+        dismissCodexCompat: async () => refreshState(await call('dismissCodexCompat')),
         // 导入安装前历史(issue #27):返回 { ok, message, state? },成功时刷新本地快照。
         importLegacyHistory: async () => {
           const result = await costMeter.importLegacyHistory()
@@ -2508,6 +2538,10 @@
         )
         return dispose
       })
+      // Codex 订阅兼容一次性提示(契约 E):常驻 sidebar.footer.action,组件内部按
+      // state.codexCompat.promptDue 门控;旧宿主无该键,组件始终渲染空,也不加载 chunk。
+      slots.inject('sidebar.footer.action', () => slots.register(
+        { name: 'sidebar.footer.action', id: 'cost-meter-codex-compat', order: 1, inject: injected }, CodexCompatPromptSlot))
 
       // 峰/谷切换前弹窗提醒:全局 fixed 浮层(fixed 定位与宿主位置无关),挂在常驻的
       // sidebar.footer.action 插槽——conversation.composer.dock 仅在有活跃会话的页面渲染,

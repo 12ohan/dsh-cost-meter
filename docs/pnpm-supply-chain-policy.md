@@ -35,7 +35,7 @@
 ```yaml
 minimumReleaseAgeExclude:
   # 保留宿主已经写入的其他条目
-  - dsh-cost-meter@1.8.36
+  - dsh-cost-meter@1.9.0
 ```
 
 只影响列出的 `名称@版本`；不要删除文件里已有的其他排除项。修改后完全退出并重新打开 DSH，再在插件页重试。
@@ -49,7 +49,7 @@ minimumReleaseAgeExclude:
 dsh plugin --profile desktop remove dsh-cost-meter --config.minimum-release-age=0
 
 # 安装 / 升级
-dsh plugin --profile desktop add dsh-cost-meter@1.8.36 --config.minimum-release-age=0
+dsh plugin --profile desktop add dsh-cost-meter@1.9.0 --config.minimum-release-age=0
 ```
 
 如果是 lockfile 校验阶段失败（`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`），也可以加 `--trust-lockfile` 跳过校验并重试。以上两个参数已在本机 pnpm 11.28.5 的临时 Profile 上实测可用。
@@ -83,6 +83,6 @@ This page explains the pnpm `minimumReleaseAge` (supply-chain) policy shipped in
 
 - **Scope** — DSH 0.2.1-rc.1 / 0.2.1-rc.2 bundle pnpm **11.28.5**, which enables a built-in **24-hour** `minimumReleaseAge`. Packages published less than 24 hours ago can produce a resolution-policy violation.
 - **Symptoms** — the plugin page reports uninstall/install failure with lines such as `✓ Lockfile passes supply-chain policies (verified 28m ago)`, then `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` (lockfile verification) or `ERR_PNPM_RESOLUTION_POLICY_VIOLATIONS_UNHANDLED` (dependency resolution during `pnpm remove`). The unhandled-callback case is a defect of the host's bundled pnpm; the plugin cannot patch it.
-- **Workarounds** — (1) wait until the package/version is 24 hours old, then retry; (2) add an exact `minimumReleaseAgeExclude` entry (`- dsh-cost-meter@1.8.36`) to the profile's `pnpm-workspace.yaml` (`%USERPROFILE%\.dsh\profiles\<profile>\pnpm-workspace.yaml` on Windows, `~/.dsh/profiles/<profile>/pnpm-workspace.yaml` elsewhere), keep existing entries, restart DSH and retry; (3) forward pnpm flags for one operation via the CLI, for example `dsh plugin --profile desktop remove dsh-cost-meter --config.minimum-release-age=0` (or `--trust-lockfile` when only lockfile verification fails). Both flags were verified against pnpm 11.28.5 in a temporary profile.
+- **Workarounds** — (1) wait until the package/version is 24 hours old, then retry; (2) add an exact `minimumReleaseAgeExclude` entry (`- dsh-cost-meter@1.9.0`) to the profile's `pnpm-workspace.yaml` (`%USERPROFILE%\.dsh\profiles\<profile>\pnpm-workspace.yaml` on Windows, `~/.dsh/profiles/<profile>/pnpm-workspace.yaml` elsewhere), keep existing entries, restart DSH and retry; (3) forward pnpm flags for one operation via the CLI, for example `dsh plugin --profile desktop remove dsh-cost-meter --config.minimum-release-age=0` (or `--trust-lockfile` when only lockfile verification fails). Both flags were verified against pnpm 11.28.5 in a temporary profile.
 - **Diagnostics** — read the first `ERR_PNPM_*` line in `<profile>/.plugin-manager/logs/operation-*/pnpm.log`; remove credentials before sharing. Do not delete the profile or the ledger.
 - **Upstream** — DSH's repository restricts external pull requests, so this cannot be patched from the plugin side; the workarounds above are the supported mitigation until a DSH release updates the bundled pnpm. See also issue [#250](https://github.com/Han-1413141/dsh-cost-meter/issues/250).

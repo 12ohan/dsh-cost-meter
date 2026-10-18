@@ -8,20 +8,20 @@
 
 **DeepSeek Harness 会话费用统计插件(界面中英双语)**
 
-本会话费用 · 当日费用 · OpenCode Go 订阅额度显示 · 预算与已用百分比 · 官方账户余额 · 自定义 Provider 余额查询(可配任意 HTTP 端点) · 余额三段进度条 · 历史记录 · 峰谷计价时段显示(UTC 01:00–04:00、06:00–10:00 为峰时段;周末与中国法定假日全天按谷价,分别标注) · 峰/谷切换前弹窗与系统通知提醒(位置/提前量/提醒类型可配) · 官方价格一键同步 · 类 Codex Token 用量热图 · 多厂商多模型价格计费(内置 170+ 模型 ID 价格目录与自动匹配) · 主流 Coding Plan 额度查询与显示(Anthropic / Z.ai / MiniMax / Kimi / OpenRouter / SiliconFlow / CommandCode / SCNet / 火山方舟 / 千问 / 小米 MiMo 十一家,含 Volcano Ark AK/SK 签名与 MiMo 控制台 Cookie 查询) · Plan/API 双轨计费(订阅额度与按量金额分离统计,每 1% 额度与满窗的 token/等值金额估算及日/周/月曲线) · 输入框上方额度横条(预算/Go/Coding Plan 用量一条横排显示,可开关)
+本会话费用 · 当日费用 · OpenCode Go 订阅额度显示 · 预算与已用百分比 · 官方账户余额 · 自定义 Provider 余额查询(可配任意 HTTP 端点) · 余额三段进度条 · 历史记录 · 峰谷计价时段显示(UTC 01:00–04:00、06:00–10:00 为峰时段;周末与中国法定假日全天按谷价,分别标注) · 峰/谷切换前弹窗与系统通知提醒(位置/提前量/提醒类型可配) · 官方价格一键同步 · 类 Codex Token 用量热图 · 多厂商多模型价格计费(内置 170+ 模型 ID 价格目录与自动匹配) · 主流 Coding Plan 额度查询与显示(Anthropic / Z.ai / MiniMax / Kimi / OpenRouter / SiliconFlow / CommandCode / SCNet / 火山方舟 / 千问 / 小米 MiMo 十一家,含 Volcano Ark AK/SK 签名与 MiMo 控制台 Cookie 查询) · Plan/API 双轨计费(订阅额度与按量金额分离统计,每 1% 额度与满窗的 token/等值金额估算及日/周/月曲线) · 订阅插件兼容(Codex / ChatGPT 订阅) · 手机端适配(dsh-pocket) · 输入框上方额度横条(预算/Go/Coding Plan 用量一条横排显示,可开关)
 
-[![version](https://img.shields.io/badge/version-1.8.36-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
+[![version](https://img.shields.io/badge/version-1.9.0-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
 
 **最低支持宿主：DSH 0.2.0。** 插件把下限声明在 `engines.dsh`（宿主准入插件的闸门），不再支持任何 DSH 0.1.x 版本；本轮适配目标为 npm `next` 标签的 **0.2.1-rc.2**。具体范围与宿主的读取方式见[兼容声明](docs/dsh-0.2.1-compatibility.md#中文)。
 
 新增 [DeepSeek Search／Fetch API 次数费](docs/web-request-fees.md#中文)，只计有结果的成功请求，并将网页抓取独立分类。
 
-**v1.8.36** 修复升级后老会话费用显示 ¥0（[#300](https://github.com/Han-1413141/dsh-cost-meter/issues/300)），赠送余额部分到期/回收不再误报消费偏差（[#302](https://github.com/Han-1413141/dsh-cost-meter/issues/302)），并补充 DSH 0.2.1-rc.x 宿主内置 pnpm 供应链策略导致的安装/卸载失败排障（[说明](docs/pnpm-supply-chain-policy.md)）。USD 账本数据、历史金额与计价规则不变。
+**v1.9.0** 新增 Codex / ChatGPT 订阅插件兼容（订阅调用归为 Plan 订阅额度、不计入 API 花费，首次检测弹出一次性可关闭提示处理历史归类）、better-session 的 SQLite 会话存储兼容、全部费用界面的 dsh-pocket 手机端适配，并按 [#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274#issuecomment-6236591566) 为 OpenDesign 增加 Control Key `/billing/preflight` 回退与窗口/钱包独立降级。账本格式不变，不自动重算历史金额。
 
 
 桌面端用户请按 [Desktop 安装说明](docs/install-troubleshooting.md#desktop-安装与更新)，使用应用自带的 CLI 和 `desktop` Profile。
 
-更新说明：[v1.8.36](docs/update-notes-1.8.36.md#中文)。更新后完全重启 DSH。
+更新说明：[v1.9.0](docs/update-notes-1.9.0.md#中文)。更新后完全重启 DSH。
 
 声明范围内的宿主记录与此前的 0.1.x 历史见[兼容记录](docs/host-compatibility.md)；逐版本清单在 `package.json` 的 `dsh.compatibility.dshReleases`。
 
@@ -51,6 +51,10 @@
 | 自定义 Provider 余额 | 侧边栏 / 设置页(可配) | 可配置 HTTP 查询任意 Provider 余额(LiteLLM 等);中/英名称、币种、extract 规则(点路径 / 数字常量 / add / subtract / divide,divide 适配 NewApi 等 quota 端点,见下方[示例](#自定义-provider-余额配置示例newapi-模板));与 Coding Plan 同区可折叠配置 |
 | OpenCode Go 额度 | 侧边栏 / 设置页 / 右下角(dock,可配) | 滚动 5 小时 / 本周 / 本月用量百分比与重置时间,三档可分别开关,可同时显示预算已用%;Key 自动发现(专用引用 / 官方 Go 路由 apiKeyEnv / 环境变量 / opencode 登录态)或手动填写 |
 | Coding Plan 额度 | 侧边栏 / 设置页(每家可配) | 多厂商 coding plan 订阅额度查询(Anthropic Claude Pro/Max、Z.ai/智谱 GLM、MiniMax Token Plan、Kimi Code 本周/5 小时配额(无订阅 Key 时回落 PAYG 余额)、OpenRouter credits、SiliconFlow 余额、CommandCode 5h/周窗口与月度 Credits 余额、小米 MiMo Token Plan 套餐/补偿积分窗口与周期截止重置、余额(控制台 Cookie 凭据)、火山方舟 Volcano Ark 5h/周/月三档(需 AK/SK 管控面 HMAC 签名,需 ArkReadOnlyAccess + BillingCenterReadOnlyAccess)),各家独立启用开关、凭据、显示位置与刷新间隔(侧边栏卡片与 Go 额度同款,收起窄栏显示百分比),默认使用官方端点，MiniMax 可[配置可信查询域名](docs/minimax-quota-endpoint.md);无凭据/无订阅为中性提示;SCNet 超算互联网 Token Plan 支持[外部控制台额度快照](docs/scnet-official-snapshot.md)，无有效快照时按官方 Credits 抵扣表由本地账本估算月度用量(无需凭据) |
+| 订阅插件兼容 | 设置 → 费用 → Codex / 侧边栏与额度卡片 | 自动检测已安装的 Codex / ChatGPT 订阅插件，把其订阅调用归为 Plan 订阅额度、不计入 API 按量花费；新用量在记账时直接归类，历史 Codex 计费由一次性可关闭提示确认后重算（幂等）。显式 plan/API 配置不被覆盖。[说明](docs/update-notes-1.9.0.md#中文) |
+| SQLite 会话存储（better-session） | 宿主集成 | 自动探测宿主会话后端；当 `@morlay/better-session` / `@morlay/session-rdb`（SQLite）接管存储时，历史回填、旧账本导入、历史重定价、小时桶修复、fork 清洗与逐会话费用/轨迹/调用详情继续可用。JSONL 路径行为不变；旧 JSONL 与 RDB 历史不自动合并。[说明](docs/better-session.md) |
+| OpenDesign 额度 | 侧边栏 / 设置页（OpenDesign 厂商） | 从控制台 API 读取工作区 coding plan 窗口；使用 Control Key 时主端点 401/403 会保守回退一次 `/billing/preflight`，窗口与钱包读取独立降级。[排查说明](docs/opendesign-billing.md#中文) |
+| 手机端适配（dsh-pocket） | 全部费用界面 | ≤1023px 窄屏与 dsh-pocket 移动布局下：卡片单列、标签横向滚动、36px 触控高度、对话框不超过 90vh 并避开安全区、宽表横向滚动；桌面布局不变 |
 | 额度横条 | 输入框上方(显示设置可开关) | 一条横排 chips 实时显示预算已用% / Go 主窗口 / 各已启用 Coding Plan 用量窗口(短标签+迷你进度条,≥80% 预警、≥100% 超支,悬停见重置时刻);点击任意 chip 即刷新对应数据源(budget→状态、Go→Go 额度、厂商→该家全部窗口),同一厂商多窗口融合为一条 chip 分段显示;首次更新弹引导卡由用户自主决定开关;无可用数据自动隐藏 |
 | 点击立即刷新 | 侧边栏余额/额度图框 | 官方余额 / 自定义余额 / Coding Plan 图框(含窄栏收起态)点击即触发一次查询,刷新中呼吸闪烁,失败保持原值并在悬停提示说明;键盘 Enter/Space 可触发;更新后首次进入有引导提示 |
 | 简化侧栏显示 | 设置 → 费用 → 显示 | 可选开启；更新首次提示选择，压缩卡片和明细，面板高度限制为视口的 38% 且不超过 320 像素；保留金额、额度、点击刷新与悬停详情，关闭后恢复原布局。[使用说明](docs/sidebar-simple.md) |
@@ -334,22 +338,22 @@ Node.js 20 请改用 `npm install -g pnpm@10`。版本要求见 [pnpm 官方安�
 dsh plugin --profile web add dsh-cost-meter
 ```
 
-**PowerShell 一键脚本**(复制整行粘贴回车;自动补齐 pnpm、自动探测 git,无需克隆仓库;安装链**固定到发布 tag `v1.8.36`**,建议先下载审阅再运行):
+**PowerShell 一键脚本**(复制整行粘贴回车;自动补齐 pnpm、自动探测 git,无需克隆仓库;安装链**固定到发布 tag `v1.9.0`**,建议先下载审阅再运行):
 
 ```powershell
-irm https://raw.githubusercontent.com/Han-1413141/dsh-cost-meter/v1.8.36/install.ps1 | iex
+irm https://raw.githubusercontent.com/Han-1413141/dsh-cost-meter/v1.9.0/install.ps1 | iex
 ```
 
 **或直接命令行**(机器上需已有 pnpm 与 git;同样固定到 tag):
 
 ```sh
-dsh plugin --profile web add github:Han-1413141/dsh-cost-meter#v1.8.36
+dsh plugin --profile web add github:Han-1413141/dsh-cost-meter#v1.9.0
 ```
 
 没有 git 时可用 GitHub tag 打包直链:
 
 ```sh
-dsh plugin --profile web add https://github.com/Han-1413141/dsh-cost-meter/archive/refs/tags/v1.8.36.tar.gz
+dsh plugin --profile web add https://github.com/Han-1413141/dsh-cost-meter/archive/refs/tags/v1.9.0.tar.gz
 ```
 
 安装后**重启** `dsh web`(插件行、Typert 清单与客户端 bundle 均在启动时扫描):
@@ -414,7 +418,7 @@ DSH **0.2.1-rc.1 / 0.2.1-rc.2** 宿主自带 pnpm **11.28.5**，默认启用内�
 
    ```yaml
    minimumReleaseAgeExclude:
-     - dsh-cost-meter@1.8.36
+     - dsh-cost-meter@1.9.0
    ```
 
 3. 仅本次操作用 CLI 透传 pnpm 参数：`dsh plugin --profile desktop remove dsh-cost-meter --config.minimum-release-age=0`；若只是 lockfile 校验阶段失败，可改用 `--trust-lockfile`。这两个参数已在本机 pnpm 11.28.5 临时 Profile 上实测可用。
@@ -455,7 +459,7 @@ dsh plugin --profile web add link:./dsh-cost-meter  # 符号链接,改 lib/clien
 - **历史价格保护**：「价格币种」、单价和价格映射的修改只影响后续调用，旧明细使用已保存的价格版本。主动重算前需要确认，并保留原金额、价格版本和完整账本备份。详见[更新说明](docs/update-notes-2026-10-15.md#中文)。
 - **官方账单对齐口径**:① 与官方实时数字存在**分钟级时差**属预期——账本 2 秒防抖落盘,关停瞬间仍在途的流会被服务端照常扣费而 usage 块无人接收(缺口集中在缓存命中列);② reasoning tokens 由 API 单独上报且**不计费**,token 列为五桶合计,与官方「三列」天然对不齐,**对账请以金额为准**;③ 「价格币种」设为人民币时按官方 CNY 价目直计入账,与人民币账单币种一致(CNY 计价账号推荐);设为 USD 时显示金额经固定汇率折算,与 CNY 直计存在结构性细差(两套价目比值非均匀);④ 赠送余额到期/回收不算消费:当日余额减少只发生在赠送桶(充值余额不变)、且本地官方渠道费用最多只能解释减量的 1/4 时,重置对账基准并给出「可能是赠送余额到期/回收」的说明,不再按消费偏差告警;
 - 预算与超支提示**仅提醒,不阻止调用**。
-- **Plan/API 双轨计费**(issue #64):订阅制渠道(MiniMax / Codex 手动标记等)的调用金额只记「等值」,预算/今日费用/概览卡片等金额展示仅统计按量计费(API)部分;
+- **Plan/API 双轨计费**(issue #64):订阅制渠道(MiniMax / Codex、ChatGPT 订阅插件等)的调用金额只记「等值」,预算/今日费用/概览卡片等金额展示仅统计按量计费(API)部分;
 - **「含 Plan 总额」开关**:概览页汇总卡片下的快捷开关切换全部金额展示口径——关闭时仅计真金白银(API 渠道),开启后显示含 Plan 等值的总金额;网关路由(provider 缺失)调用的第三方目录模型自动归入对应订阅归类,无模型明细的历史残差计入 API 口径;设置 → 用量 的 Token Plan 统计面板提供每 1% 额度与满窗的 token/等值金额估算与日/周/月曲线;分类可在配置中按厂商或 provider:model 级覆盖。
 - **全仓安全审计修复**:账本退出丢写(close/flush 次序)、发版脚本命令注入、面板空指针崩溃(Go 月窗空值)3 项高危,及路由调用小时桶漏记、官方余额对账告警失效、自定义余额提取失败误显 $0、计费流中断泄漏等 30 余项中低危问题全量修复;账本损坏自动备份、写失败重试、配置补丁原子性、原型链与凭据处理加固。逐项清单见 [CHANGELOG.md](CHANGELOG.md)。
 

@@ -3,6 +3,12 @@
 > 本文是面向使用者的版本更新总览；逐条开发记录见 [CHANGELOG.md](../CHANGELOG.md),完整提交历史见
 > [Commits](https://github.com/Han-1413141/dsh-cost-meter/commits/master)。
 
+## v1.9.0(2026-10-18)—— 订阅插件与 SQLite 会话存储兼容、手机端适配与 OpenDesign preflight 回退
+
+- Codex / ChatGPT 订阅插件兼容：订阅用量自动归为 Plan，首次检测弹出一次性可关闭提示，设置页「Codex 订阅兼容」可随时重新操作；历史归类需用户确认且幂等。[更新说明](update-notes-1.9.0.md)
+- better-session SQLite 会话存储兼容：会话后端自动探测，RDB 下回填/导入/历史重定价/逐会话统计继续可用；JSONL 行为不变，并修复 RDB 空扫描误消费一次性迁移标记。[兼容说明](better-session.md)
+- 全部费用 UI 适配 dsh-pocket 手机端（≤1023px 与移动布局）；OpenDesign 增加 `/billing/preflight` Control Key 回退与窗口/钱包独立降级（#274，感谢 [@playgithub](https://github.com/Han-1413141/dsh-cost-meter/issues/274#issuecomment-6215322540)、[@codeforker654](https://github.com/Han-1413141/dsh-cost-meter/issues/274#issuecomment-6236228870)、[@yunjuanhuakai](https://github.com/Han-1413141/dsh-cost-meter/issues/274#issuecomment-6236591566)）。[验证与影响](release-notes/v1.9.0.md)
+
 ## v1.8.36(2026-10-17)—— 旧会话金额修复、赠送余额对账与 DSH 0.2.1-rc.2
 
 - 修复 [#300](https://github.com/Han-1413141/dsh-cost-meter/issues/300)：升级后老会话费用显示 ¥0；冻结汇率金额随首次落盘持久化，跨进程合并不丢失不重复，客户端增加 USD 回退。USD 账本与历史金额不变。
