@@ -166,6 +166,7 @@ try {
   assert.equal(await page.evaluate(()=>window.current().codexQuotaEnabled),false,'Codex example uses a supplied snapshot without enabling discovery')
   await region('输入区')
   await page.getByLabel('调整组件',{exact:true}).selectOption('strip-codex')
+  assert.equal(await page.getByRole('checkbox',{name:'显示此组件',exact:true}).count(),0,'Codex has independent explicit switches instead of a duplicate generic toggle')
   await page.locator('[data-display=strip-codex]').waitFor()
   await page.getByRole('checkbox',{name:'在输入区显示 Codex 额度',exact:true}).uncheck()
   await page.waitForFunction(()=>window.current().codexQuotaStrip===false)

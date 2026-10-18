@@ -124,6 +124,6 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
       !selected ? el('option', { value: '', disabled: true, hidden: true }, text('选择组件', 'Choose a component')) : null,
       ...(region === 'sidebar' ? ['budget','balance','today','peak','models','go','plan','customBalance','codex'] : region === 'composer' ? ['strip-budget','strip-go','strip-plans','strip-codex','session-dock','badge','corner','models'] : ['session-header','badge','turn']).map(key => el('option', { key, value: key }, labels[key])))),
     selected ? el('div', { className: 'cm-inspector-controls', key: selected, 'data-inspector': selected },
-      selection && !['models', 'today', 'budget', 'peak', 'balance', 'go', 'plan', 'customBalance'].includes(selected) ? check(text('显示此组件', 'Show this component'), selection.on, () => set(selection.patch)) : null,
+      selection && !['models', 'today', 'budget', 'peak', 'balance', 'go', 'plan', 'customBalance', 'codex', 'strip-codex'].includes(selected) ? check(text('显示此组件', 'Show this component'), selection.on, () => set(selection.patch)) : null,
       ...controls) : null)
 }
