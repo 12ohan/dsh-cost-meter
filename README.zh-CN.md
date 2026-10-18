@@ -18,6 +18,8 @@
 
 **v1.9.1** 修复皮肤插件把主题别名调成半透明后插件浮层与弹窗透出后方页面的问题（统一改为「本地不透明基底 + 皮肤色渐变叠层」，保留皮肤色调、默认主题视觉不变）；并带来可度量的性能优化：记账不再每笔重建价格历史快照（1000 笔 1308ms → 93ms）、账本落盘合并减少冗余深拷贝（约 40ms → 30ms）、统计渲染缓存键改用 `pricesRev`（2.55ms → 0.015ms）、设置页差异比较引用短路。账本格式与历史金额口径不变。
 
+开发分支更新（尚未发布到 npm）：[OpenDesign 查询修复](docs/opendesign-billing.md)、[随机端口 / 局域网 / WorkBuddy2API 配置](docs/custom-balance-sources.md)、[透明度修复与性能测量](docs/performance-2026-10-18.md)。
+
 
 桌面端用户请按 [Desktop 安装说明](docs/install-troubleshooting.md#desktop-安装与更新)，使用应用自带的 CLI 和 `desktop` Profile。
 

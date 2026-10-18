@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+- OpenDesign 直接查询接受 Control Key 的 `/billing/preflight`，省去先失败的请求；保留钱包独立查询和身份校验，补充只使用 DSH API 时的配置说明。感谢 @playgithub、@codeforker654、@yunjuanhuakai 在 [#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274) 的需求、复现与端点定位，以及 @unifilitence 在 [#313](https://github.com/Han-1413141/dsh-cost-meter/issues/313) 的独立验证。
+- 自定义余额支持跟随宿主随机端口的相对路径、端口改变后的缓存失效，以及显式允许的局域网 HTTP；新增 WorkBuddy2API 活跃账号池积分预设。感谢 @Jav1es 的 [#311](https://github.com/Han-1413141/dsh-cost-meter/issues/311)，以及 @snhun 的 [#309](https://github.com/Han-1413141/dsh-cost-meter/issues/309) / [#310](https://github.com/Han-1413141/dsh-cost-meter/issues/310)。[配置说明](docs/custom-balance-sources.md)
+- 修复皮肤背景透明度导致费用页面和浮层透出后方内容，132 个浏览器场景通过。
+- 缓存宿主语言探测结果并随事件失效，处理设置描述事件重入；同条件隔离基准中，每轮 2,000 次费用读取从 1,719.58 ms 降至 40.19 ms。感谢 @XHPAN 的 [#312](https://github.com/Han-1413141/dsh-cost-meter/issues/312)。CSS 无损压缩后主客户端为 260,671 字节。[测量方法与原始数据](docs/performance-2026-10-18.md)
+
 ## [1.9.1] - 2026-10-18
 
 - 修复皮肤类插件把主题别名（`--dsw-alias-bg-*`）调成半透明后，插件浮层与弹窗透出后方页面内容的问题：主包统计明细弹窗、额度引导、峰谷提醒与精简底栏，统计页费用明细弹窗、上下文费用开关引导与 billion-context 提示，定价页模型/价格组合浮层，统一改为「本地不透明基底（浅色 `#fff` / 深色 `#151517`）+ 皮肤色渐变叠层」合成——保留皮肤色调，半透明皮肤下不再透出内容，默认主题与不透明皮肤视觉完全不变。新增 `test/skin-occlusion-static.mjs`（源码规则 + 构建产物标记双重断言）并在真实浏览器回归中模拟 Dream Skin 半透明场景。详见[更新说明](docs/update-notes-1.9.1.md)。

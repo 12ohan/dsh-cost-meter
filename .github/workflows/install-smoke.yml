@@ -75,6 +75,7 @@ jobs:
           node test/statistics-warmup.mjs
           node test/cost-views-browser.mjs
           node test/pricing-theme-browser.mjs
+          node test/skin-opacity-browser.mjs
           node test/custom-model-prices.mjs
           node test/price-multiplier.mjs
           node test/billion-context-compatibility-browser.mjs
@@ -96,6 +97,8 @@ jobs:
             .tmp-context-regression-browser/report.json
             .tmp-pricing-theme-browser/*.png
             .tmp-pricing-theme-browser/report.json
+            .tmp-skin-opacity-after/*.png
+            .tmp-skin-opacity-after/result.json
             .tmp-billion-notice-browser/*.png
             .tmp-billion-notice-browser/report.json
             .tmp-cache-write-price-browser/*.png

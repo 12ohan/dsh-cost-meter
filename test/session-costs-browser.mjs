@@ -255,13 +255,17 @@ try {
   // to bg-layer-2 (applyModalOverlay). Test those independent channels directly.
   await page.setViewportSize({width:1280,height:900})
   await page.evaluate(()=>{document.documentElement.style.setProperty('--dsw-alias-bg-base','rgba(18,16,26,.18)');document.documentElement.style.setProperty('--dsw-alias-bg-layer-2','rgb(238,232,246)')})
-  const skinPopup = await page.locator('dialog').evaluate(n=>{const s=getComputedStyle(n);return {color:s.backgroundColor,image:s.backgroundImage}})
-  assert.equal(skinPopup.color,'rgb(255, 255, 255)','opaque local base keeps translucent skins from bleeding through')
-  assert.match(skinPopup.image,/rgb\(238, 232, 246\)/,'skin layer tint is re-applied over the local base')
+  const skinPixels = element => {
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1
+    const context = canvas.getContext('2d')
+    context.fillStyle = getComputedStyle(element).backgroundColor
+    context.fillRect(0, 0, 1, 1)
+    return [...context.getImageData(0, 0, 1, 1).data]
+  }
+  assert.deepEqual(await page.locator('dialog').evaluate(skinPixels), [238, 232, 246, 255], 'opaque skin colour is preserved')
   await page.evaluate(()=>document.documentElement.style.setProperty('--dsw-alias-bg-layer-2','rgba(238,232,246,.92)'))
-  const translucentPopup = await page.locator('dialog').evaluate(n=>{const s=getComputedStyle(n);return {color:s.backgroundColor,image:s.backgroundImage}})
-  assert.equal(translucentPopup.color,'rgb(255, 255, 255)','translucent skin tint never makes the popup base translucent')
-  assert.match(translucentPopup.image,/rgba\(238, 232, 246, 0\.92\)/,'translucent skin tint stays visible as a composited gradient layer')
+  assert.deepEqual(await page.locator('dialog').evaluate(skinPixels), [238, 232, 246, 255], 'translucent skin retains RGB channels with opaque alpha')
+  assert.deepEqual(await page.locator('.cm-stat').evaluate(skinPixels), [238, 232, 246, 255], 'statistics content uses the popup surface instead of the dark wallpaper wash')
   await page.screenshot({path:join(output,'04-theme-popup-opacity.png')})
   await page.locator('.cm-stat-dialog-body').evaluate(n=>{n.scrollTop=0})
   await page.evaluate(()=>{window.refreshFails=true})

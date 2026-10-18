@@ -127,12 +127,30 @@ if (cssResult.warnings.length) throw new Error('client CSS contains build warnin
 // Store repeated native-theme and component prefixes once; restore before injection.
 // This is lossless text packing: the actual stylesheet and cascade do not change.
 const compactCss = cssResult.code.trim()
-const cssPhrases = ['color:var(--dsw-alias-', 'var(--dsw-alias-', '.cm-', 'background:', 'align-items:', 'border-radius:', 'font-size:',
-  'display:', 'padding:', 'justify-content:', 'margin:', 'gap:', 'font-weight:', 'line-height:', 'border:', 'min-width:', 'max-width:']
-const cssTokenBase = 0x0180, cssTokenRange = `[${String.fromCharCode(cssTokenBase)}-${String.fromCharCode(cssTokenBase + cssPhrases.length - 1)}]`
+// Select repeated declarations, selectors and theme tokens by their actual UTF-8 savings.
+// Decode once at load time; the stylesheet is byte-for-byte identical to esbuild's output.
+const cssCounts = new Map()
+for (const pattern of [/[a-z-]+:[^;{}]+;?/g, /\.cm-[a-z-]+/g, /var\(--[a-z0-9-]+(?:,[^()]*)?\)/g]) {
+  for (const [phrase] of compactCss.matchAll(pattern)) {
+    if (phrase.length > 7 && !phrase.includes('~')) cssCounts.set(phrase, (cssCounts.get(phrase) ?? 0) + 1)
+  }
+}
+for (const phrase of ['var(--dsw-alias-', '.cm-', 'background:', 'align-items:', 'border-radius:', 'font-size:', 'display:', 'padding:', 'justify-content:', 'margin:', 'gap:', 'font-weight:', 'line-height:', 'border:', 'min-width:', 'max-width:']) {
+  cssCounts.set(phrase, compactCss.split(phrase).length - 1)
+}
+const cssCandidates = [...cssCounts].filter(([, count]) => count >= 2).sort((a, b) =>
+  (Buffer.byteLength(b[0]) - 2) * (b[1] - 1) - (Buffer.byteLength(a[0]) - 2) * (a[1] - 1) || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+const cssPhrases = [], cssTokenBase = 0x0180
+const cssTokenRange = `[${String.fromCharCode(cssTokenBase)}-${String.fromCharCode(cssTokenBase + 127)}]`
 assert.ok(!new RegExp(cssTokenRange).test(compactCss), 'CSS packing markers must be unused')
 let packedCss = compactCss
-for (const [i, phrase] of cssPhrases.entries()) packedCss = packedCss.replaceAll(phrase, String.fromCharCode(cssTokenBase + i))
+for (const [phrase] of cssCandidates) {
+  const count = packedCss.split(phrase).length - 1, bytes = Buffer.byteLength(phrase)
+  if (count * (bytes - 2) - bytes - 1 < 12) continue
+  packedCss = packedCss.replaceAll(phrase, String.fromCharCode(cssTokenBase + cssPhrases.length))
+  cssPhrases.push(phrase)
+  if (cssPhrases.length === 128) break
+}
 assert.equal(packedCss.replace(new RegExp(cssTokenRange, 'g'), token => cssPhrases[token.charCodeAt(0) - cssTokenBase]), compactCss)
 src = src.replace(cssMatch[0], () => `const cssPhrases=${javascriptLiteral(cssPhrases.join('~'))}.split("~");const css=${javascriptLiteral(packedCss)}.replace(/${cssTokenRange}/g,token=>cssPhrases[token.charCodeAt(0)-${cssTokenBase}])`)
 const result = await transform(src, {

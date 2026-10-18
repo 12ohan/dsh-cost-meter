@@ -18,6 +18,8 @@ Supports [official Search/Fetch request fees](docs/web-request-fees.md#english),
 
 **v1.9.1** fixes translucent skin plugins leaking page content through plugin overlays and dialogs (overlays now composite an opaque local base with a skin-tint gradient, keeping the skin hue with no visual change on the default theme) and ships measured performance work: per-entry price-history rebuilds removed (1000 consecutive entries 1308ms → 93ms), leaner ledger flush merges (~40ms → 30ms), a `pricesRev`-based statistics cache key (2.55ms → 0.015ms) and faster settings diffing. The ledger format and historical amounts are unchanged.
 
+Development changes (not yet published to npm): [OpenDesign query fix](docs/opendesign-billing.md), [dynamic ports / LAN / WorkBuddy2API setup](docs/custom-balance-sources.md), and [opacity fixes with performance measurements](docs/performance-2026-10-18.md).
+
 
 Desktop users: follow the [Desktop installation instructions](docs/install-troubleshooting.md#desktop-安装与更新) for the application's own CLI and `desktop` Profile.
 

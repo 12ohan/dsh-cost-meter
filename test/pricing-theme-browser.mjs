@@ -71,7 +71,7 @@ await page.route('**/*', route => {
 })
 const luminance = color => {
   const channels = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(value => {
-    const v = value / 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4
+    const v = color.startsWith('color(srgb ') ? value : value / 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4
   })
   return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722
 }
