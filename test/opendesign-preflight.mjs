@@ -132,13 +132,14 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
   assert.deepEqual(result.partial, { usage: OPEN_DESIGN_QUOTA_FAILURES.noSubscription })
 }
 
-// 6. eligible:false preflight + unreadable wallet: the dedicated soft "no subscription" error, in
+// 6. eligible:false without a readable balance: the dedicated soft "no subscription" error, in
 // both languages, with the built-in fallback text when the message catalog has no key yet.
 {
   const missingKey = (_, code) => code
+  const noBalance = { ...noSubscription, balanceUsd: undefined }
   for (const locale of ['en', 'zh']) {
     const error = await failureOf(queryOpenDesignQuota(key, locale, missingKey, {
-      workspaceId, fetchImpl: transport({ usage: rejected(401), preflight: json(noSubscription), wallet: rejected(401) }).fetchImpl,
+      workspaceId, fetchImpl: transport({ usage: rejected(401), preflight: json(noBalance), wallet: rejected(401) }).fetchImpl,
     }))
     assert.equal(error.soft, true)
     assert.equal(error.code, OPEN_DESIGN_QUOTA_FAILURES.noSubscription)
@@ -147,10 +148,22 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
   }
   const translated = (_, code) => code === 'codingPlanNoSubscription' ? 'OpenDesign: no plan (catalog)' : 'OpenDesign: ' + code
   const error = await failureOf(queryOpenDesignQuota(key, 'en', translated, {
-    workspaceId, fetchImpl: transport({ usage: rejected(401), preflight: json(noSubscription), wallet: rejected(401) }).fetchImpl,
+    workspaceId, fetchImpl: transport({ usage: rejected(401), preflight: json(noBalance), wallet: rejected(401) }).fetchImpl,
   }))
   assert.equal(error.message, 'OpenDesign: no plan (catalog)')
   assert.equal(error.code, OPEN_DESIGN_QUOTA_FAILURES.noSubscription)
+}
+
+// A valid preflight balance is useful even without a subscription and a readable wallet route.
+for (const locale of ['zh', 'en']) {
+  const result = await queryOpenDesignQuota(key, locale, message, {
+    workspaceId, fetchImpl: transport({ preflight: json(noSubscription), wallet: rejected(403) }).fetchImpl,
+  })
+  assert.deepEqual(result.windows, { balance: { text: '$1.5000', resetsAt: '' } })
+  assert.deepEqual(result.partial, { usage: OPEN_DESIGN_QUOTA_FAILURES.noSubscription, wallet: OPEN_DESIGN_QUOTA_FAILURES.unauthorized })
+  assert.match(result.message, /billing\/preflight/)
+  assert.match(result.message, /codingPlanNoSubscription/)
+  assert.match(result.message, /codingPlanUnauthorized/)
 }
 
 // 7. A preflight response that is not JSON is an invalid response, never a leaked body.
@@ -210,6 +223,18 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
   assert.equal(error.code, OPEN_DESIGN_QUOTA_FAILURES.identityMismatch)
   assert.equal(error.soft, undefined)
   assert.match(error.message, /identities/)
+}
+
+// Identity checks also apply to ineligible members, before displaying a no-subscription notice.
+{
+  const error = await failureOf(queryOpenDesignQuota(key, 'en', message, {
+    workspaceId, fetchImpl: transport({ preflight: json({ ...noSubscription, workspaceMemberId: 'member-2' }), wallet: json(wallet) }).fetchImpl,
+  }))
+  assert.equal(error.code, OPEN_DESIGN_QUOTA_FAILURES.identityMismatch)
+  const wrongWorkspace = { ...noSubscription, workspaceId: 'ws-other', codingPlan: { ...noSubscription.codingPlan, workspaceId: 'ws-other' } }
+  await assert.rejects(queryOpenDesignQuota(key, 'en', message, {
+    workspaceId, fetchImpl: transport({ preflight: json(wrongWorkspace), wallet: rejected(403) }).fetchImpl,
+  }), error => error.code === OPEN_DESIGN_QUOTA_FAILURES.unauthorized)
 }
 
 // 13. A body without the redundant outer workspaceId is accepted (the response is scoped by the

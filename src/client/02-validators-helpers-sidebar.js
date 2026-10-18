@@ -2836,6 +2836,7 @@
         return codingPlanWindowLabel(name, t) + ' ' + value + (reset ? ' · ' + reset : '')
       })
       if (live.fetchedAt > 0) detailParts.push(t('goQuotaFetchedAt', { time: new Date(live.fetchedAt).toLocaleTimeString() }))
+      if (live.message) detailParts.push(live.message)
       detailParts.push(...clickRefreshTipLines(t, refresh))
       const detail = [t(rowDef.labelKey), ...detailParts].join('\n')
       const pcts = entries.map(([, win]) => pctOf(win)).filter(p => p !== null)
@@ -3054,6 +3055,7 @@
           const vendor = STRIP_VENDOR_SHORT[rowDef.id] ?? rowDef.id
           const segs = []
           const detailParts = []
+          if (live.message) detailParts.push(live.message)
           let worst = 0 // 0 ok < 1 warn < 2 over;chip 告警级别取所有窗口的最差
           let shown = 0
           for (const [name, win] of entries) {

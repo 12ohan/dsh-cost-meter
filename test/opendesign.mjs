@@ -111,7 +111,7 @@ const React = { createElement: element, Fragment: 'fragment', useState: value =>
   useRef: value => ({ current: value }), useEffect() {}, useMemo: fn => fn(), useCallback: fn => fn }
 const source = readdirSync(new URL('../src/client/', import.meta.url)).filter(name => name.endsWith('.js')).sort()
   .map(name => readFileSync(new URL('../src/client/' + name, import.meta.url), 'utf8')).join('')
-vm.runInNewContext(source.replace('exports.apply = apply', 'exports.testing = { PlanQuotaCard, parseConfig, resolveClientPriceRaw, billingClassOfLocal, MESSAGES }; exports.apply = apply'), {
+vm.runInNewContext(source.replace('exports.apply = apply', 'exports.testing = { PlanQuotaCard, CodingPlanBox, QuotaStrip, parseConfig, resolveClientPriceRaw, billingClassOfLocal, MESSAGES }; exports.apply = apply'), {
   window: { __ModuleLoader__: { load: value => { factory = value.factory } } }, navigator: { language: 'en' }, console, setTimeout, clearTimeout,
 })
 const ui = factory(name => name === 'react' ? React : {}).testing
@@ -132,5 +132,13 @@ for (const locale of ['zh', 'en']) {
   assert.equal(saved.codingPlans.opendesign.workspaceId, 'ws-2')
   assert.ok(contents.some(row => row.props.target === 'codingPlans.opendesign' && row.props.placeholder === 'OPENDESIGN_CONTROL_KEY'))
   assert.ok(contents.some(row => row.children?.includes(t('opendesignNote'))))
+  const message = locale === 'zh' ? '套餐额度：查询失败，钱包仍可用。' : 'Plan quota: unavailable; wallet is still available.'
+  const enabled = { ...clientConfig, locale, quotaStrip: { ...clientConfig.quotaStrip, enabled: true }, codingPlans: { ...clientConfig.codingPlans, opendesign: { ...clientConfig.codingPlans.opendesign, enabled: true } } }
+  const state = { config: enabled, codingPlans: { opendesign: { status: 'ok', message, fetchedAt: 1, windows: { balance: { text: '$12.50', resetsAt: '' } } } } }
+  const visible = ui.PlanQuotaCard({ state, draft: enabled, setDraft() {}, planId: 'opendesign', labelKey: 'codingPlanOpendesign', t, api: {} })
+  assert.ok(nodes(visible.props.statusNode).some(row => row.children?.includes(message)), 'partial reason is visible in settings')
+  const box = ui.CodingPlanBox({ id: 'opendesign', state, wide: true })
+  assert.ok(nodes(box.props.label).some(row => row.children?.some(child => typeof child === 'string' && child.includes(message))), 'sidebar tooltip includes the partial reason')
+  assert.ok(JSON.stringify(ui.QuotaStrip({ useCost: () => ({ state }) })).includes(message), 'quota-strip tooltip includes the partial reason')
 }
 console.log('[ok] OpenDesign: 35 public prices, scoped aliases, long context, Plan/API, validated workspace quota/wallet, auth boundaries, refresh/restart and bilingual settings; no live account or model requests')
