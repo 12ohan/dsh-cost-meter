@@ -266,7 +266,7 @@ window.__ModuleLoader__.load({
       @container(max-width:420px){.cm-plan-summary{gap:8px;grid-template-columns:1fr 1fr}.cm-plan-part-head{align-items:start;flex-wrap:wrap}}
       @media(prefers-reduced-motion:reduce){.cm-cost-arc{transition:none}}
       /* dsh-pocket 手机端适配(task-10):统计表/图/弹窗窄屏收敛;桌面端规则不变。 */
-      @media (max-width:1023px){.cm-stat-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.cm-stat-grid,.cm-stat-shares{grid-template-columns:1fr;gap:14px}.cm-cost-chart{grid-template-columns:128px minmax(0,1fr);gap:10px 14px}.cm-stat-panel{padding:12px}.cm-stat-table th,.cm-stat-table td{padding:8px 6px}.cm-stat input,.cm-stat select{max-width:100%}.cm-stat-controls{flex-wrap:wrap}.cm-stat-dialog{max-width:calc(100vw - 24px);max-height:90vh;overflow:auto}}
+      @media (max-width:1023px){.cm-stat-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.cm-stat-grid,.cm-stat-shares{grid-template-columns:1fr;gap:14px}.cm-cost-chart{grid-template-columns:128px minmax(0,1fr);gap:10px 14px}.cm-stat-panel{padding:12px}.cm-stat-table th,.cm-stat-table td{padding:8px 6px}.cm-stat input,.cm-stat select{max-width:100%}.cm-stat-controls{flex-wrap:wrap}}
       body[data-dsh-pocket-layout="mobile"] .cm-stat-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
       body[data-dsh-pocket-layout="mobile"] .cm-stat-grid,body[data-dsh-pocket-layout="mobile"] .cm-stat-shares{grid-template-columns:1fr}`
     // Keep categorical colors consistent across standalone and peer panels.

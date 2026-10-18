@@ -15,7 +15,7 @@ window.__ModuleLoader__.load({
       const style = document.createElement('style')
       style.textContent = '.cm-codex-compat-dialog{width:min(560px,94vw)}.cm-codex-compat{display:flex;flex-direction:column;gap:8px;font-size:13px}'
       // dsh-pocket 手机端适配(task-10):弹窗铺满窄屏、安全区内边距;桌面端规则不变。
-      style.textContent += '@media (max-width:1023px){.cm-codex-compat-dialog{width:calc(100vw - 24px);max-height:90vh;overflow:auto}.cm-codex-compat{padding:0 2px}}body[data-dsh-pocket-layout="mobile"] .cm-codex-compat-dialog{width:calc(100vw - 24px)}'
+      style.textContent += '@media (max-width:1023px){.cm-codex-compat-dialog{width:calc(100vw - 32px)}.cm-codex-compat{padding:0 2px}}body[data-dsh-pocket-layout="mobile"] .cm-codex-compat-dialog{width:calc(100vw - 32px)}'
       document.head.appendChild(style)
     }
 
