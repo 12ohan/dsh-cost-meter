@@ -66,7 +66,7 @@ window.__ModuleLoader__.load({
       // 输入框上方额度横条(issue #31 后续):横排 chips,每片 = 短标签 + 迷你进度条 + 百分比;
       // 可点击刷新(issue #52):action 态带手型/焦点环,厂商多窗口融合为段(.cm-qseg 竖线分隔)。
       '.cm-qstrip{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px;width:100%;max-width:var(--dsh-chat-content-width,720px);margin:0 auto;box-sizing:border-box;padding:0 calc(var(--dsh-composer-side-clearance,0px) + 16px)}',
-      '.cm-qchip{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;background:var(--dsw-alias-bg-layer-2);font-size:11px;line-height:22px;color:var(--dsw-alias-label-secondary);white-space:nowrap;font-variant-numeric:tabular-nums;cursor:default}',
+      '.cm-qchip{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;background:transparent;font-size:11px;line-height:22px;color:var(--dsw-alias-label-secondary);white-space:nowrap;font-variant-numeric:tabular-nums;cursor:default}',
       '.cm-qchip .cm-qlabel{color:var(--dsw-alias-label-primary);font-weight:600}',
       // display:block:qbar 不是 flex 容器,内部 qfill 默认 inline,行内盒宽高被忽略导致填充永远不可见(issue #52)。
       '.cm-qchip .cm-qbar{display:block;width:44px;height:4px;border-radius:2px;background:var(--dsw-alias-border-l1);overflow:hidden;flex:none}',
@@ -592,7 +592,7 @@ window.__ModuleLoader__.load({
         refreshCodingPlan: '刷新',
         loginCodingPlan: '登录', loggingIn: '登录中…',
         codingPlanNotQueried: '未查询额度',
-        gatewayQuotaTitle: 'CLIProxyAPI 网关额度', gatewaySourceAdd: '添加来源', gatewaySourceLabel: '来源名称', gatewaySourceBaseURL: 'Base URL', gatewaySourceDisplay: '显示位置', gatewaySourceRefreshInterval: '刷新间隔(分钟)', gatewaySourceAllowlist: '允许的 Host', gatewaySourceCredential: 'Management Key(只写)', gatewaySourceStatus: '状态', gatewaySourceUnsupported: '不支持的 Provider', gatewaySourceUnknown: '未知', gatewaySourceNoAccounts: '未发现账号', gatewaySourceFetchedAt: '抓取于 {time}', gatewaySwitchAccount: '切换账号 (当前: {account})', gatewayOnlyGemini: '只显示 Gemini 额度',
+        gatewayQuotaTitle: 'CLIProxyAPI 网关额度', gatewaySourceAdd: '添加来源', gatewaySourceLabel: '来源名称', gatewaySourceBaseURL: 'Base URL', gatewaySourceDisplay: '显示位置', gatewaySourceRefreshInterval: '刷新间隔(分钟)', gatewaySourceAllowlist: '凭据白名单（主机:端口，逗号分隔）', gatewaySourceCredential: 'Management Key(只写)', gatewaySourceStatus: '状态', gatewaySourceUnsupported: '不支持的 Provider', gatewaySourceUnknown: '未知', gatewaySourceNoAccounts: '未发现账号', gatewaySourceFetchedAt: '抓取于 {time}', gatewaySwitchAccount: '切换账号 (当前: {account})', gatewayOnlyGemini: '只显示 Gemini 额度',
         refresh: '刷新',
         quotaEnableFirst: '先勾选启用这一项',
         quotaRefreshReady: '启用并保存显示位置后可刷新',
@@ -1135,7 +1135,7 @@ window.__ModuleLoader__.load({
         refreshCodingPlan: 'Refresh',
         loginCodingPlan: 'Login', loggingIn: 'Signing in…',
         codingPlanNotQueried: 'Quota not queried',
-        gatewayQuotaTitle: 'CLIProxyAPI gateway quotas', gatewaySourceAdd: 'Add source', gatewaySourceLabel: 'Source label', gatewaySourceBaseURL: 'Base URL', gatewaySourceDisplay: 'Display', gatewaySourceRefreshInterval: 'Refresh interval (minutes)', gatewaySourceAllowlist: 'Allowed hosts', gatewaySourceCredential: 'Management key (write-only)', gatewaySourceStatus: 'Status', gatewaySourceUnsupported: 'Unsupported providers', gatewaySourceUnknown: 'Unknown', gatewaySourceNoAccounts: 'No accounts', gatewaySourceFetchedAt: 'fetched {time}', gatewaySwitchAccount: 'Switch account (current: {account})', gatewayOnlyGemini: 'Gemini quota only',
+        gatewayQuotaTitle: 'CLIProxyAPI gateway quotas', gatewaySourceAdd: 'Add source', gatewaySourceLabel: 'Source label', gatewaySourceBaseURL: 'Base URL', gatewaySourceDisplay: 'Display', gatewaySourceRefreshInterval: 'Refresh interval (minutes)', gatewaySourceAllowlist: 'Credential allowlist (host:port, comma-separated)', gatewaySourceCredential: 'Management key (write-only)', gatewaySourceStatus: 'Status', gatewaySourceUnsupported: 'Unsupported providers', gatewaySourceUnknown: 'Unknown', gatewaySourceNoAccounts: 'No accounts', gatewaySourceFetchedAt: 'fetched {time}', gatewaySwitchAccount: 'Switch account (current: {account})', gatewayOnlyGemini: 'Gemini quota only',
         refresh: 'Refresh',
         quotaEnableFirst: 'Enable this item first',
         quotaRefreshReady: 'Enable and save a display position to refresh',

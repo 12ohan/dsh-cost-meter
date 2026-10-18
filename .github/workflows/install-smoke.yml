@@ -83,6 +83,7 @@ jobs:
           node test/model-stats-browser.mjs
           node test/factory-quota-browser.mjs
           node test/display-settings-browser.mjs
+          node test/balance-gateway-browser.mjs
           node test/peak-progress-browser.mjs
           node test/peak-style-picker-browser.mjs
           git fetch --depth=1 origin tag v1.8.29
@@ -95,6 +96,7 @@ jobs:
           path: |
             .tmp-context-regression-browser/*.png
             .tmp-display-review/*
+            .tmp-balance-gateway-browser/*
             .tmp-idle-performance/result.json
             .tmp-context-regression-browser/report.json
             .tmp-pricing-theme-browser/*.png
