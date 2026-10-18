@@ -1,11 +1,13 @@
 # dsh-cost-meter 版本更新历史
 
-## 未发布 — 2026-10-18
+## v1.9.2(2026-10-18)—— 额度查询、自定义余额、皮肤与性能修复
 
 OpenDesign 改为直接读取 Control Key preflight；自定义余额支持相对路径和显式配置的局域网 HTTP；新增 WorkBuddy2API 积分预设；修复皮肤透明度透出，并减少自动语言模式的设置读取开销。见[配置说明](custom-balance-sources.md)与[性能、透明度测量](performance-2026-10-18.md)。
 
 > 本文是面向使用者的版本更新总览；逐条开发记录见 [CHANGELOG.md](../CHANGELOG.md),完整提交历史见
 > [Commits](https://github.com/Han-1413141/dsh-cost-meter/commits/master)。
+
+v1.9.1 未单独发布到 npm，下列记账、落盘与渲染优化随 v1.9.2 一并发布。见[本版更新说明](update-notes-1.9.2.md)。
 
 ## v1.9.1(2026-10-18)—— 皮肤半透明透出修复与性能优化
 
