@@ -1,5 +1,9 @@
 # dsh-cost-meter 版本更新历史
 
+## v1.9.3(2026-10-18)—— Codex 兼容交互与费用设置布局修复
+
+- 兼容弹窗可立即关闭，修复热更新后的归类接口 404 和 Codex 标签页空白；概览卡片及统计页面减少留白，兼容设置默认收起。[更新说明](update-notes-1.9.3.md)
+
 ## v1.9.2(2026-10-18)—— 额度查询、自定义余额、皮肤与性能修复
 
 OpenDesign 改为直接读取 Control Key preflight；自定义余额支持相对路径和显式配置的局域网 HTTP；新增 WorkBuddy2API 积分预设；修复皮肤透明度透出，并减少自动语言模式的设置读取开销。见[配置说明](custom-balance-sources.md)与[性能、透明度测量](performance-2026-10-18.md)。
