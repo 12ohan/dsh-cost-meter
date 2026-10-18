@@ -557,6 +557,8 @@ dsh --profile web --port 3099                           # 真机启动(观察启
 
 ## 更新历史
 
+**版本号策略**：发版只递增补丁号（例如 `1.9.0 → 1.9.1`），新增功能、插件兼容与 UI 更新也按补丁号发布；次版本/主版本号保持不变，除非出现不兼容变更且明确同意。1.9.0 是最后一次升次版本号。
+
 各版本更新总览与社区 issue 处理记录见 [docs/UPDATE-HISTORY.md](docs/UPDATE-HISTORY.md);逐条开发记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## Star 增长记录

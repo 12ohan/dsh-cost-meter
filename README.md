@@ -553,6 +553,8 @@ Join the WeChat group to discuss the plugin, share feedback, and suggest feature
 
 ## Update history
 
+**Version policy**: releases increment only the patch number (for example `1.9.0 → 1.9.1`), including feature releases, new plugin compatibility and UI updates. The minor/major positions stay fixed unless a breaking change requires them and is explicitly approved; 1.9.0 was the last minor bump.
+
 A per-version overview and the community-issue resolution log live in [docs/UPDATE-HISTORY.md](docs/UPDATE-HISTORY.md) (中文); the itemized changelog is [CHANGELOG.md](CHANGELOG.md).
 
 ## Star History
