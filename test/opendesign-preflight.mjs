@@ -1,6 +1,6 @@
 // Issue #274 follow-up: on some accounts /billing/coding-plan-usage only accepts a browser session,
 // while /billing/preflight accepts the same Control Key as a plain Bearer credential and nests the
-// identical quota windows under `codingPlan`. The query must fall back only on 401/403, keep the
+// identical quota windows under `codingPlan`. Query preflight directly, keep the
 // wallet independent, and never send a cookie. Every request below is injected: no live network.
 import assert from 'node:assert/strict'
 import { OPENDESIGN_API, OPEN_DESIGN_QUOTA_FAILURES, parseOpenDesignUsage, queryOpenDesignQuota } from '../lib/opendesign.js'
@@ -73,11 +73,13 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
     'an eligible:false codingPlan still means no subscription')
   assert.equal(parseOpenDesignUsage({ codingPlan: { eligible: true, windows } }, workspaceId), null,
     'the parser itself still requires a workspace identity')
+  assert.equal(parseOpenDesignUsage({ ...preflightBody, workspaceId: 'ws-other' }, workspaceId), null)
+  assert.equal(parseOpenDesignUsage({ ...preflightBody, codingPlan: { ...preflightBody.codingPlan, workspaceMemberId: 'member-other' } }, workspaceId), null)
   assert.equal(parseOpenDesignUsage({ ...preflightBody, workspaceId: 'ws-other', codingPlan: { ...preflightBody.codingPlan, workspaceId: 'ws-other' } }, workspaceId), null,
     'a conflicting workspace stays invalid')
 }
 
-// 2. usage 401 -> preflight 200: full windows, preflight endpoint, no partial marker, wallet kept.
+// 2. preflight 200: full windows, preflight endpoint, no partial marker, wallet kept.
 {
   const { result, calls } = await run({ usage: rejected(401), preflight: json(preflightBody), wallet: json(wallet) })
   assert.equal(result.endpoint, preflightUrl)
@@ -86,12 +88,12 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
   assert.equal(result.windows.fiveHour.resetsAt, fiveHourReset)
   assert.equal(result.windows.weekly.resetsAt, weeklyReset)
   assert.equal(result.windows.balance.text, '$2.0000', 'a readable wallet stays authoritative over the preflight balance')
-  assert.equal(Object.hasOwn(result, 'partial'), false, 'a successful fallback is a normal, non-partial answer')
-  assert.deepEqual(calls.slice().sort(), [preflightUrl, usageUrl, walletUrl].sort())
-  assert.ok(calls.indexOf(usageUrl) < calls.indexOf(preflightUrl), 'preflight is only tried after the primary route is rejected')
+  assert.equal(Object.hasOwn(result, 'partial'), false, 'a successful preflight query is a normal, non-partial answer')
+  assert.deepEqual(calls.slice().sort(), [preflightUrl, walletUrl].sort())
+  assert.equal(calls.includes(usageUrl), false, 'the browser-session-only route is never queried')
 }
 
-// 3. usage 200 never triggers the fallback.
+// 3. Even when the old route would answer, only preflight and wallet are queried.
 {
   let usageCalls = 0, preflightCalls = 0
   const { result, calls } = await run({
@@ -99,16 +101,16 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
     preflight: () => { preflightCalls++; return json(preflightBody) },
     wallet: json(wallet),
   })
-  assert.equal(usageCalls, 1)
-  assert.equal(preflightCalls, 0, 'a 200 from the primary route never reaches the fallback')
-  assert.equal(result.endpoint, usageUrl)
+  assert.equal(usageCalls, 0)
+  assert.equal(preflightCalls, 1)
+  assert.equal(result.endpoint, preflightUrl)
   assert.equal(result.windows.fiveHour.percent, 31.88)
   assert.equal(result.windows.balance.text, '$2.0000')
   assert.equal(Object.hasOwn(result, 'partial'), false)
   assert.equal(calls.length, 2)
 }
 
-// 4. usage 401 + preflight 401 + wallet 200: wallet-only partial, preflight attempted exactly once.
+// 4. preflight 403 + wallet 200: wallet-only partial, preflight attempted exactly once.
 {
   let preflightCalls = 0
   const { result, calls } = await run({
@@ -120,7 +122,7 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
   assert.deepEqual(result.partial, { usage: OPEN_DESIGN_QUOTA_FAILURES.unauthorized })
   assert.equal(result.endpoint, walletUrl)
   assert.equal(preflightCalls, 1)
-  assert.equal(calls.length, 3)
+  assert.equal(calls.length, 2)
 }
 
 // 5. A preflight eligible:false answer + readable wallet is a partial success (no fabricated windows).
@@ -174,15 +176,15 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
   assert.equal(JSON.stringify(result).includes(key), false)
 }
 
-// 10. The fallback only covers rejected credentials: a 500 from the primary route is not retried.
+// 10. A preflight HTTP failure preserves the wallet without trying the legacy route.
 {
   let preflightCalls = 0
   const { result } = await run({
     usage: () => new Response('upstream failure', { status: 500 }),
-    preflight: () => { preflightCalls++; return json(preflightBody) },
+    preflight: () => { preflightCalls++; return new Response('upstream failure', { status: 500 }) },
     wallet: json(wallet),
   })
-  assert.equal(preflightCalls, 0, 'non-auth HTTP failures never switch endpoints')
+  assert.equal(preflightCalls, 1, 'non-auth HTTP failures never switch endpoints')
   assert.deepEqual(result.partial, { usage: OPEN_DESIGN_QUOTA_FAILURES.http })
   assert.equal(result.windows.balance.text, '$2.0000')
 }
@@ -232,7 +234,7 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
     'a conflicting nested codingPlan workspace is rejected')
 }
 
-// 14. The registered quota adapter keeps the { windows, endpoint } contract after the fallback.
+// 14. The registered quota adapter keeps the { windows, endpoint } contract with direct preflight.
 {
   const previousFetch = globalThis.fetch
   const attempts = []
@@ -243,7 +245,7 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
     assert.equal(routed.windows.fiveHour.percent, 31.88)
     assert.equal(routed.windows.balance.text, '$2.0000')
     assert.equal(Object.hasOwn(routed, 'partial'), false)
-    assert.equal(attempts.length, 0, 'a successful fallback is not reported as a partial refresh')
+    assert.equal(attempts.length, 0, 'a successful preflight query is not reported as a partial refresh')
   } finally { globalThis.fetch = previousFetch }
 }
 
@@ -259,4 +261,4 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
 
 assert.equal(networkCalls, 0, 'no real network request was made')
 globalThis.fetch = realFetch
-console.log('[ok] OpenDesign preflight fallback: Bearer-only fallback on 401/403, authoritative wallet, balanceUsd fallback, no-subscription/invalid/network classification and no cookies; no live account or network requests')
+console.log('[ok] OpenDesign direct preflight: two Bearer-only reads, authoritative wallet, balanceUsd fallback, no-subscription/invalid/network classification and no cookies; no live account or network requests')

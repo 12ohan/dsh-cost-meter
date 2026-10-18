@@ -119,6 +119,7 @@
       display: oneOf(e.display, ['sidebar', 'settings', 'off'], 'both'),
       unit: e.adapter === 'tokenrhythm' ? 'CNY' : ['CNY', 'EUR', 'CREDITS'].includes(e.unit) ? e.unit : 'USD',
       convertToDisplayCurrency: e.convertToDisplayCurrency === true,
+      allowInsecureHttp: e.allowInsecureHttp === true,
       refreshMinutes: typeof e.refreshMinutes === 'number' && Number.isFinite(e.refreshMinutes) ? e.refreshMinutes : 15,
       request: e.request && typeof e.request === 'object' ? e.request : { url: '' },
       extract: e.extract && typeof e.extract === 'object' ? e.extract : {},

@@ -65,8 +65,8 @@ assert.equal(requests.length, 2, 'missing credentials/workspace never send a req
 const attempts = []
 await assert.rejects(queryOpenDesignQuota(key, 'en', message, { workspaceId: 'ws-1', fetchImpl: async url => { attempts.push(url); return new Response('PRIVATE BODY ' + key, { status: 401 }) } }), error => error.soft === true && error.code === 'unauthorized' && !error.message.includes(key))
 assert.deepEqual(attempts.map(url => url.slice(OPENDESIGN_API.length)).sort(), [
-  '/workspaces/ws-1/billing/coding-plan-usage', '/workspaces/ws-1/billing/preflight', '/workspaces/ws-1/wallet/balance',
-], 'a rejected Control Key falls back to the preflight endpoint (issue #274); neither endpoint is retried')
+  '/workspaces/ws-1/billing/preflight', '/workspaces/ws-1/wallet/balance',
+], 'Control Key queries go directly to preflight and wallet; neither endpoint is retried on 401')
 await assert.rejects(queryOpenDesignQuota(key, 'en', message, { workspaceId: 'ws-1', fetchImpl: async () => Response.json({ ...quota, workspaceId: 'different' }) }), /identity/)
 await assert.rejects(queryOpenDesignQuota(key, 'en', message, { workspaceId: 'ws-1', fetchImpl: async url => Response.json(url.endsWith('/wallet/balance') ? { ...wallet, workspaceMemberId: 'other' } : quota) }), /identities/)
 await assert.rejects(queryOpenDesignQuota(key, 'en', message, { workspaceId: 'ws-1', fetchImpl: async () => new Response('<html>' + key) }), error => !error.message.includes(key))

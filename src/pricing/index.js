@@ -542,7 +542,7 @@ window.__ModuleLoader__.load({
         '.cm-combo-caret{right:6px;font-size:10px}',
         // 浮层固定定位挂到 body:设置面板是宿主 overlay 里 role=dialog 的 div,它带 overflow
         // 与自己的层叠上下文;底色沿用宿主浮层令牌(bg-layer-2),靠 elevation 的描边+阴影分层。
-        '.cm-combo-panel{position:fixed;z-index:10000;display:flex;flex-direction:column;gap:2px;box-sizing:border-box;padding:4px;border-radius:12px;background:var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base));box-shadow:var(--dsw-elevation-panel,0 3px 8px rgba(0,0,0,.06),0 0 16px rgba(0,0,0,.04))}',
+        '.cm-combo-panel{position:fixed;z-index:10000;display:flex;flex-direction:column;gap:2px;box-sizing:border-box;padding:4px;border-radius:12px;background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base,#fff)) r g b / 1);box-shadow:var(--dsw-elevation-panel,0 3px 8px rgba(0,0,0,.06),0 0 16px rgba(0,0,0,.04))}',
         '.cm-combo-list{display:flex;flex-direction:column;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}',
         // flex:none 不可省:面板限高后,列内子项默认可收缩,会把每行压扁成一条、文字被裁掉。
         '.cm-combo-option{flex:none;font:inherit;font-size:12px;line-height:1.5;text-align:left;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',

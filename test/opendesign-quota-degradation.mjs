@@ -51,9 +51,9 @@ const query = (routes, locale = 'en') => queryOpenDesignQuota(key, locale, messa
   assert.deepEqual(result.windows, { balance: { text: '$12.50', resetsAt: '' } }, 'a usage 401 must not discard the readable wallet')
   assert.equal(result.endpoint, base + '/wallet/balance')
   assert.deepEqual(result.partial, { usage: OPEN_DESIGN_QUOTA_FAILURES.unauthorized })
-  assert.equal(usageAttempts, 1, 'a rejected credential is not retried on the primary route')
+  assert.equal(usageAttempts, 0, 'a rejected credential is not retried on the primary route')
   assert.equal(preflightAttempts, 1, 'the Cookie-free preflight fallback is attempted once')
-  assert.equal(calls.length, 3, 'usage, its preflight fallback and the wallet are read independently')
+  assert.equal(calls.length, 2, 'preflight and wallet are read independently')
   assert.equal(JSON.stringify(result).includes(key), false)
 }
 
@@ -63,7 +63,7 @@ const query = (routes, locale = 'en') => queryOpenDesignQuota(key, locale, messa
   assert.equal(result.windows.fiveHour.percent, 25)
   assert.equal(result.windows.weekly.percent, 0)
   assert.equal(Object.hasOwn(result.windows, 'balance'), false, 'a failed wallet read is not fabricated as $0')
-  assert.equal(result.endpoint, base + '/billing/coding-plan-usage')
+  assert.equal(result.endpoint, base + '/billing/preflight')
   assert.deepEqual(result.partial, { wallet: OPEN_DESIGN_QUOTA_FAILURES.unauthorized })
 }
 
@@ -79,7 +79,7 @@ const query = (routes, locale = 'en') => queryOpenDesignQuota(key, locale, messa
     assert.equal(error.message.includes(key), false, 'upstream bodies and credentials stay out of the message')
     return true
   })
-  assert.equal(calls.length, 3)
+  assert.equal(calls.length, 2)
 }
 
 // 4. eligible:false (no subscription) + unreadable wallet -> a dedicated soft "no subscription" error,

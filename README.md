@@ -18,6 +18,8 @@ Supports [official Search/Fetch request fees](docs/web-request-fees.md#english),
 
 **v1.9.0** adds compatibility with the Codex and ChatGPT subscription plugins (subscription calls classified as Plan quota instead of API spend, with a one-time dismissible history prompt), supports better-session's SQLite session storage, adapts every cost UI to dsh-pocket mobile layouts, and restores OpenDesign coding-plan quota queries via a Control-Key `/billing/preflight` fallback with independent window/wallet degradation ([#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274#issuecomment-6236591566)). The ledger format is unchanged and historical amounts are not recalculated automatically.
 
+Development changes (not yet published to npm): [OpenDesign query fix](docs/opendesign-billing.md), [dynamic ports / LAN / WorkBuddy2API setup](docs/custom-balance-sources.md), and [opacity fixes with performance measurements](docs/performance-2026-10-18.md).
+
 
 Desktop users: follow the [Desktop installation instructions](docs/install-troubleshooting.md#desktop-安装与更新) for the application's own CLI and `desktop` Profile.
 

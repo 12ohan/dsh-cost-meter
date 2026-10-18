@@ -18,6 +18,8 @@
 
 **v1.9.0** 新增 Codex / ChatGPT 订阅插件兼容（订阅调用归为 Plan 订阅额度、不计入 API 花费，首次检测弹出一次性可关闭提示处理历史归类）、better-session 的 SQLite 会话存储兼容、全部费用界面的 dsh-pocket 手机端适配，并按 [#274](https://github.com/Han-1413141/dsh-cost-meter/issues/274#issuecomment-6236591566) 为 OpenDesign 增加 Control Key `/billing/preflight` 回退与窗口/钱包独立降级。账本格式不变，不自动重算历史金额。
 
+开发分支更新（尚未发布到 npm）：[OpenDesign 查询修复](docs/opendesign-billing.md)、[随机端口 / 局域网 / WorkBuddy2API 配置](docs/custom-balance-sources.md)、[透明度修复与性能测量](docs/performance-2026-10-18.md)。
+
 
 桌面端用户请按 [Desktop 安装说明](docs/install-troubleshooting.md#desktop-安装与更新)，使用应用自带的 CLI 和 `desktop` Profile。
 

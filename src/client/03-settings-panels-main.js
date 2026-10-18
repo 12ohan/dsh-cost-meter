@@ -1343,9 +1343,9 @@
               el('input', {
                 className: 'cm-input',
                 value: entry.request?.url ?? '',
-                placeholder: 'https://example.com/key/info',
+                placeholder: '/plugins/dsh-workbuddy-connect/status',
                 onChange: event => setRequest('url', event.target.value),
-              })),
+              }), el('span', { className: 'cm-hint' }, t('customBalanceUrlHint'))),
             jsonField('headers', 'customBalanceHeaders', 5, 'customBalanceHeadersVarNote'),
             !['GET', 'HEAD'].includes((entry.request?.method ?? 'GET').toUpperCase()) && jsonField('body', 'customBalanceBody', 5, 'customBalanceBodyNote'),
             // 凭据输入(v1.7.6,issue #86):请求头里每个 {{VAR}} 占位符一行 write-only 输入,
@@ -1376,6 +1376,9 @@
                 onChange: event => applyAllowedHostsText(event.target.value),
               }),
               el('span', { className: 'cm-hint' }, t('customBalanceAllowedHostsHint'))),
+            !fixedAdapter && el('label', { className: 'cm-check', style: { gridColumn: '1 / -1' } },
+              el('input', { type: 'checkbox', checked: entry.allowInsecureHttp === true, onChange: event => setField('allowInsecureHttp', event.target.checked) }),
+              t('customBalanceHttp')),
             jsonField('extract', 'customBalanceExtract', 8)))
       return el(QuotaCard, {
         name: `#${index + 1} · ` + (resolveCustomBalanceLabel(entry, resolveLocale(config)) || t('customBalanceTitle')),
@@ -1749,6 +1752,12 @@
       const setEntry = (index, patch) => setEntries(entries.map((e, i) => i === index ? { ...e, ...patch } : e))
       const addEntry = (adapter = 'custom') => {
         if (entries.length >= 8) return
+        if (adapter === 'workbuddy2api') {
+          setEntries([...entries, { enabled: false, label: 'WorkBuddy2API 积分', labelEn: 'WorkBuddy2API credits', display: 'both', unit: 'CREDITS', refreshMinutes: 15,
+            request: { url: 'http://127.0.0.1:8790/api/credits/expiry?package_limit=1', method: 'GET', headers: { 'X-Admin-Token': '{{WORKBUDDY2API_ADMIN_TOKEN}}' } },
+            extract: { remaining: 'summary.available_remaining' }, allowedHosts: ['127.0.0.1:8790'], allowInsecureHttp: false }])
+          return
+        }
         setEntries([...entries, {
           ...(adapter !== 'custom' ? { adapter } : {}),
           enabled: false,
@@ -1796,7 +1805,9 @@
           el('button', { className: 'cm-btn small', onClick: addGateway, disabled: sources.length >= 4 }, t('gatewaySourceAdd')),
           el('button', { className: 'cm-btn small', onClick: () => addEntry(), disabled: entries.length >= 8 }, t('customBalanceAdd')),
           el('button', { className: 'cm-btn small', onClick: () => addEntry('aliyun'), disabled: entries.length >= 8 }, t('aliyunBalanceAdd')),
-          el('button', { className: 'cm-btn small', onClick: () => addEntry('tokenrhythm'), disabled: entries.length >= 8 }, t('tokenRhythmBalanceAdd'))))
+          el('button', { className: 'cm-btn small', onClick: () => addEntry('tokenrhythm'), disabled: entries.length >= 8 }, t('tokenRhythmBalanceAdd')),
+          el('button', { className: 'cm-btn small', onClick: () => addEntry('workbuddy2api'), disabled: entries.length >= 8 }, t('workBuddyBalanceAdd')),
+          el('p', { className: 'cm-note' }, t('workBuddyBalanceNote'))))
     }
 
     // ── Token 用量统计(历史总量 + 每日格子热图;显示位置可配) ────────────────
