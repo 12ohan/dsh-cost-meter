@@ -187,9 +187,9 @@ window.__ModuleLoader__.load({
       const dataKey = [state.meta.dayKey, state.total?.calls, state.total?.cost, state.total?.apiCost,
         state.today?.calls, state.today?.cost, state.today?.apiCost].join(':')
       // 展示相关配置指纹:改价格/汇率/口径会改变金额与明细内容,但账本与 dayKey 都不变。
-      // 价格表按整体序列化(实测约 78KB、单次约 0.2ms,可接受):跳过它就只能靠 fetchedAt
-      // 这类间接信号,而手改单价与后台价表刷新都不动 fetchedAt。
-      const configKey = JSON.stringify([state.config.prices, state.config.priceOverrides, state.config.priceMatch,
+      // 价格表优先用服务端下发的 pricesRev 作指纹(实测 0.015ms,而序列化整张 178KB
+      // 价目表约 2.55ms/次);旧宿主没有 pricesRev 时回退整体序列化,行为不变。
+      const configKey = JSON.stringify([state.pricesRev ?? state.config.prices, state.config.priceOverrides, state.config.priceMatch,
         state.config.planBilling, state.config.codingPlans, state.config.goQuota?.enabled,
         state.config.peakEnabled, state.config.peakEffectiveAt, state.config.peakWindows, state.config.peakHolidays,
         state.config.fetchedAt, state.config.priceSource, state.config.currency, state.config.exchangeRate,

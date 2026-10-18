@@ -1693,7 +1693,7 @@
   },
   "clientBytes": {
     "before": 261676,
-    "after": 260655
+    "after": 260671
   },
   "dependencies": {
     "acorn": "8.15.0",
