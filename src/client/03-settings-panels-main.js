@@ -1971,7 +1971,7 @@
           const base = draftBaseRef.current ?? baselineRef.current
           if (base !== null && typeof base === 'object') {
             for (const key of Object.keys(draft)) {
-              if (key === 'activeLocale') continue
+              if (key === 'activeLocale' || draft[key] === base[key]) continue
               if (JSON.stringify(draft[key]) !== JSON.stringify(base[key])) patch[key] = draft[key]
             }
           }

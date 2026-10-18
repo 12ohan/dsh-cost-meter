@@ -200,6 +200,15 @@ const report=tag=>{try{fetch('/report',{method:'POST',headers:{'content-type':'a
       // 弹窗会被内容撑到视口外且无法滚动)。max-height:none 即为失效。
       const cs=getComputedStyle(dialog);
       check(cs.maxHeight!=='none','dialog keeps a height cap (max-height='+cs.maxHeight+')');
+      // 皮肤插件把 alias 调成半透明时,弹窗必须用本地不透明基底合成皮肤色调,
+      // 否则弹窗会透出后方页面内容(弹窗内左右两栏互相透出的真实回归)。
+      root.style.setProperty('--dsw-alias-bg-base','rgba(18,16,26,.18)')
+      root.style.setProperty('--dsw-alias-bg-layer-2','rgba(238,232,246,.92)')
+      const skinned=getComputedStyle(dialog)
+      check(/^rgb\\(/.test(skinned.backgroundColor),'opaque local base keeps translucent skins from bleeding through (bg='+skinned.backgroundColor+')')
+      check(/rgba\\(238, 232, 246, 0\\.92\\)/.test(skinned.backgroundImage),'skin tint stays visible as a composited gradient layer (image='+skinned.backgroundImage+')')
+      root.style.removeProperty('--dsw-alias-bg-base')
+      root.style.removeProperty('--dsw-alias-bg-layer-2')
       check(r.bottom<=win.innerHeight+0.5,'dialog must not overflow the viewport bottom (bottom='+r.bottom.toFixed(1)+' vh='+win.innerHeight+')');
       // 内容超高时必须真的可滚动:断言「确实溢出且滚动范围 > 0」,而不是断言
       // overflow==='auto' —— 裸 <dialog> 的 UA 默认值就是 auto,那条断言恒真(空断言)。

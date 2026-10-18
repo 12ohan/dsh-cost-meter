@@ -6949,6 +6949,7 @@ await import('./session-storage-compat.mjs')
 await import('./session-readpaths-rdb.mjs')
 await import('./opendesign-preflight.mjs')
 await import('./pocket-layout-static.mjs')
+await import('./skin-occlusion-static.mjs')
 console.log('[ok] 全部验证通过')
 
 await import('./exchange-rates.mjs')

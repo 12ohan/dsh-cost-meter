@@ -377,6 +377,9 @@ window.__ModuleLoader__.load({
       'body[data-dsh-pocket-layout="mobile"] .cm-tabs{flex-wrap:nowrap;overflow-x:auto}',
       'body[data-dsh-pocket-layout="mobile"] .cm-footer-stack{padding-bottom:env(safe-area-inset-bottom)}',
       'body[data-dsh-pocket-layout="mobile"] :is(.cm-peak-alert,.cm-qguide){max-width:calc(100vw - 24px)}',
+      'body{--cob:var(--dsw-static-neutral-bluish-00,#fff);--cl2:var(--dsw-alias-bg-layer-2,#fff)}',
+      'body[data-ds-dark-theme],html[data-theme=dark] body{--cob:var(--dsw-static-neutral-bluish-950,#151517)}',
+      '.cm-stat-dialog,.cm-qguide,.cm-peak-alert,.cm-footer-stack.simple{background-color:var(--cob,#fff);background-image:linear-gradient(var(--cl2),var(--cl2))}',
     ].join('\n')
     // 样式表注入。**按内容比对,不按 id 去重**:客户端插件热更新(DSH 的 client HMR,不刷新
     // 页面就换掉插件代码)时,页面上留着的是上一版的 <style>,旧写法只看 id 存不存在就跳过

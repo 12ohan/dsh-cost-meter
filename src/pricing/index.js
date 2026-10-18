@@ -542,7 +542,11 @@ window.__ModuleLoader__.load({
         '.cm-combo-caret{right:6px;font-size:10px}',
         // 浮层固定定位挂到 body:设置面板是宿主 overlay 里 role=dialog 的 div,它带 overflow
         // 与自己的层叠上下文;底色沿用宿主浮层令牌(bg-layer-2),靠 elevation 的描边+阴影分层。
-        '.cm-combo-panel{position:fixed;z-index:10000;display:flex;flex-direction:column;gap:2px;box-sizing:border-box;padding:4px;border-radius:12px;background:var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base));box-shadow:var(--dsw-elevation-panel,0 3px 8px rgba(0,0,0,.06),0 0 16px rgba(0,0,0,.04))}',
+        // 皮肤插件可能把 bg-layer-2 调成半透明:用不透明基底 + 皮肤色渐变叠层合成,避免下拉
+        // 面板透出后方页面内容。
+        'body{--cob:var(--dsw-static-neutral-bluish-00,#fff)}',
+        'body[data-ds-dark-theme],html[data-theme=dark] body{--cob:var(--dsw-static-neutral-bluish-950,#151517)}',
+        '.cm-combo-panel{position:fixed;z-index:10000;display:flex;flex-direction:column;gap:2px;box-sizing:border-box;padding:4px;border-radius:12px;background-color:var(--cob,#fff);background-image:linear-gradient(var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base,#fff)),var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base,#fff)));box-shadow:var(--dsw-elevation-panel,0 3px 8px rgba(0,0,0,.06),0 0 16px rgba(0,0,0,.04))}',
         '.cm-combo-list{display:flex;flex-direction:column;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}',
         // flex:none 不可省:面板限高后,列内子项默认可收缩,会把每行压扁成一条、文字被裁掉。
         '.cm-combo-option{flex:none;font:inherit;font-size:12px;line-height:1.5;text-align:left;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
