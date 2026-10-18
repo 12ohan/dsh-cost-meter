@@ -2752,7 +2752,7 @@
       return snap.source === source ? snap : { status: 'idle', windows: {}, fetchedAt: 0 }
     }
 
-    /** Codex 额度侧边栏卡片:复用 MiniMax 行渲染(已用口径,5h + 7d 双窗口)。 */
+    /** Codex 额度侧边栏卡片:明确显示剩余额度和本机时区的重置时间。 */
     function CodexPlanBox(props) {
       const hoverProps = useQuotaHoverRefresh()
       const { state, wide } = props
@@ -2768,26 +2768,27 @@
         title: t('codexQuotaUnavailable'), ...clickableRefreshProps(refresh.busy, refresh.run),
       }, el('div', { className: 'cm-mm-title' }, wide === false ? 'Codex' : t('codexQuotaTitle')),
       el('span', { className: 'cm-hint' }, wide === false ? '—' : t(snap.status === 'idle' || refresh.busy ? 'refreshing' : 'codexQuotaUnavailable')))
-      const five = snap.windows.five ?? null
-      const weekly = snap.windows.weekly ?? null
-      if (five === null && weekly === null) return null
-      const direction = barDirectionOf(state.config, 'plan')
-      const fiveView = five === null ? null : miniMaxRow(t('codingPlanRemain5h'), five, direction, t)
-      const weekView = weekly === null ? null : miniMaxRow(t('codingPlanRemain7d'), weekly, direction, t)
-      const views = [fiveView, weekView].filter(Boolean)
-      const level = views.some(v => v.level === 'over') ? 'over' : views.some(v => v.level === 'warn') ? 'warn' : 'ok'
-      const lineOf = (label, win, view) => { const reset = miniMaxResetText(win, t); return label + ' ' + quotaValueText(view.label, direction, t) + (reset ? ' · ' + reset : '') }
+      const views = [['five', 'codexQuotaFive'], ['weekly', 'codexQuotaWeek']].flatMap(([key, label]) => {
+        const win = snap.windows[key]
+        if (!win) return []
+        const text = quotaValueText(simpleBarByDirection(win.percent, 'remaining').label, 'remaining', t)
+        const date = new Date(typeof win.resetsAt === 'string' ? win.resetsAt : NaN)
+        const reset = Number.isFinite(date.getTime()) ? t('codexQuotaReset', { time: date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) }) : ''
+        return [{ key, label: t(label), text, reset, win }]
+      })
+      if (!views.length) return null
+      const level = views.some(v => v.win.percent >= 100) ? 'over' : views.some(v => v.win.percent >= 80) ? 'warn' : 'ok'
       const detail = [
         t('codexQuotaTitle'),
-        fiveView === null ? null : lineOf(t('codingPlanRemain5h'), five, fiveView),
-        weekView === null ? null : lineOf(t('codingPlanRemain7d'), weekly, weekView),
+        ...views.map(view => view.label + ' · ' + view.text + (view.reset ? ' · ' + miniMaxResetText(view.win, t) : '')),
         snap.fetchedAt > 0 ? t('goQuotaFetchedAt', { time: new Date(snap.fetchedAt).toLocaleTimeString() }) : null,
         ...clickRefreshTipLines(t, refresh),
       ].filter(Boolean).join('\n')
       const body = el(Fragment, null,
         el('div', { className: 'cm-mm-title' }, t('codexQuotaTitle')),
-        fiveView?.row,
-        weekView?.row)
+        ...views.map(view => el('div', { key: view.key, className: 'cm-codex-window' },
+          el('span', null, view.label + ' ·'), el('strong', null, view.text),
+          view.reset ? el('span', { className: 'cm-mm-reset' }, '· ' + view.reset) : null)))
       const rail = el(Fragment, null, ...views.map(view => el('div', { className: 'cm-bbox-rail cm-num' }, view.text)))
       return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
@@ -3115,12 +3116,12 @@
           label: 'Codex',
           level: worst >= 100 ? 'over' : worst >= 80 ? 'warn' : 'ok',
           tip: t('codexQuotaTitle') + ': ' + [
-            fivePct === null ? null : '5h ' + fivePct + '%',
-            weekPct === null ? null : t('codingPlanRemain7d') + ' ' + weekPct + '%',
+            fivePct === null ? null : '5h ' + quotaValueText(100 - fivePct, 'remaining', t),
+            weekPct === null ? null : t('codingPlanRemain7d') + ' ' + quotaValueText(100 - weekPct, 'remaining', t),
           ].filter(Boolean).join(' · '),
           segs: [
-            fivePct === null ? null : { name: '5h', pct: Math.round(simpleBarByDirection(fivePct, barDirectionOf(config, 'plan')).width) },
-            weekPct === null ? null : { name: 'weekly', pct: Math.round(simpleBarByDirection(weekPct, barDirectionOf(config, 'plan')).width) },
+            fivePct === null ? null : { name: '5h', pct: 100 - fivePct },
+            weekPct === null ? null : { name: 'weekly', pct: 100 - weekPct },
           ].filter(Boolean),
         })
       }
@@ -3155,7 +3156,7 @@
               } else {
                 kids.push(el('span', { className: 'cm-qseg', key: s.name },
                   el('span', { className: 'cm-qbar' }, el('span', { className: 'cm-qfill', style: { width: s.pct + '%' } })),
-                  el('span', null, s.pct + '%')))
+                  el('span', null, c.key === 'codex' ? quotaValueText(s.pct, 'remaining', t) : s.pct + '%')))
               }
             })
           }

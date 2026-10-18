@@ -359,7 +359,9 @@ assert.equal(subHook.tree.windows.five.resetsAt, new Date(1800000001 * 1000).toI
 const subCard = subscription.mount(subscription.ui.CodexPlanBox, { state: { config: { ...config, codexQuotaEnabled: true, codexQuotaSource: 'subscription' } }, wide: true })
 assert.ok(subCard.tree)
 assert.match(textOf(subCard.tree), /5h/)
-assert.match(textOf(subCard.tree), /7d/)
+assert.match(textOf(subCard.tree), /Weekly quota/)
+assert.match(textOf(subCard.tree), /60% remaining/)
+assert.match(textOf(subCard.tree), /20% remaining/)
 subCard.dispose()
 await subscription.ui.fetchCodexQuota(true, true, 'subscription')
 assert.equal(rpcCalls[1].payload.force, true, 'manual refresh reaches the host RPC')
@@ -389,7 +391,7 @@ for (const locale of ['en', 'zh']) {
   recovery.ui.codexQuotaCache.fetchedAt -= 61_000
   await recovery.tick(60_000)
   assert.equal(calls, 2, 'the minute retry recovers without remounting or toggling settings')
-  assert.match(textOf(card.tree), /20%/)
+  assert.match(textOf(card.tree), locale === 'en' ? /80% remaining/ : /剩余 80%/)
   await recovery.tick(60_000)
   assert.equal(calls, 2, 'successful data remains cached for five minutes')
   recovery.ui.codexQuotaCache.fetchedAt -= 301_000
@@ -400,7 +402,7 @@ for (const locale of ['en', 'zh']) {
   assert.match(textOf(card.tree), locale === 'en' ? /sign in.*retry/ : /登录.*重试/)
   signedIn = true
   card.tree.props.onClick(); await recovery.flush()
-  assert.match(textOf(card.tree), /20%/, 'clicking the fallback retries immediately, bypassing the failure cache')
+  assert.match(textOf(card.tree), locale === 'en' ? /80% remaining/ : /剩余 80%/, 'clicking the fallback retries immediately, bypassing the failure cache')
   recovery.dispose()
   assert.equal(recovery.timers.size, 0, 'unmount removes all quota timers')
 }
@@ -413,13 +415,13 @@ for (const locale of ['en', 'zh']) {
   const state = { config: { ...config, codexQuotaEnabled: true } }
   const card = preview.mount(preview.ui.CodexPlanBox, { state, wide: true, preview: true })
   card.render({ state: { ...state, displayPreviewCodex: { status: 'ok', windows: { weekly: { percent: 42 } } } }, wide: true, preview: true })
-  assert.match(textOf(card.tree), /42%/)
+  assert.match(textOf(card.tree), /58%/)
   card.tree.children[0].props.onClick(); await preview.flush(); await preview.tick(60_000)
   Object.assign(preview.ui.codexQuotaCache, { status: 'ok', windows: { weekly: { percent: 75 } } })
   card.render({ state, wide: true, preview: true })
-  assert.match(textOf(card.tree), /75%/, 'current-data preview reads the current cache without mounting a query')
+  assert.match(textOf(card.tree), /25%/, 'current-data preview reads the current cache without mounting a query')
   card.render({ state: { config: { ...state.config, codexQuotaSource: 'subscription' } }, wide: true, preview: true })
-  assert.doesNotMatch(textOf(card.tree), /75%/, 'a preview cannot show quota belonging to a previously selected source')
+  assert.doesNotMatch(textOf(card.tree), /25%/, 'a preview cannot show quota belonging to a previously selected source')
   assert.equal(calls, 0); assert.equal(preview.requests.length, 0); assert.equal(preview.timers.size, 0)
   preview.dispose()
 }

@@ -36,7 +36,8 @@ const slot=entries.get('sidebar.footer.action:cost-meter'),injected=slot.options
 function useCost(pick){return pick(React.useSyncExternalStore(store.subscribe,store.getSnapshot))}
 window.configure=patch=>injected.api.updateConfig(patch);
 window.dispose=()=>{root.unmount();for(const fn of disposers.reverse())fn()};
-const root=createRoot(document.getElementById('root'));root.render(React.createElement(slot.component,{...injected,useCost,wide:true}));
+function App(){const[wide,setWide]=React.useState(true);window.setWide=setWide;return React.createElement(slot.component,{...injected,useCost,wide})}
+const root=createRoot(document.getElementById('root'));root.render(React.createElement(App));
 `
 const compiled = await build({ stdin: { contents: code, resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'esm', platform: 'browser' })
 let signedIn = false
@@ -49,7 +50,7 @@ const server = createServer(async (request, response) => {
     assert.equal(message.type, 'client-request'); assert.equal(message.method, 'codex-subscription/usage')
     response.setHeader('content-type', 'application/json')
     return response.end(JSON.stringify({ type: 'server-response', rpcId: message.rpcId, result: signedIn
-      ? { ok: true, value: { rateLimits: [{ id: 'codex', windows: [{ windowSeconds: 18000, remainingPercent: 60 }, { windowSeconds: 604800, remainingPercent: 20 }] }] } }
+      ? { ok: true, value: { rateLimits: [{ id: 'codex', windows: [{ windowSeconds: 18000, remainingPercent: 60 }, { windowSeconds: 604800, remainingPercent: 83, resetsAt: Date.parse('2026-10-25T00:10:00Z') / 1000 }] }] } }
       : { ok: false, error: { code: 'internal', message: 'ChatGPT subscription is not signed in', details: { issues: [] } } } }))
   }
   if (request.url !== '/') { response.statusCode = 404; return response.end() }
@@ -59,7 +60,7 @@ const server = createServer(async (request, response) => {
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
 const origin = `http://127.0.0.1:${server.address().port}`
 const browser = await chromium.launch({ executablePath, headless: true })
-const page = await browser.newPage({ viewport: { width: 600, height: 400 } })
+const page = await browser.newPage({ viewport: { width: 600, height: 400 }, timezoneId: 'Asia/Shanghai' })
 const errors = [], external = []
 page.on('pageerror', error => errors.push(String(error)))
 await page.route('**/*', route => {
@@ -76,12 +77,25 @@ try {
   await page.screenshot({ path: join(output, 'unavailable.png') })
   signedIn = true
   await page.clock.fastForward(61_000)
-  await card.getByText('40%', { exact: true }).waitFor()
-  await card.getByText('80%', { exact: true }).waitFor()
+  await card.getByText('剩余 60%', { exact: true }).waitFor()
+  await card.getByText('剩余 83%', { exact: true }).waitFor()
+  await card.getByText('· 10/25 08:10 重置', { exact: true }).waitFor()
   assert.equal(calls.length, 2, 'sign-in recovers through the real RPC without remounting')
   await card.click(); await page.waitForFunction(() => document.querySelector('[data-cm-display="codex"]').getAttribute('aria-busy') === 'false')
   assert.equal(calls.at(-1).payload.force, true)
   await page.screenshot({ path: join(output, 'quota.png') })
+  await page.evaluate(() => window.configure({ barDirections: { plan: 'used' } }))
+  await card.getByText('剩余 83%', { exact: true }).waitFor()
+  await page.evaluate(() => { document.getElementById('root').style.width = '200px' })
+  assert.equal(await card.evaluate(node => node.scrollWidth <= node.clientWidth), true)
+  await page.screenshot({ path: join(output, 'quota-narrow.png') })
+  await page.evaluate(() => window.configure({ locale: 'en' }))
+  await card.getByText('83% remaining', { exact: true }).waitFor()
+  assert.equal(await card.evaluate(node => node.scrollWidth <= node.clientWidth), true)
+  await page.screenshot({ path: join(output, 'quota-en.png') })
+  await page.evaluate(() => window.setWide(false))
+  await card.getByText('83% remaining', { exact: true }).waitFor()
+  assert.equal(await card.evaluate(node => node.scrollWidth <= node.clientWidth), true)
   await page.evaluate(() => window.configure({ codexQuotaEnabled: false }))
   await card.waitFor({ state: 'detached' })
   const count = calls.length

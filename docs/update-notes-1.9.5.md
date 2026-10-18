@@ -4,7 +4,9 @@
 
 ### Codex 额度恢复显示
 
-开启“显示 Codex 额度”和“在侧栏显示 Codex 额度”后，查询失败或暂未登录不会再让卡片消失。卡片显示登录与重试提示，点击可立即重新查询。启用期间自动恢复检查，成功数据缓存五分钟，失败一分钟后重试；关闭后停止检查。正常取得数据后显示 5h、7d 两个窗口。
+开启“显示 Codex 额度”和“在侧栏显示 Codex 额度”后，查询失败或暂未登录不会再让卡片消失。卡片显示登录与重试提示，点击可立即重新查询。启用期间自动恢复检查，成功数据缓存五分钟，失败一分钟后重试；关闭后停止检查。
+
+额度改用简洁文字卡，例如“周额度 · 剩余 83% · 10/25 08:10 重置”，5h 窗口单列一行。统一使用剩余比例，重置时间按本机时区显示。会话额度条也明确标注“剩余”，避免把已用比例误解为剩余。
 
 “使用示例数据”的百分比仅用于预览。真实额度仍需要启用并登录对应 Codex 插件。修复当前数据预览使用旧快照的问题，预览本身不触发账户查询。
 
@@ -20,7 +22,9 @@
 
 ### Codex quota recovery
 
-Enabled sidebar cards stay visible when quota reads fail or the account is signed out. The card explains how to recover and supports an immediate click-to-retry. Enabled views check once per minute, cache successful reads for five minutes, and retry failures after one minute. Disabling the view cleans up its checks. Successful reads show both 5h and 7d windows.
+Enabled sidebar cards stay visible when quota reads fail or the account is signed out. The card explains how to recover and supports an immediate click-to-retry. Enabled views check once per minute, cache successful reads for five minutes, and retry failures after one minute. Disabling the view cleans up its checks.
+
+Compact text rows show the window, explicit remaining percentage and reset date/time in the device timezone, with a separate 5h row when available. The conversation strip also labels percentages as remaining.
 
 Example percentages remain preview-only. Real quota requires an enabled, signed-in Codex plugin. Current-data previews now read the current cache without querying the account.
 
