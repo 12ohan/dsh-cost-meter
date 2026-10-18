@@ -293,6 +293,7 @@ assert.equal(quota.requests.length, 0)
 await quota.ui.fetchCodexQuota(true, false)
 assert.equal(quota.requests.length, 0, '强制刷新也不能绕过禁用开关')
 disabled.render({ enabled: true, source: 'connect' })
+await quota.flush()
 assert.equal(quota.requests.length, 1)
 assert.equal(quota.requests[0][0], '/plugins/dsh-openai-codex/auth/status')
 assert.equal(quota.requests[0][1].credentials, 'same-origin')
@@ -333,24 +334,24 @@ await quota.tick(60000); await quota.tick(300000)
 assert.equal(quota.requests.length, 1, '关闭后不重试、不轮询')
 quota.dispose()
 
-// codex-subscription:显式数据源时 POST /api/codex-subscription/usage,读 5h + 7d 双窗口。
-const subscription = environment(async (url, init) => {
-  assert.equal(url, '/api/codex-subscription/usage')
-  assert.equal(init.method, 'POST')
-  assert.equal(init.headers['content-type'], 'application/json')
-  const envelope = JSON.parse(init.body)
-  assert.equal(envelope.type, 'client-request')
-  assert.equal(envelope.method, 'codex-subscription/usage')
-  assert.equal(envelope.payload.force, false)
-  return { ok: true, json: async () => ({ type: 'server-response', rpcId: envelope.rpcId, result: { ok: true,
-    value: { rateLimits: [
+// The host can carry RPC without serving browser HTTP at the page origin.
+const rpcCalls = []
+const subscription = environment(async () => { throw Error('subscription must use the host RPC transport') })
+subscription.ui.codexQuotaCache.rpc = { async call(channel, method, payload, signal) {
+  rpcCalls.push({ channel, method, payload, signal })
+  assert.equal(channel, '/api')
+  assert.equal(method, 'codex-subscription/usage')
+  assert.ok(signal instanceof AbortSignal)
+  return { ok: true, value: { rateLimits: [
       { id: 'codex', windows: [{ windowSeconds: 18000, remainingPercent: 60, resetsAt: 1800000001 }, { windowSeconds: 604800, remainingPercent: 20, resetsAt: 1800000002 }] },
       { id: 'code_review', windows: [{ windowSeconds: 604800, remainingPercent: 5 }] },
-    ] } } }) }
-})
+    ] } }
+} }
 const subHook = subscription.mount(p => subscription.ui.useCodexQuota(p.enabled, p.source), { enabled: true, source: 'subscription' })
 await subscription.flush()
-assert.equal(subscription.requests.length, 1)
+assert.equal(subscription.requests.length, 0, 'the subscription transport does not use page-origin fetch')
+assert.equal(rpcCalls.length, 1)
+assert.equal(rpcCalls[0].payload.force, false)
 assert.equal(subHook.tree.status, 'ok')
 assert.equal(subHook.tree.windows.five.percent, 40)
 assert.equal(subHook.tree.windows.weekly.percent, 80)
@@ -360,8 +361,60 @@ assert.ok(subCard.tree)
 assert.match(textOf(subCard.tree), /5h/)
 assert.match(textOf(subCard.tree), /7d/)
 subCard.dispose()
+await subscription.ui.fetchCodexQuota(true, true, 'subscription')
+assert.equal(rpcCalls[1].payload.force, true, 'manual refresh reaches the host RPC')
 subHook.render({ enabled: false, source: 'subscription' })
 subscription.dispose()
+
+// Source changes start their own request and discard late replies in both orders.
+const connectReply = remainingPercent => ({ ok: true, json: async () => ({ status: 'signed-in', usage: {
+  rateLimits: [{ id: 'codex', windows: [{ windowSeconds: 604800, remainingPercent }] }],
+} }) })
+const subscriptionReply = remainingPercent => ({ ok: true, value: {
+  rateLimits: [{ id: 'codex', windows: [{ windowSeconds: 18000, remainingPercent }] }],
+} })
+const oldConnect = deferred(), newSubscription = deferred()
+const race = environment(() => oldConnect.promise)
+let raceRpcCalls = 0
+race.ui.codexQuotaCache.rpc = { call: () => { raceRpcCalls++; return newSubscription.promise } }
+const raceHook = race.mount(p => race.ui.useCodexQuota(true, p.source), { source: 'connect' })
+await race.flush()
+raceHook.render({ source: 'subscription' })
+const sameSource = race.mount(p => race.ui.useCodexQuota(true, p.source), { source: 'subscription' })
+await race.flush()
+const pendingSubscription = race.ui.codexQuotaCache.inFlight
+assert.equal(race.requests.length, 1)
+assert.equal(raceRpcCalls, 1, 'same-source callers share the pending subscription request')
+oldConnect.resolve(connectReply(90)); await race.flush()
+assert.equal(raceHook.tree.status, 'idle', 'the old source cannot show its quota after a switch')
+assert.equal(race.ui.codexQuotaCache.inFlight, pendingSubscription, 'an old completion cannot release the current pending request')
+newSubscription.resolve(subscriptionReply(30)); await race.flush()
+assert.equal(raceHook.tree.windows.five.percent, 70)
+assert.equal(sameSource.tree.windows.five.percent, 70)
+assert.equal(raceHook.tree.windows.weekly, undefined)
+assert.equal(race.ui.codexQuotaCache.source, 'subscription')
+race.dispose()
+
+const lateSubscription = deferred()
+const reverse = environment(async () => connectReply(85))
+reverse.ui.codexQuotaCache.rpc = { call: () => lateSubscription.promise }
+const reverseHook = reverse.mount(p => reverse.ui.useCodexQuota(true, p.source), { source: 'subscription' })
+await reverse.flush()
+reverseHook.render({ source: 'connect' }); await reverse.flush()
+assert.equal(reverseHook.tree.windows.weekly.percent, 15)
+lateSubscription.resolve(subscriptionReply(0)); await reverse.flush()
+assert.equal(reverseHook.tree.windows.weekly.percent, 15, 'a late subscription reply cannot replace the selected connect source')
+assert.equal(reverse.ui.codexQuotaCache.source, 'connect')
+reverse.dispose()
+
+for (const result of [null, { ok: false }, subscriptionReply(undefined)]) {
+  const fallback = environment(async () => connectReply(75))
+  fallback.ui.codexQuotaCache.rpc = { call: async () => result }
+  await fallback.ui.fetchCodexQuota(false, true, 'auto')
+  assert.equal(fallback.ui.codexQuotaCache.windows.weekly.percent, 25)
+  assert.equal(fallback.requests.length, 1, 'auto falls back when the subscription RPC is missing, fails or has no supported windows')
+  fallback.dispose()
+}
 
 const missing = environment(async () => ({ ok: false, status: 404 }))
 const missingHook = missing.mount(p => missing.ui.useCodexQuota(p.enabled, p.source), { enabled: true, source: 'connect' })

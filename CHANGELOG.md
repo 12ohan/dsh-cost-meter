@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- 修复 Codex 数据源切换时复用旧请求、显示旧来源额度的问题；订阅查询沿用宿主 Connection RPC，支持自定义连接传输。
+
 - **Codex 额度双窗口与可配置数据源**：Codex 额度卡片、输入框横条与窄栏现在同时读取 `dsh-codex-subscription` 的 5 小时（18000s）和 7 天（604800s）窗口；新增 `codexQuotaSource`（`auto` / `subscription` / `connect`），`auto` 优先订阅插件的 `/api/codex-subscription/usage`，读取失败时回退既有的 `dsh-codex-connect` 周额度路由，显式选择则只读对应来源。保留仅提供周窗口的旧路由兼容，不影响 Plan/API 计费归类。
 
 ## [1.9.3] - 2026-10-18

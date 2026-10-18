@@ -2645,10 +2645,9 @@
 
     // ── ChatGPT PLUS(Codex)额度(issue #59 / dsh-codex-subscription)──────────
     // 数据源二选一:dsh-codex-connect 的只读状态路由,或 dsh-codex-subscription 的
-    // DSH 同源认证 RPC。两条都只读、由浏览器同源请求,插件不在/未登录时相关 UI 自动隐藏。
+    // 宿主 Connection RPC。两条均只读,插件不在/未登录时相关 UI 自动隐藏。
 
     const CODEX_STATUS_PATH = '/plugins/dsh-openai-codex/auth/status'
-    const CODEX_SUBSCRIPTION_PATH = '/api/codex-subscription/usage'
     const CODEX_WINDOWS = { 18000: 'five', 604800: 'weekly' }
 
     /** 把 rateLimits[] 归一化为与 coding plan 同构的窗口对象(percent=已用)。 */
@@ -2677,22 +2676,19 @@
 
     /** 读取 dsh-codex-subscription 的 DSH 同源认证 RPC;失败返回 null 以便 auto 回退。 */
     async function fetchCodexSubscription(force) {
-      const rpcId = String(Date.now()) + Math.random().toString(36).slice(2)
       try {
-        const resp = await fetch(CODEX_SUBSCRIPTION_PATH, {
-          method: 'POST', credentials: 'same-origin',
-          headers: { 'content-type': 'application/json', accept: 'application/json' },
-          body: JSON.stringify({ type: 'client-request', rpcId, method: 'codex-subscription/usage', payload: { force } }),
-          signal: AbortSignal.timeout(8000),
-        })
-        if (!resp.ok) return null
-        const env = await resp.json().catch(() => null)
-        const value = env?.type === 'server-response' && env.rpcId === rpcId && env.result?.ok ? env.result.value : null
-        return value === null ? null : parseCodexWindows(value.rateLimits)
+        const result = await codexQuotaCache.rpc?.call('/api', 'codex-subscription/usage', { force }, AbortSignal.timeout(8000))
+        return result?.ok ? parseCodexWindows(result.value?.rateLimits) : null
       } catch { return null }
     }
 
-    const codexQuotaCache = { status: 'idle', windows: {}, fetchedAt: 0, source: 'auto', inFlight: null, listeners: [] }
+    const codexQuotaCache = { source: 'auto', listeners: [] }
+    const resetCodexQuota = rpc => Object.assign(codexQuotaCache, { rpc, request: null, inFlight: null, fetchedAt: 0, status: 'idle', windows: {} })
+    resetCodexQuota(null)
+    const codexQuotaSnapshot = () => {
+      const { rpc, request, inFlight, listeners, ...view } = codexQuotaCache
+      return view
+    }
     const subscribeCodexQuota = fn => {
       codexQuotaCache.listeners.push(fn)
       return () => { codexQuotaCache.listeners = codexQuotaCache.listeners.filter(f => f !== fn) }
@@ -2705,9 +2701,13 @@
      */
     async function fetchCodexQuota(force = false, enabled = false, source = 'auto') {
       if (!enabled) return
-      if (codexQuotaCache.inFlight !== null) return codexQuotaCache.inFlight
+      if (codexQuotaCache.inFlight !== null && codexQuotaCache.source === source) return codexQuotaCache.inFlight
       if (!force && codexQuotaCache.source === source && codexQuotaCache.fetchedAt > 0 && Date.now() - codexQuotaCache.fetchedAt < 5 * 60_000) return undefined
-      const task = (async () => {
+      const request = {}
+      codexQuotaCache.request = request
+      if (codexQuotaCache.source !== source) Object.assign(codexQuotaCache, { status: 'idle', windows: {}, fetchedAt: 0, source })
+      notifyCodexQuota()
+      const task = Promise.resolve().then(async () => {
         let windows = {}
         try {
           if (source !== 'connect') windows = await fetchCodexSubscription(force) ?? {}
@@ -2715,39 +2715,34 @@
             const resp = await fetch(CODEX_STATUS_PATH, { credentials: 'same-origin', headers: { accept: 'application/json' }, signal: AbortSignal.timeout(8000) })
             if (resp.ok) windows = parseCodexStatus(await resp.json().catch(() => null)) ?? {}
           }
+        } catch {} finally {
+          // Only the latest selected source may publish or clear its request.
+          if (codexQuotaCache.request !== request) return
           codexQuotaCache.status = Object.keys(windows).length > 0 ? 'ok' : 'unavailable'
           codexQuotaCache.windows = windows
-        } catch {
-          codexQuotaCache.status = 'unavailable'
-        } finally {
           codexQuotaCache.fetchedAt = Date.now()
-          codexQuotaCache.source = source
           codexQuotaCache.inFlight = null
           notifyCodexQuota()
         }
-      })()
+      })
       codexQuotaCache.inFlight = task
       return task
     }
 
     function useCodexQuota(enabled, source = 'auto') {
-      const [snap, setSnap] = useState(() => ({
-        status: codexQuotaCache.status,
-        windows: codexQuotaCache.windows,
-        fetchedAt: codexQuotaCache.fetchedAt,
-      }))
+      const [snap, setSnap] = useState(codexQuotaSnapshot)
       useEffect(() => {
         if (!enabled) return
         let mounted = true
         const sync = () => {
-          if (mounted) setSnap({ status: codexQuotaCache.status, windows: codexQuotaCache.windows, fetchedAt: codexQuotaCache.fetchedAt })
+          if (mounted) setSnap(codexQuotaSnapshot())
         }
         const unsubscribe = subscribeCodexQuota(sync)
         sync()
         void fetchCodexQuota(false, true, source)
         return () => { mounted = false; unsubscribe() }
       }, [enabled, source])
-      return snap
+      return snap.source === source ? snap : { status: 'idle', windows: {}, fetchedAt: 0 }
     }
 
     /** Codex 额度侧边栏卡片:复用 MiniMax 行渲染(已用口径,5h + 7d 双窗口)。 */
@@ -3093,7 +3088,7 @@
       }
       // Codex chip(issue #59):connect / subscription 在位且已登录时出现;5h + 周双窗口。
       // 独立于 Coding Plan 开关:即使 strip.plans 为 false,Codex chip 仍应渲染。
-      const codexWins = config.codexQuotaEnabled === true && codexQuotaCache.status === 'ok' ? codexQuotaCache.windows : {}
+      const codexWins = config.codexQuotaEnabled === true && codexQuotaCache.source === (config.codexQuotaSource ?? 'auto') && codexQuotaCache.status === 'ok' ? codexQuotaCache.windows : {}
       const fiveWin = codexWins.five ?? null
       const weekWin = codexWins.weekly ?? null
       const pctOf = win => Math.max(0, Math.min(100, Math.round(Number(win.percent) || 0)))
@@ -3400,6 +3395,7 @@
       // 其余显示全关时也要为它保留渲染入口(模块装载即有被动探测,快照同步读)。
       const codexSnapshot = preview && state.displayPreviewCodex ? state.displayPreviewCodex : codexQuotaCache
       const codexOn = config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false && codexSnapshot.status === 'ok'
+        && (preview || codexSnapshot.source === (config.codexQuotaSource ?? 'auto'))
         && (codexSnapshot.windows.five !== null || codexSnapshot.windows.weekly !== null)
       const budgetOn = (config.budget ?? {}).enabled === true && config.hideBudget !== true
       const showToday = config.sidebar !== false && config.hideTodayCost !== true
