@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { build } from 'esbuild'
 import { sanitizeConfig, zeroDay } from '../lib/store.js'
 
@@ -12,7 +12,10 @@ const req = createRequire(join(modules, '__quota.cjs'))
 const host = createRequire(join(resolve(process.env.DSH_TEST_NODE_MODULES ?? modules), '__quota.cjs'))
 const { chromium } = req('playwright-core')
 const executablePath = process.env.CM_TEST_BROWSER ?? ['C:/Program Files/Google/Chrome/Application/chrome.exe', '/usr/bin/google-chrome', '/usr/bin/chromium'].find(existsSync)
-const connectionSource = readFileSync(join(host.resolve('@deepseek-ai/dsh-client-connection/package.json'), '..', 'lib/client.js'), 'utf8')
+const connectionManifest = process.env.DSH_TEST_CONNECTION_MANIFEST ?? host.resolve('@deepseek-ai/dsh-client-connection/package.json')
+const connectionExport = JSON.parse(readFileSync(connectionManifest, 'utf8')).exports['./client']
+const connectionEntry = typeof connectionExport === 'string' ? connectionExport : connectionExport.browser ?? connectionExport.default
+const connectionSource = readFileSync(resolve(dirname(connectionManifest), connectionEntry), 'utf8')
 const state = { config: sanitizeConfig({ locale: 'zh', codexQuotaEnabled: true, codexQuotaSource: 'subscription', peakEnabled: false,
   hideOfficialBalance: true, sidebar: false, hideTodayCost: true, goQuota: { enabled: false }, budget: { enabled: false }, quotaStrip: { enabled: true, budget: false, go: false, plans: false } }),
   today: zeroDay(), month: zeroDay(), total: zeroDay(), history: [] }
