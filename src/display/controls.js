@@ -56,6 +56,10 @@ function DisplayInspector({ props, config, set, selected, select, labels, regist
   if (selected === 'customBalance') controls = [display('customBalance'), number(t('customBalanceRefreshInterval'), config.customBalance?.refreshMinutes ?? 15, value => nested('customBalance', { refreshMinutes: Math.floor(value) }), 1)]
   if (selected === 'plan') controls = [direction('plan'), el('p', null, text('各账户的显示位置在“额度”中设置。', 'Set each account’s placement in Quota.'))]
   if (selected === 'codex') controls = [check(t('codexQuotaEnabled'), config.codexQuotaEnabled === true, value => set({ codexQuotaEnabled: value })),
+    choice(text('数据源', 'Data source'), config.codexQuotaSource ?? 'auto',
+      [['auto', text('自动检测', 'Auto-detect')], ['connect', 'dsh-codex-connect'], ['subscription', 'dsh-codex-subscription']],
+      value => set({ codexQuotaSource: value })),
+    el('p', { className: 'cm-inspector-note cm-inspector-help' }, text('自动检测优先 dsh-codex-subscription，失败回退 dsh-codex-connect。', 'Auto prefers dsh-codex-subscription, then falls back to dsh-codex-connect.')),
     check(t('codexQuotaSidebar'), config.codexQuotaSidebar !== false, value => set({ codexQuotaSidebar: value }))]
   if (selected === 'general') controls = [
     choice(t('languageLabel'), config.locale ?? 'auto', [['auto', t('localeAuto')], ['zh', '简体中文'], ['en', 'English']], value => set({ locale: value })),

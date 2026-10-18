@@ -2303,6 +2303,11 @@
       ctx.effect(() => () => { unmount() }, 'cost-meter: remote contribution')
       const costMeter = ctx.get('remote.costMeter')
       if (costMeter === undefined) return
+      ctx.effect(() => {
+        const rpc = ctx.get('connection')?.rpc
+        resetCodexQuota(rpc)
+        return () => { if (codexQuotaCache.rpc === rpc) resetCodexQuota(null) }
+      }, 'cost-meter: Codex quota transport')
       const readLocale = () => {
         try { return supportedLocale(ctx.get('locale')?.getSnapshot?.().active) }
         catch { return null }

@@ -26,6 +26,6 @@ function displayPreviewData(state, config, examples, selected) {
     goQuota: { status: 'ok', rolling: { percent: 24 }, weekly: { percent: 18 }, monthly: { percent: 12 }, fetchedAt: 0 },
     codingPlans: { minimax: { status: 'ok', windows: { '5h': { percent: 35 }, weekly: { percent: 62 } }, fetchedAt: 0 } },
     customBalances: [], customBalance: { status: 'ok', remaining: 68, spend: 32, maxBudget: 100, unit: 'USD', fetchedAt: 0 },
-    displayPreviewCodex: { status: 'ok', windows: { weekly: { percent: 42 } }, fetchedAt: 0 }, gatewayQuotas: { sources: [] },
+    displayPreviewCodex: { status: 'ok', windows: { five: { percent: 35 }, weekly: { percent: 42 } }, fetchedAt: 0 }, gatewayQuotas: { sources: [] },
   } }
 }
