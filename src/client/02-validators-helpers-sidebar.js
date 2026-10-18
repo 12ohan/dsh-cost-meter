@@ -3158,7 +3158,7 @@
               } else {
                 kids.push(el('span', { className: 'cm-qseg', key: s.name },
                   el('span', { className: 'cm-qbar' }, el('span', { className: 'cm-qfill', style: { width: s.pct + '%' } })),
-                  el('span', null, c.key === 'codex' ? quotaValueText(s.pct, 'remaining', t) : s.pct + '%')))
+                  el('span', null, c.key === 'codex' ? (c.segs.length > 1 ? (s.name === '5h' ? '5h' : t('goShortWeekly')) + ' ' : '') + quotaValueText(s.pct, 'remaining', t) : s.pct + '%')))
               }
             })
           }

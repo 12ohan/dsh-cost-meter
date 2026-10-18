@@ -309,6 +309,7 @@ assert.equal(quota.requests.length, 1, '有效缓存无需重复查询')
 const visible = quota.mount(quota.ui.CodexPlanBox, { state: { config: { ...config, codexQuotaEnabled: true, codexQuotaSource: 'connect' } }, wide: true })
 await quota.flush()
 assert.ok(visible.tree)
+assert.doesNotMatch(textOf(visible.tree), /5h/, 'a weekly-only quota response never invents a five-hour window')
 // #207: sidebar display is independent of the conversation's quota strip.
 let quotaConfig = { ...config, codexQuotaEnabled: true, codexQuotaSidebar: false, codexQuotaSource: 'connect', quotaStrip: { enabled: true, budget: false, go: false, plans: false } }
 const quotaProps = () => ({ wide: true, useCost: pick => pick({ state: { config: quotaConfig } }) })

@@ -76,14 +76,14 @@ window.__ModuleLoader__.load({
       registry.plan = { on: planOn, patch: { codingPlans: { ...config.codingPlans, [selectedPlan]: { ...planConfig, display: planOn ? 'settings' : 'both' } } } }
       const strip = config.quotaStrip ?? {}
       const codex = previewData.state.displayPreviewCodex
-      const codexPercentages = codex?.status === 'ok' ? Object.values(codex.windows ?? {}).map(win => Number.isFinite(win?.percent) ? Math.max(0, Math.min(100, 100 - win.percent)) : null) : []
+      const codexPercentages = codex?.status === 'ok' ? Object.entries(codex.windows ?? {}).map(([key, win]) => ({ key, pct: Number.isFinite(win?.percent) ? Math.max(0, Math.min(100, 100 - win.percent)) : null })) : []
       const codexStrip = item('strip-codex', text('输入框上方 · Codex 额度', 'Above composer · Codex quota'),
         strip.enabled === true && config.codexQuotaEnabled === true && config.codexQuotaStrip !== false,
         { codexQuotaStrip: config.codexQuotaStrip === false },
         el('span', { className: 'cm-qchip' }, el('span', { className: 'cm-qlabel' }, 'Codex'),
-          ...(codexPercentages.length ? codexPercentages : [null]).map((pct, index) => el('span', { key: index, className: 'cm-qseg' },
+          ...(codexPercentages.length ? codexPercentages : [{ pct: null }]).map(({ key, pct }, index) => el('span', { key: index, className: 'cm-qseg' },
             el('span', { className: 'cm-qbar' }, el('span', { className: 'cm-qfill', style: { width: (pct ?? 0) + '%' } })),
-            el('span', { className: 'cm-qtext' }, pct === null ? '—' : t('quotaRemaining', { pct }))))))
+            el('span', { className: 'cm-qtext' }, pct === null ? '—' : (codexPercentages.length > 1 ? (key === 'five' ? '5h' : t('goShortWeekly')) + ' ' : '') + t('quotaRemaining', { pct }))))))
       const stripItem = (key, label, value, kind) => {
         const on = strip.enabled === true && strip[key] !== false
         // Enabling one item from a disabled strip must not show its siblings unexpectedly.

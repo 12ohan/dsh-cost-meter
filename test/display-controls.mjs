@@ -8,6 +8,11 @@ const el = (type, props, ...children) => ({ type, props: props ?? {}, children }
 const React = { cloneElement: (node, props) => ({ ...node, props: { ...node.props, ...props } }) }
 const Inspector = vm.runInNewContext(readFileSync(new URL('../src/display/controls.js', import.meta.url), 'utf8') + '\nDisplayInspector', { React, el })
 const nodes = node => node && typeof node === 'object' ? [node, ...node.children.flatMap(nodes)] : []
+const previewData = vm.runInNewContext(readFileSync(new URL('../src/display/examples.js', import.meta.url), 'utf8') + '\ndisplayPreviewData', { React, el })
+const codexKeys = state => Object.keys(previewData(state, sanitizeConfig({}), true, 'strip-codex').state.displayPreviewCodex.windows)
+assert.deepEqual(codexKeys({}), ['weekly'], 'unknown-account examples default to weekly quota only')
+assert.deepEqual(codexKeys({ displayPreviewCodex: { status: 'ok', windows: { weekly: { percent: 17 } } } }), ['weekly'], 'Pro-like weekly-only responses never gain a fabricated 5h example')
+assert.deepEqual(codexKeys({ displayPreviewCodex: { status: 'ok', windows: { five: { percent: 20 }, weekly: { percent: 17 } } } }), ['five', 'weekly'], 'both windows appear only when the provider actually returns them')
 let config = sanitizeConfig({ codingPlans: { minimax: { enabled: false, display: 'both', baseUrl: 'https://www.minimax.cn' }, kimi: { enabled: false, display: 'settings' } } })
 let writes = 0, selectedPlan = 'minimax', navigated = null
 const initial = JSON.stringify(config.codingPlans.kimi)

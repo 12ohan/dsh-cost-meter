@@ -3,6 +3,8 @@ function displayPreviewData(state, config, examples, selected, planId = 'minimax
   if (!examples) return { state, config }
   const rate = Number(config.exchangeRate) > 0 ? Number(config.exchangeRate) : 1
   const amount = Number(config.budget?.amount) > 0 ? Number(config.budget.amount) : 200
+  const codexWindows = state.displayPreviewCodex?.status === 'ok' && Object.keys(state.displayPreviewCodex.windows ?? {}).length
+    ? state.displayPreviewCodex.windows : { weekly: {} }
   const bucket = (cost, input, output, cacheRead, calls) => ({ cost: cost / rate, apiCost: cost / rate, input, output, cacheRead, cacheWrite: 0, reasoning: 0, calls })
   const todayCost = amount * .04608
   const today = { ...bucket(todayCost, 48000, 6400, 192000, 14), byProviderModel: {
@@ -26,6 +28,6 @@ function displayPreviewData(state, config, examples, selected, planId = 'minimax
     goQuota: { status: 'ok', rolling: { percent: 24 }, weekly: { percent: 18 }, monthly: { percent: 12 }, fetchedAt: 0 },
     codingPlans: { [planId]: { status: 'ok', windows: { '5h': { percent: 35 }, weekly: { percent: 62 } }, fetchedAt: 0 } },
     customBalances: [], customBalance: { status: 'ok', remaining: 68, spend: 32, maxBudget: 100, unit: 'USD', fetchedAt: 0 },
-    displayPreviewCodex: { status: 'ok', windows: { five: { percent: 35 }, weekly: { percent: 42 } }, fetchedAt: 0 }, gatewayQuotas: { sources: [] },
+    displayPreviewCodex: { status: 'ok', windows: Object.fromEntries(['five', 'weekly'].filter(key => codexWindows[key]).map(key => [key, { percent: key === 'five' ? 35 : 42 }])), fetchedAt: 0 }, gatewayQuotas: { sources: [] },
   } }
 }

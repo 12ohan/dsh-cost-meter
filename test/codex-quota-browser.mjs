@@ -40,7 +40,7 @@ function App(){const[wide,setWide]=React.useState(true);window.setWide=setWide;r
 const root=createRoot(document.getElementById('root'));root.render(React.createElement(App));
 `
 const compiled = await build({ stdin: { contents: code, resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'esm', platform: 'browser' })
-let signedIn = false
+let signedIn = false, hasFive = true
 const calls = []
 const server = createServer(async (request, response) => {
   if (request.url === '/app.js') { response.setHeader('content-type', 'text/javascript'); return response.end(compiled.outputFiles[0].contents) }
@@ -50,7 +50,7 @@ const server = createServer(async (request, response) => {
     assert.equal(message.type, 'client-request'); assert.equal(message.method, 'codex-subscription/usage')
     response.setHeader('content-type', 'application/json')
     return response.end(JSON.stringify({ type: 'server-response', rpcId: message.rpcId, result: signedIn
-      ? { ok: true, value: { rateLimits: [{ id: 'codex', windows: [{ windowSeconds: 18000, remainingPercent: 60 }, { windowSeconds: 604800, remainingPercent: 83, resetsAt: Date.parse('2026-10-25T00:10:00Z') / 1000 }] }] } }
+      ? { ok: true, value: { rateLimits: [{ id: 'codex', windows: [...hasFive ? [{ windowSeconds: 18000, remainingPercent: 60 }] : [], { windowSeconds: 604800, remainingPercent: 83, resetsAt: Date.parse('2026-10-25T00:10:00Z') / 1000 }] }] } }
       : { ok: false, error: { code: 'internal', message: 'ChatGPT subscription is not signed in', details: { issues: [] } } } }))
   }
   if (request.url !== '/') { response.statusCode = 404; return response.end() }
@@ -79,10 +79,14 @@ try {
   await page.clock.fastForward(61_000)
   await card.getByText('剩余 60%', { exact: true }).waitFor()
   await card.getByText('剩余 83%', { exact: true }).waitFor()
-  await page.locator('#composer').getByText('剩余 83%', { exact: true }).waitFor()
+  await page.locator('#composer').getByText(/周 剩余 83%/).waitFor()
   await card.getByText('· 10/25 08:10 重置', { exact: true }).waitFor()
   assert.equal(calls.length, 2, 'sign-in recovers through the real RPC without remounting')
+  await page.screenshot({ path: join(output, 'quota-dual.png') })
+  hasFive = false
   await card.click(); await page.waitForFunction(() => document.querySelector('[data-cm-display="codex"]').getAttribute('aria-busy') === 'false')
+  assert.doesNotMatch(await card.innerText(), /5h/, 'weekly-only accounts never render a 5h row')
+  assert.equal(await page.locator('#composer .cm-qseg').count(), 1, 'weekly-only accounts render exactly one composer segment')
   assert.equal(calls.at(-1).payload.force, true)
   await page.screenshot({ path: join(output, 'quota.png') })
   await page.evaluate(() => window.configure({ barDirections: { plan: 'used' } }))
