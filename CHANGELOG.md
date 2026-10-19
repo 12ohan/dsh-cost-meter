@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.10] - 2026-10-19
+
+- Windows 无锁竞争时直接记录 Node 启动时间，不再同步启动 PowerShell；仅在竞争旧版原生锁或查询其他进程时读取原生身份，并缓存结果。
+- 毫秒身份改用 v2 锁元数据，旧版保留仍在使用的新版锁，避免把毫秒当作 Windows ticks 导致两个进程同时进入账本写入。
+- 统一毫秒与原生 ticks 的比较，回收 PID 复用后的旧锁；原生身份继续精确比较，未知身份、探测失败与时间误差范围内的锁继续保留。账本文件格式和金额不变。
+- 增加冻结 v1.9.9 读写器、真实 Windows 新旧进程互斥、近期文件时间的 PID 复用、死亡进程及启动零 PowerShell 调用回归。感谢 [@Oct1AtJoe](https://github.com/Oct1AtJoe) 在 [PR #327](https://github.com/Han-1413141/dsh-cost-meter/pull/327) 提供性能定位和原始优化实现。[更新说明](docs/update-notes-1.9.10.md)
+
 ## [1.9.9] - 2026-10-19
 
 - 修复 OpenCode Go 登录态自动读取未遵循 `OPENCODE_AUTH_CONTENT`、`XDG_DATA_HOME` 的问题，避免误读旧登录文件；保持费用插件专用 Key 与模型路由凭据的既有优先级。
