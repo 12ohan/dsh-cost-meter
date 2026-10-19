@@ -11,6 +11,13 @@ window.__ModuleLoader__.load({
     try { hostNative = require('@deepseek-ai/dsh-client-ui-primitives') } catch {}
     const Native = Object.fromEntries(Object.entries(fallbackNative).map(([name, component]) => [name, hostNative[name] ?? component]))
     const css = 'DISPLAY_STYLE_SOURCE'
+    // Only owned surfaces change. Nested statistics share the surrounding material;
+    // floating surfaces retain a 90% opacity floor, including fully transparent skins.
+    const skinCss = `
+      body :is(.cm-section,.cm-stat){background:transparent}
+      body :is(.cm-stat-dialog,.cm-qguide,.cm-peak-alert,.cm-footer-stack.simple,.cm-combo-panel,.cm-context-intro),body dialog.cm-fee-dialog{background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base,#fff)) r g b / max(alpha,.9))}
+      body :is(.cm-simple-summary,.cm-billion-notice){background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-1,var(--dsw-alias-bg-base,#fff)) r g b / max(alpha,.9))}
+    `
     /* DISPLAY_APPEARANCE_SOURCE */
     /* DISPLAY_PARTS_SOURCE */
     /* DISPLAY_SIDEBAR_SOURCE */
@@ -172,6 +179,7 @@ window.__ModuleLoader__.load({
           el('h3', null, text('设置你看到的界面', 'Make the screen yours')),
           el('p', null, text('点击虚线框，在右侧调整显示与样式。淡化表示已隐藏。', 'Select an outlined item, then customize it on the right. Faded components are hidden.'))),
           el('button', { ref: expandButton, type: 'button', className: 'cm-btn small cm-display-expand', onClick: () => setExpanded(true) }, icon('IconFullscreenOutlineRegular', 14), text('放大预览', 'Expand preview'))),
+        el(SkinTransparency, { config, set, text }),
         expanded ? el('dialog', { ref: dialogRef, className: 'cm-display-dialog', 'aria-label': text('桌面显示预览', 'Desktop display preview'),
           onCancel: event => { event.preventDefault(); event.stopPropagation(); setExpanded(false) }, onKeyDown: event => { if(event.key==='Escape')event.stopPropagation() } },
           el('div', { className: 'cm-display-dialog-head' }, text('显示设置', 'Display settings'),
@@ -190,12 +198,21 @@ window.__ModuleLoader__.load({
           el(DetailedSettings, { ...this.props, open: true }), el(ModelSidebarSettings, this.props))
       }
     }
+    function SkinTransparency({ config, set, text }) {
+      return el('div', { className: 'cm-field' },
+        el('label', { className: 'cm-check' },
+          el('input', { type: 'checkbox', checked: config.followSkinTransparency === true,
+            onChange: event => set({ followSkinTransparency: event.target.checked }) }),
+          text('跟随皮肤透明度', 'Follow skin transparency')),
+        el('span', { className: 'cm-hint' }, text('费用页跟随设置窗口背景，弹窗保留至少 90% 不透明度。', 'Use the settings window background; dialogs remain at least 90% opaque.')))
+    }
     function DetailedSettings({ state, draft, setDraft, t, locale, numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, open = false }) {
       const config=state.config
       const setField=(key,value)=>setDraft(previous=>({...previous,[key]:value}))
       return el('details', { className: 'cm-display-details', open: open || undefined },
         el('summary', null, locale === 'en' ? 'More options · layout, currency and refresh intervals' : '详细设置 · 布局、金额格式与刷新频率'),
         el('div', { className: 'cm-grid' },
+            el(SkinTransparency, { config: draft ?? config, set: patch => setDraft(previous => ({ ...(previous ?? config), ...patch })), text: (zh, en) => locale === 'en' ? en : zh }),
             el('div', { className: 'cm-grid-group' }, t('groupGeneral')),
             ...['includeSubagentCost', 'codexQuotaEnabled', 'codexQuotaSidebar', 'codexQuotaStrip'].map(key => el('label', { key, className: 'cm-check' },
               el('input', { type: 'checkbox', checked: draft?.[key] === true, onChange: event => setField(key, event.target.checked) }),
@@ -436,11 +453,19 @@ window.__ModuleLoader__.load({
                 el('span', null, t('budgetDetailLabel'))))))
     }
 
-    function mount(ctx) {
+    function mount(ctx, store) {
       const style = document.createElement('style')
       style.textContent = css
       document.head.appendChild(style)
-      ctx.effect(() => () => style.remove(), 'cost-meter: display settings styles')
+      const skin = document.createElement('style')
+      const syncSkin = () => {
+        const next = store?.getSnapshot().state?.config?.followSkinTransparency === true ? skinCss : ''
+        if (skin.textContent !== next) skin.textContent = next
+      }
+      document.head.appendChild(skin)
+      syncSkin()
+      const stop = store?.subscribe(syncSkin)
+      ctx.effect(() => () => { stop?.(); skin.remove(); style.remove() }, 'cost-meter: display settings styles')
       return DisplayBoundary
     }
     return { mount, DisplaySettings }

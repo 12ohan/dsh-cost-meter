@@ -2614,6 +2614,7 @@
       const sync = () => {
         const state = store.getSnapshot().state
         if (state?.config?.sessionListCosts) void loadPage('session-list').catch(() => {})
+        if (state?.config?.followSkinTransparency) void loadPage('display').catch(() => {})
         const position = state?.config?.position ?? 'dock'
         const showToday = state?.config?.sidebar !== false && state?.config?.hideTodayCost !== true
         const balanceDisplay = state?.config?.balance?.display ?? 'both'

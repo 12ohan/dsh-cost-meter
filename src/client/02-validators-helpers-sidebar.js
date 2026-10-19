@@ -143,7 +143,7 @@
         hideBudget: v.hideBudget === true,
         hideTodayCost: v.hideTodayCost === true,
         modelStatistics: v.modelStatistics ?? {},
-        ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost'], value => value === true),
+        ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'followSkinTransparency'], value => value === true),
         sessionCostCompact: v.sessionCostCompact === true,
         contextCostsEnabled: v.contextCostsEnabled === true,
         contextCostsPromptSeen: v.contextCostsPromptSeen === true,
