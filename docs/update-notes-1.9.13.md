@@ -4,6 +4,10 @@
 
 ### 会话列表、模型名称和额度
 
+- 新增 WorkBuddy 官方积分余额，读取本地登录文件，支持个人与企业账号；默认关闭。感谢 [@SternChiri](https://github.com/SternChiri) 在 [PR #341](https://github.com/Han-1413141/dsh-cost-meter/pull/341) 提供实现和测试，凭据与计费适配源自 [@corrinehu 的 dsh-workbuddy-connect](https://github.com/corrinehu/dsh-workbuddy-connect)，已保留 MIT 许可。
+
+在“费用 → 额度”启用 WorkBuddy，登录文件由本机 WorkBuddy 或 dsh-workbuddy-connect 提供。本插件只读凭据与官方积分接口，不刷新 Token、不解密登录文件，也不发送模型请求。查询失败显示原因，登录过期时重新登录；无效余额不显示为零。
+
 - 在“费用 → 显示 → 侧栏 → 会话列表金额”开启行末金额，支持累计／今日及 Token 悬停说明，默认关闭。可见行合并查询、缓存并定时刷新，隐藏页面停止定时查询。
 - 模型花费与统计页读取宿主模型目录中的可读名称；统计键、价格匹配和已记录金额保持原样。
 - CommandCode 使用当前账期用量和剩余额度计算月使用比例；辅助接口失败时继续显示余额。
@@ -32,7 +36,7 @@ Ollama Cloud 的 DeepSeek V4.1 Flash 与 V4 Pro 和 DeepSeek 官方同价，但�
 
 ### 构建
 
-主客户端超出 DSH STORE 单文件上限前只剩 145 字节。CSS 词组打包改为每轮按当前打包文本重新计数，选择实测节省最多的词组；构建继续逐字节校验解包后的样式与 esbuild 输出一致，界面与样式不变。模型显示设置移入按需加载的显示模块。`lib/client.js` 为 261,266 字节，低于 262,144 字节上限。
+主客户端超出 DSH STORE 单文件上限前只剩 145 字节。CSS 词组打包改为每轮按当前打包文本重新计数，选择实测节省最多的词组；构建继续逐字节校验解包后的样式与 esbuild 输出一致，界面与样式不变。模型显示设置移入按需加载的显示模块。`lib/client.js` 为 261,666 字节，低于 262,144 字节上限。
 
 ### 历史费用
 
@@ -44,6 +48,7 @@ Ollama Cloud 的 DeepSeek V4.1 Flash 与 V4 Pro 和 DeepSeek 官方同价，但�
 
 ### Session list, model names and quotas
 
+- WorkBuddy official credits use local sign-in files and the personal or enterprise billing endpoint. Off by default; no token refresh, credential decryption, or model requests. Contribution: @SternChiri in PR #341, adapted from @corrinehu/dsh-workbuddy-connect under MIT.
 - Optional session-row amounts show total or today's cost and token details on hover. The feature is off by default, batches visible rows, caches results, and pauses periodic reads when the page is hidden.
 - Model cost cards and statistics use readable names from the host catalog while retaining original aggregation keys and prices.
 - CommandCode monthly usage combines billing-period consumption with remaining credits; failed auxiliary reads retain the balance display.
@@ -72,7 +77,7 @@ This release:
 
 ### Build
 
-The main client was 145 bytes below the DSH STORE per-file bound. CSS phrase packing now re-counts candidates in the packed text each round and takes the largest measured saving. The build still checks that the unpacked stylesheet matches esbuild's output byte for byte; the UI and styles are unchanged. Model display settings now load with the display module. `lib/client.js` is 261,266 bytes, below the 262,144-byte bound.
+The main client was 145 bytes below the DSH STORE per-file bound. CSS phrase packing now re-counts candidates in the packed text each round and takes the largest measured saving. The build still checks that the unpacked stylesheet matches esbuild's output byte for byte; the UI and styles are unchanged. Model display settings now load with the display module. `lib/client.js` is 261,666 bytes, below the 262,144-byte bound.
 
 ### Recorded history
 

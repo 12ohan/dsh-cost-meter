@@ -18,6 +18,7 @@ const connectionEntry = typeof connectionExport === 'string' ? connectionExport 
 const connectionSource = readFileSync(resolve(dirname(connectionManifest), connectionEntry), 'utf8')
 const state = { config: sanitizeConfig({ locale: 'zh', codexQuotaEnabled: true, codexQuotaSource: 'subscription', peakEnabled: false,
   hideOfficialBalance: true, sidebar: false, hideTodayCost: true, goQuota: { enabled: false }, budget: { enabled: false }, quotaStrip: { enabled: true, budget: false, go: false, plans: false } }),
+  codingPlans: { workbuddy: { status: 'ok', message: '', fetchedAt: 0, windows: { balance: { text: '1,117', resetsAt: '' } } } },
   today: zeroDay(), month: zeroDay(), total: zeroDay(), history: [] }
 const code = `
 import React from ${JSON.stringify(req.resolve('react'))};
@@ -148,6 +149,16 @@ try {
   const count = calls.length
   await page.clock.fastForward(360_000)
   assert.equal(calls.length, count, 'hiding both surfaces stops quota reads without changing the enabled account')
+  await page.evaluate(() => window.configure({ sidebarSimple: false, sidebarStyle: 'standard', codingPlans: { workbuddy: { enabled: true, display: 'sidebar' } } }))
+  const workbuddy = page.locator('[data-cm-plan="workbuddy"]')
+  await workbuddy.waitFor()
+  assert.equal((await workbuddy.innerText()).split('1,117').length - 1, 1, 'WorkBuddy balance appears once')
+  assert.match(await workbuddy.locator('.cm-mm-title').innerText(), /WorkBuddy[\s\S]*1,117/)
+  await page.evaluate(() => window.configure({ locale: 'zh' }))
+  assert.match(await workbuddy.innerText(), /WorkBuddy 积分/)
+  await workbuddy.screenshot({ path: join(output, 'workbuddy-balance.png') })
+  await page.evaluate(() => window.configure({ codingPlans: { workbuddy: { enabled: false, display: 'sidebar' } } }))
+  await workbuddy.waitFor({ state: 'detached' })
   assert.deepEqual(errors, []); assert.deepEqual(external, [])
   writeFileSync(join(output, 'result.json'), JSON.stringify({ passed: true, calls: calls.length, layouts, remainingBars: true, resetTopRight: true, weeklyOnly: true, missingReset: true, externalRequests: 0, browserErrors: errors }, null, 2))
   await page.evaluate(() => window.dispose())

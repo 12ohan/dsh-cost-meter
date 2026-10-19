@@ -1514,6 +1514,7 @@
       { id: 'volcengine', labelKey: 'codingPlanVolcengine' },
       { id: 'qwen', labelKey: 'codingPlanQwen' },
       { id: 'mimo', labelKey: 'codingPlanMimo' },
+      { id: 'workbuddy', labelKey: 'wbT' },
       { id: 'factory', labelKey: 'codingPlanFactory' },
     ]
 
@@ -1712,6 +1713,7 @@
                 placeholder: t('volcengineSecretPlaceholder'),
               }),
               el('p', { className: 'cm-note' }, t('volcengineNote')))
+            : planId === 'workbuddy' ? el('p', { className: 'cm-note' }, t('wbH'))
             : el(Fragment, null,
               el('div', { className: 'cm-field' },
                 el('label', null, planId === 'mimo' ? 'Cookie (platform.xiaomimimo.com)' : planId === 'factory' ? 'Factory Token' : planId === 'opendesign' ? 'OpenDesign Control Key' : t('codingPlanKeyLabel'))),

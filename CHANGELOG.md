@@ -2,6 +2,7 @@
 
 ## [1.9.13] - 2026-10-19
 
+- 新增 WorkBuddy 官方积分余额，读取本地登录文件，支持个人与企业账号；默认关闭。感谢 [@SternChiri](https://github.com/SternChiri) 在 [PR #341](https://github.com/Han-1413141/dsh-cost-meter/pull/341) 提供实现和测试，凭据与计费适配源自 [@corrinehu 的 dsh-workbuddy-connect](https://github.com/corrinehu/dsh-workbuddy-connect)，已保留 MIT 许可。
 - 新增会话列表行末金额，默认关闭，支持累计／今日、显示币种和金额精度，悬停查看 Token；可见行合并查询并缓存，收起侧栏时隐藏。感谢 [@2JumpSinA](https://github.com/2JumpSinA) 在 [#332](https://github.com/Han-1413141/dsh-cost-meter/issues/332) 提出需求与交互建议。
 - CommandCode 根据当前账期用量和余额计算月额度使用率，辅助查询失败时保留余额。感谢 [@YQLiu-git](https://github.com/YQLiu-git) 在 [#334](https://github.com/Han-1413141/dsh-cost-meter/issues/334) 提供接口、样例与计算方法。
 - 统计页和模型花费卡使用宿主模型目录中的可读名称，保留原始统计键。感谢 [@ArseneLupins](https://github.com/ArseneLupins) 在 [#335](https://github.com/Han-1413141/dsh-cost-meter/issues/335) 报告第三方模型名称问题。

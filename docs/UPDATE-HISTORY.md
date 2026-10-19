@@ -2,6 +2,7 @@
 
 ## v1.9.13(2026-10-19)—— 会话列表金额、额度显示与计费修复
 
+- 新增 WorkBuddy 官方积分余额，读取本地登录文件，支持个人与企业账号；默认关闭。感谢 [@SternChiri](https://github.com/SternChiri) 在 [PR #341](https://github.com/Han-1413141/dsh-cost-meter/pull/341) 提供实现和测试，凭据与计费适配源自 [@corrinehu 的 dsh-workbuddy-connect](https://github.com/corrinehu/dsh-workbuddy-connect)，已保留 MIT 许可。
 - 会话列表支持累计／今日金额及 Token 悬停说明；CommandCode 新增月额度比例，Codex 显示剩余额度进度与重置时间。
 - 模型统计显示宿主目录名称；修复本轮费用的币种参数，验证 OpenCode Go 认证回归。
 - Ollama Cloud 的 DeepSeek V4.1 Flash / V4 Pro 改按 Ollama 自己的峰谷时段计费（周一至周五 12:00–18:00 UTC 峰时，其余时段与周末谷价，无中国法定假日规则）；DeepSeek 官方、OpenCode Go、本地模型与其他渠道不变。
