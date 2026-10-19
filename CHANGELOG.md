@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- Pending review: correct the Ollama Cloud DeepSeek peak calendar while preserving recorded history. The proposed 1.9.13 changes are detailed below; this version has not been released. Reported by [@LetterXbox](https://github.com/LetterXbox), with reproduction and scope discussion in [#337](https://github.com/Han-1413141/dsh-cost-meter/issues/337).
+- 待评审：修正 Ollama Cloud DeepSeek 峰谷日历并保留历史入账金额。拟议的 1.9.13 改动详见下文，该版本尚未发布。问题由 [@LetterXbox](https://github.com/LetterXbox) 报告，复现与范围讨论见 [#337](https://github.com/Han-1413141/dsh-cost-meter/issues/337)。
+
 ## [1.9.13] - 2026-10-19
 
 - 修复 Ollama Cloud 的 DeepSeek V4.1 Flash / V4 Pro 套用 DeepSeek 官方峰谷时段与中国法定假日规则的问题：改按 Ollama 自己的日历计费（周一至周五 12:00–18:00 UTC 为峰时，其余时段与 UTC 周末为谷价，无假日规则）。此前 DeepSeek 工作日 01:00–04:00、06:00–10:00 UTC 按双倍入账，工作日 12:00–18:00 UTC 只记一半，其余时段金额正确。
