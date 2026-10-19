@@ -2633,17 +2633,17 @@
      * 「余量」填充,与通用卡片/额度横条的「已用」方向相反,同屏并列时引起误读
      * (issue #57);现统一为已用口径,告警阈值也与 CodingPlanBox 一致(≥80 warn / ≥100 over)。
      */
-    function miniMaxRow(label, win, direction, t) {
+    function miniMaxRow(label, win, direction, t, explicit) {
       const pct = planWindowUsedPct(win)
       const level = pct === null ? 'ok' : pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok'
       const barView = simpleBarByDirection(pct, direction)
-      const text = win?.unlimited ? '∞' : barView.label === null ? '—' : barView.label + '%'
+      const text = win?.unlimited ? '∞' : explicit ? quotaValueText(barView.label, direction, t) : barView.label === null ? '—' : barView.label + '%'
       return {
         level,
         pct,
         text,
         label: barView.label,
-        row: el('div', { className: 'cm-mm-row' + (level === 'ok' ? '' : ' ' + level) },
+        row: el('div', { key: label, className: 'cm-mm-row' + (level === 'ok' ? '' : ' ' + level) },
           el('span', { className: 'cm-bbox-label' }, label),
           el('div', { className: 'cm-bbox-bar' },
             el('div', { className: 'cm-bbox-fill', style: { width: barView.width + '%' } })),
@@ -2802,7 +2802,7 @@
       return snap.source === source ? snap : { status: 'idle', windows: {}, fetchedAt: 0 }
     }
 
-    /** Codex 额度侧边栏卡片:明确显示剩余额度和本机时区的重置时间。 */
+    /** Codex uses the same progress rows as MiniMax, explicitly labelled as remaining. */
     function CodexPlanBox(props) {
       const hoverProps = useQuotaHoverRefresh()
       const { state, wide } = props
@@ -2818,27 +2818,28 @@
         title: t('codexQuotaUnavailable'), ...clickableRefreshProps(refresh.busy, refresh.run),
       }, el('div', { className: 'cm-mm-title' }, wide === false ? 'Codex' : t('codexQuotaTitle')),
       el('span', { className: 'cm-hint' }, wide === false ? '—' : t(snap.status === 'idle' || refresh.busy ? 'refreshing' : 'codexQuotaUnavailable')))
-      const views = [['five', 'codexQuotaFive'], ['weekly', 'codexQuotaWeek']].flatMap(([key, label]) => {
+      const views = [['five', 'codexQuotaFive', '5h'], ['weekly', 'codexQuotaWeek', '7d']].flatMap(([key, label, short]) => {
         const win = snap.windows[key]
         if (!win) return []
-        const text = quotaValueText(simpleBarByDirection(win.percent, 'remaining').label, 'remaining', t)
+        const view = miniMaxRow(short, win, 'remaining', t, true)
         const date = new Date(typeof win.resetsAt === 'string' ? win.resetsAt : NaN)
         const reset = Number.isFinite(date.getTime()) ? t('codexQuotaReset', { time: date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) }) : ''
-        return [{ key, label: t(label), text, reset, win }]
+        return [{ ...view, key, short, name: t(label), reset, win }]
       })
       if (!views.length) return null
-      const level = views.some(v => v.win.percent >= 100) ? 'over' : views.some(v => v.win.percent >= 80) ? 'warn' : 'ok'
+      const level = views.some(v => v.pct >= 100) ? 'over' : views.some(v => v.pct >= 80) ? 'warn' : 'ok'
       const detail = [
         t('codexQuotaTitle'),
-        ...views.map(view => view.label + ' · ' + view.text + (view.reset ? ' · ' + miniMaxResetText(view.win, t) : '')),
+        ...views.map(view => view.name + ' · ' + view.text + (view.reset ? ' · ' + miniMaxResetText(view.win, t) : '')),
         snap.fetchedAt > 0 ? t('goQuotaFetchedAt', { time: new Date(snap.fetchedAt).toLocaleTimeString() }) : null,
         ...clickRefreshTipLines(t, refresh),
       ].filter(Boolean).join('\n')
       const body = el(Fragment, null,
-        el('div', { className: 'cm-mm-title' }, t('codexQuotaTitle')),
-        ...views.map(view => el('div', { key: view.key, className: 'cm-codex-window' },
-          el('span', null, view.label + ' ·'), el('strong', null, view.text),
-          view.reset ? el('span', { className: 'cm-mm-reset' }, '· ' + view.reset) : null)))
+        el('div', { className: 'cm-bbox-head cm-codex-head' },
+          el('div', { className: 'cm-mm-title' }, t('codexQuotaTitle')),
+          el('div', { className: 'cm-codex-resets' }, ...views.filter(view => view.reset).map(view =>
+            el('span', { key: view.key, className: 'cm-mm-reset' }, (views.length > 1 ? view.short + ' · ' : '') + view.reset)))),
+        ...views.map(view => view.row))
       const rail = el(Fragment, null, ...views.map(view => el('div', { className: 'cm-bbox-rail cm-num' }, view.text)))
       return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
