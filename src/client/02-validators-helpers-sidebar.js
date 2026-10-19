@@ -1146,6 +1146,7 @@
       minimax: ['minimax', 'minimax-code'],
       kimi: ['kimi', 'kimi-code'],
       commandcode: ['commandcode', 'command-code'],
+      clinepass: ['clinepass', 'cline-pass'],
       workbuddy: ['workbuddy', 'workbuddy-subscription'],
       antigravity: ['antigravity'],
       stepfun: ['stepfun', 'step-code'],
@@ -1159,14 +1160,14 @@
       mimo: ['mimo', 'xiaomimimo', 'mimo-token-plan', 'xiaomi-token-plan', 'xiaomi-token-plan-cn', 'xiaomi-token-plan-sgp', 'xiaomi-token-plan-ams'],
       factory: ['factory', 'droid', 'factory-a', 'factory-g', 'factory-o'],
     }
-    const PLAN_PROVIDER_IDS_LOCAL = ['opendesign', 'anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'scnet', 'volcengine', 'qwen', 'mimo', 'factory', 'go', 'codex', 'volcengine-agent', 'tencent-coding', 'tencent-token', 'baidu-coding', 'workbuddy', 'antigravity', 'stepfun']
+    const PLAN_PROVIDER_IDS_LOCAL = ['opendesign', 'anthropic', 'zai', 'minimax', 'kimi', 'openrouter', 'siliconflow', 'commandcode', 'clinepass', 'scnet', 'volcengine', 'qwen', 'mimo', 'factory', 'go', 'codex', 'volcengine-agent', 'tencent-coding', 'tencent-token', 'baidu-coding', 'workbuddy', 'antigravity', 'stepfun']
     const PLAN_NAME_HINTS_LOCAL = {
       opendesign: 'opendesign|open[._-]?design',
       codex: 'codex|chatgpt', 'baidu-coding': 'baidu|qianfan|百度|千帆',
       'tencent-coding': 'tencent|tokenhub|腾讯',
       anthropic: 'anthropic|claude', zai: 'z[._-]?ai|zhipu|glm|智谱', minimax: 'minimax|海螺',
       kimi: 'kimi|moonshot|moonshotai|月之暗面', openrouter: 'openrouter', siliconflow: 'siliconflow|硅基',
-      commandcode: 'commandcode', scnet: 'scnet|sugon|超算',
+      commandcode: 'commandcode', clinepass: 'cline[._-]?pass|clinepass', scnet: 'scnet|sugon|超算',
       volcengine: 'volcengine|volcano|volc|ark|火山|方舟', qwen: 'qwen|qianwen|千问|通义',
       mimo: 'mimo|xiaomi|小米', factory: 'factory|droid', go: 'opencode(?:[-_\\s]?go)?|zen|go',
     }
@@ -3045,6 +3046,7 @@
       openrouter: 'OR',
       siliconflow: 'SF',
       commandcode: 'CC',
+      clinepass: 'CP',
       scnet: 'SCNet',
       volcengine: 'Ark',
       qwen: 'Qwen',
