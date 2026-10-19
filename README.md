@@ -1,35 +1,14 @@
 # dsh-cost-meter
 
-**English** | [简体中文](README.zh-CN.md)
-
-Community and feedback: [Join the WeChat group →](#community). The WeChat group is open. You're welcome to join.
+**English** | [简体中文](README.zh-CN.md) · [Install](#installation) · [Features](#feature-overview) · [Screenshots](#screenshots--walkthrough) · [Community](#community)
 
 <div align="center">
 
 **Session cost tracking plugin for the DeepSeek Harness web GUI (bilingual UI)**
 
-Per-conversation cost · daily totals · OpenCode Go subscription quota display · budget with usage percentage · official account balance · custom provider balance · balance progress bar · history · peak/off-peak pricing hours display (peak hours UTC 01:00–04:00, 06:00–10:00; weekends and Chinese public holidays are off-peak all day, with separate labels) · pre-switch popup & system-notification alerts for peak/off-peak changes (position / lead time / alert type configurable) · one-click price sync from the official docs · Codex-style token usage heat grid · multi-vendor model pricing (built-in 170+ model-ID catalog with auto-matching) · mainstream Coding Plan quota queries & display (Anthropic / Z.ai / MiniMax / Kimi / OpenRouter / SiliconFlow / CommandCode / Cline Pass / SCNet / Volcano Ark / Qwen / Xiaomi MiMo / Factory Droid) plan/API dual-track billing (subscription quota vs pay-as-you-go money separated, per-1% & full-window token/equivalent-cost estimates with daily/weekly/monthly curves) · subscription plugin compatibility (Codex / ChatGPT subscription plans) · mobile layout (dsh-pocket) · quota strip above the input box (budget / Go / coding-plan usage in one row, toggleable)
-
 [![version](https://img.shields.io/badge/version-1.9.15-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
-
-**Minimum supported host: DSH 0.2.0.** The plugin declares the floor in `engines.dsh`, the host's admission gate for plugins, and no longer supports any DSH 0.1.x release; the adaptation target is the npm `next` release **0.2.1-rc.2**. Exact ranges and how the host reads them: [compatibility declaration](docs/dsh-0.2.1-compatibility.md#english).
-
-Supports [official Search/Fetch request fees](docs/web-request-fees.md#english), separately from model tokens.
-
-**v1.9.15** adds an optional “Follow skin transparency” switch under Cost → Display, and supports Cline Pass quota in a single card with 5-hour, weekly and monthly windows.
-
-Configuration and verification: [OpenDesign queries](docs/opendesign-billing.md), [dynamic ports / LAN / WorkBuddy2API setup](docs/custom-balance-sources.md), and [opacity fixes with performance measurements](docs/performance-2026-10-18.md).
-
-
-Desktop users: follow the [Desktop installation instructions](docs/install-troubleshooting.md#desktop-安装与更新) for the application's own CLI and `desktop` Profile.
-
-Release notes: [v1.9.15](docs/update-notes-1.9.15.md#english). Fully restart DSH after updating.
-
-Host records inside the declared range, and the earlier 0.1.x history, are in the [compatibility record](docs/host-compatibility.md); the per-release list lives in `package.json` (`dsh.compatibility.dshReleases`).
-
-If startup reports **Ledger is busy** and the cost widgets are missing, see [ledger lock recovery](docs/ledger-lock-recovery.md#english).
-
 [![npm](https://img.shields.io/npm/v/dsh-cost-meter?label=npm)](https://www.npmjs.com/package/dsh-cost-meter)
+[![dshfind](https://dshfind.com/api/badge/Han-1413141/dsh-cost-meter?metric=downloads&lang=en)](https://dshfind.com/zh/plugins/Han-1413141/dsh-cost-meter?ref=badge)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![dsh](https://img.shields.io/badge/DeepSeek%20Harness-dsh--plugin-4176E6)](https://github.com/deepseek-ai/deepseek-harness)
 [![awesome · DSH plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
@@ -37,9 +16,41 @@ If startup reports **Ledger is busy** and the cost widgets are missing, see [led
 
 </div>
 
----
+**v1.9.15** adds an optional “Follow skin transparency” switch under Cost → Display, and supports Cline Pass quota in a single card with 5-hour, weekly and monthly windows.
+
+**Host floor: DSH 0.2.0** · Adaptation target: **0.2.1-rc.2** (npm `next`). Expand the compatibility notes below for exact declarations, host records and troubleshooting.
+
+Release notes: [v1.9.15](docs/update-notes-1.9.15.md#english). Fully restart DSH after updating.
+
+<details>
+<summary>Full feature summary and preview</summary>
+
+Per-conversation cost · daily totals · OpenCode Go subscription quota display · budget with usage percentage · official account balance · custom provider balance · balance progress bar · history · peak/off-peak pricing hours display (peak hours UTC 01:00–04:00, 06:00–10:00; weekends and Chinese public holidays are off-peak all day, with separate labels) · pre-switch popup & system-notification alerts for peak/off-peak changes (position / lead time / alert type configurable) · one-click price sync from the official docs · Codex-style token usage heat grid · multi-vendor model pricing (built-in 170+ model-ID catalog with auto-matching) · mainstream Coding Plan quota queries & display (Anthropic / Z.ai / MiniMax / Kimi / OpenRouter / SiliconFlow / CommandCode / Cline Pass / SCNet / Volcano Ark / Qwen / Xiaomi MiMo / Factory Droid) plan/API dual-track billing (subscription quota vs pay-as-you-go money separated, per-1% & full-window token/equivalent-cost estimates with daily/weekly/monthly curves) · subscription plugin compatibility (Codex / ChatGPT subscription plans) · mobile layout (dsh-pocket) · quota strip above the input box (budget / Go / coding-plan usage in one row, toggleable)
 
 ![Promo art](docs/promo.en.png)
+
+</details>
+
+<details>
+<summary>Compatibility, configuration and troubleshooting</summary>
+
+**Minimum supported host: DSH 0.2.0.** The plugin declares the floor in `engines.dsh`, the host's admission gate for plugins, and no longer supports any DSH 0.1.x release; the adaptation target is the npm `next` release **0.2.1-rc.2**. Exact ranges and how the host reads them: [compatibility declaration](docs/dsh-0.2.1-compatibility.md#english).
+
+Supports [official Search/Fetch request fees](docs/web-request-fees.md#english), separately from model tokens.
+
+Configuration and verification: [OpenDesign queries](docs/opendesign-billing.md), [dynamic ports / LAN / WorkBuddy2API setup](docs/custom-balance-sources.md), and [opacity fixes with performance measurements](docs/performance-2026-10-18.md).
+
+Desktop users: follow the [Desktop installation instructions](docs/install-troubleshooting.md#desktop-安装与更新) for the application's own CLI and `desktop` Profile.
+
+Host records inside the declared range, and the earlier 0.1.x history, are in the [compatibility record](docs/host-compatibility.md); the per-release list lives in `package.json` (`dsh.compatibility.dshReleases`).
+
+If startup reports **Ledger is busy** and the cost widgets are missing, see [ledger lock recovery](docs/ledger-lock-recovery.md#english).
+
+Community and feedback: [Join the WeChat group →](#community). The WeChat group is open. You're welcome to join.
+
+</details>
+
+---
 
 ## Feature overview
 
