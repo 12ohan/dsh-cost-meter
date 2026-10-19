@@ -97,10 +97,6 @@ try {
   await skinSwitch.check()
   await page.waitForFunction(() => window.current().followSkinTransparency === true && getComputedStyle(document.querySelector('.cm-section')).backgroundColor === 'rgba(0, 0, 0, 0)')
   await page.screenshot({ path: join(output, 'skin-transparency-zh.png'), fullPage: true })
-  await page.evaluate(() => window.changeLocale('en'))
-  await page.getByRole('checkbox', { name: 'Follow skin transparency', exact: true }).waitFor()
-  await page.screenshot({ path: join(output, 'skin-transparency-en.png'), fullPage: true })
-  await page.evaluate(() => window.changeLocale('zh'))
   await skinSwitch.uncheck()
   await page.waitForFunction(() => window.current().followSkinTransparency === false && getComputedStyle(document.querySelector('.cm-section')).backgroundColor !== 'rgba(0, 0, 0, 0)')
   const region=async name=>page.getByRole('tab',{name,exact:true}).click()
@@ -273,6 +269,10 @@ try {
   assert.ok(p95<1000,'opening stays responsive under 4x CPU throttle: '+p95)
   await region('会话内容');assert.equal(await item('turn').getAttribute('data-visible'),'false','saved toggles survive repeated reopening')
   await page.locator('.cm-display-general summary').click();await page.getByLabel('界面语言',{exact:true}).selectOption('en');await page.waitForFunction(()=>window.current().locale==='en')
+  const enSkinSwitch = page.getByRole('checkbox', { name: 'Follow skin transparency', exact: true })
+  await enSkinSwitch.check();await page.waitForFunction(() => window.current().followSkinTransparency === true)
+  await page.screenshot({ path: join(output, 'skin-transparency-en.png'), fullPage: true })
+  await enSkinSwitch.uncheck();await page.waitForFunction(() => window.current().followSkinTransparency === false)
   await region('Sidebar');await page.evaluate(()=>window.failSave=true);await customize('balance');const placement=page.getByLabel('Placement',{exact:true});await page.getByRole('switch',{name:'Show this component',exact:true}).click();await page.getByText(/synthetic save failure/).waitFor()
   // #258 latest feedback: native component options and the active Today tab.
   // Use the actual upstream Midnight token definition over a light host / dark OS.
