@@ -1510,6 +1510,7 @@
       { id: 'openrouter', labelKey: 'codingPlanOpenrouter' },
       { id: 'siliconflow', labelKey: 'codingPlanSiliconflow' },
       { id: 'commandcode', labelKey: 'codingPlanCommandcode' },
+      { id: 'clinepass', labelKey: 'codingPlanClinepass' },
       { id: 'scnet', labelKey: 'codingPlanScnet' },
       { id: 'volcengine', labelKey: 'codingPlanVolcengine' },
       { id: 'qwen', labelKey: 'codingPlanQwen' },
