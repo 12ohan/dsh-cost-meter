@@ -1873,7 +1873,7 @@ console.log('[ok] 宽泛匹配与跨厂商兑底(路由 provider 费用为零修
   const retryIndexSource = readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8')
   assert.ok(retryIndexSource.includes('err.soft = true'), 'queryBalance 守卫错误(未配置 Key/非官方端点)标记 soft')
   // 官方余额的 401 缓存与 500 自动恢复由 balance-credentials.mjs 实际调用验证。
-  assert.ok(retryIndexSource.includes("...goQuotaCache, value: { ...emptyGoQuota(), status: 'error'"), 'Go 额度硬失败写 error 状态并保留旧 fetchedAt')
+  // Go 的 401 缓存与立即恢复通过 go-authentication.mjs 实际调用验证；网络重试见上方真实刷新用例。
   // 自定义余额的失败与恢复通过 cache-lifecycle.mjs 实际调用服务验证。
   assert.ok(retryIndexSource.includes("...(codingPlanCaches[id] ?? { fetchedAt: 0, value: emptyCodingPlan() }),\n          value: { ...emptyCodingPlan(), status: 'error'"), 'Coding Plan 硬失败写 error 状态并保留旧 fetchedAt')
   assert.ok(retryIndexSource.includes("error && error.soft === true"), '软失败判定读取 error.soft 标记')
@@ -3484,7 +3484,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
 }
 
 // 真实 refreshGoQuota 链路的重试回归(issue #28):首次 ECONNRESET 重试后成功;
-// 401 业务错误不重试、仍落 soft/off 中性提示。
+// 401 认证错误不重试，以 error 提示修正凭据，不当成无订阅。
 {
   const prevHome = process.env.DSH_HOME
   const prevFetch = globalThis.fetch
@@ -3513,9 +3513,9 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
       wantOk: true, wantStatus: 'ok', wantCalls: 2, wantPercent: 42.5,
     },
     {
-      tag: 'http401', // 业务错误不重试:soft → off 中性提示,仅 1 次网络调用。
+      tag: 'http401', // 认证错误不重试，不归为无订阅，仅 1 次网络调用。
       script: [{ ok: false, status: 401 }],
-      wantOk: false, wantStatus: 'off', wantCalls: 1,
+      wantOk: false, wantStatus: 'error', wantCalls: 1,
     },
   ]
   for (const { tag, script, wantOk, wantStatus, wantCalls, wantPercent } of scenarios) {
@@ -6875,6 +6875,7 @@ await import('./gateway-retry.mjs')
 await import('./cache-lifecycle.mjs')
 await import('./core-boundaries.mjs')
 await import('./go-credentials.mjs')
+await import('./go-authentication.mjs')
 await import('./balance-credentials.mjs')
 await import('./account-balance.mjs')
 await import('./factory-quota.mjs')
