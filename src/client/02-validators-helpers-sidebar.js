@@ -137,6 +137,8 @@
         // showSessionId 曾遗漏于本白名单:checkbox 能保存但读侧恒 undefined,
         // 会话列表附显 ID 自上线以来实际从未生效(v1.5.38 起一并修复)。
         showSessionId: v.showSessionId === true,
+        sessionListCosts: v.sessionListCosts === true,
+        sessionListCostPeriod: v.sessionListCostPeriod === 'today' ? 'today' : 'total',
         hideOfficialBalance: v.hideOfficialBalance === true,
         hideBudget: v.hideBudget === true,
         hideTodayCost: v.hideTodayCost === true,
@@ -486,6 +488,7 @@
         // 价格表版本号:宿主在版本未变时会省略 config.prices(占载荷 56%),
         // 客户端据此沿用上一份,并按同一版本号回传以避免重复下发。
         pricesRev: typeof v.pricesRev === 'string' ? v.pricesRev : undefined,
+        modelLabels: Object.fromEntries(Object.entries(v.modelLabels ?? {}).filter(([, label]) => typeof label === 'string')),
         reconcile: v.reconcile === null || v.reconcile === undefined ? undefined : { ok: v.reconcile.ok === true, message: typeof v.reconcile.message === 'string' ? v.reconcile.message : '' },
         // 手改过价格的 OpenRouter 模型 id(缺失/畸形回落空表:不显示任何锁定标记)。
         priceLockIds: Array.isArray(v.priceLockIds) ? v.priceLockIds.filter(id => typeof id === 'string') : [],
@@ -766,13 +769,17 @@
     }
     /** 峰谷时代分界(与 lib/pricing.js LEGACY_BASE_BOUNDARY 同步):此前按当时基础价计费。 */
     const LEGACY_BASE_BOUNDARY_MS = Date.parse('2026-08-16T16:00:00Z')
+    /** Ollama Cloud 峰谷日历生效时刻 2026-08-31T00:00:00Z(与 lib/pricing.js OLLAMA_CLOUD_PEAK_EFFECTIVE_AT 同步)。 */
+    const OLLAMA_CLOUD_PEAK_EFFECTIVE_MS = 1788134400000
     function tierFor(entry, atMs, peak) {
       const base = priceAt(entry, atMs) ?? { cacheHit: 0, cacheMiss: 0, output: 0 }
       const asTier = (price, path = 'base') => ({ reasoning: 0, ...multipliedTier(price, base, path) })
-      if (base.billingMode === 'utc-peak') {
-        if (peak?.enabled !== true || !Number.isFinite(atMs)) return asTier(base)
+      // Go 与 Ollama Cloud 按 UTC 工作日计峰谷(与 lib/pricing.js tierFor 同分支)。
+      const ollama = base.peakSchedule === 'ollama'
+      if (ollama || base.billingMode === 'utc-peak') {
+        if (peak?.enabled !== true || !Number.isFinite(atMs) || (ollama && atMs < OLLAMA_CLOUD_PEAK_EFFECTIVE_MS)) return asTier(base)
         const date = new Date(atMs), day = date.getUTCDay(), hour = date.getUTCHours()
-        const high = day > 0 && day < 6 && ((hour >= 1 && hour < 4) || (hour >= 6 && hour < 10))
+        const high = day > 0 && day < 6 && (ollama ? hour >= 12 && hour < 18 : (hour >= 1 && hour < 4) || (hour >= 6 && hour < 10))
         return asTier((high ? base.peak : base.offPeak) ?? base, (high ? base.peak : base.offPeak) ? (high ? 'peak' : 'offPeak') : 'base')
       }
       // 峰谷时代之前按当时的基础价计费(历史正确;与 lib/pricing.js tierFor 同分支,
@@ -1262,7 +1269,12 @@
         const modelId = separator > 0 ? providerKey.slice(separator + 1) : providerKey
         const resolved = resolveClientPrice(provider, modelId, config)
         if (resolved.priced) {
-          const c = costOfBuckets(byModel[providerKey], tierFor(normalizeClientPrice(resolved.entry), now, { ...peak, enabled: ['deepseek-peak', 'utc-peak'].includes(resolved.billingMode) && peak.enabled }))
+          const entry = normalizeClientPrice(resolved.entry)
+          // Ollama Cloud 的 DeepSeek 模型使用自有峰谷日历;provider/model 归一化与 lib/pricing.js
+          // providerPriceEntryFor 的 peakSchedule 标记同口径(trim、小写、剥离 llm- 前缀)。
+          if (entry && resolved.billingMode === 'deepseek-peak'
+            && /^\s*(llm-)?ollama-cloud\s*:\s*deepseek-v4(\.1-flash|-pro)\s*$/.test(providerKey.toLowerCase())) entry.peakSchedule = 'ollama'
+          const c = costOfBuckets(byModel[providerKey], tierFor(entry, now, { ...peak, enabled: ['deepseek-peak', 'utc-peak'].includes(resolved.billingMode) && peak.enabled }))
           const billed = usdFromCostLocal(c, resolved.currency, cnyRate)
           total += billed
           if (billingClassOfLocal(provider, modelId, config) === 'api') api += billed
@@ -2624,17 +2636,17 @@
      * 「余量」填充,与通用卡片/额度横条的「已用」方向相反,同屏并列时引起误读
      * (issue #57);现统一为已用口径,告警阈值也与 CodingPlanBox 一致(≥80 warn / ≥100 over)。
      */
-    function miniMaxRow(label, win, direction, t) {
+    function miniMaxRow(label, win, direction, t, explicit) {
       const pct = planWindowUsedPct(win)
       const level = pct === null ? 'ok' : pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok'
       const barView = simpleBarByDirection(pct, direction)
-      const text = win?.unlimited ? '∞' : barView.label === null ? '—' : barView.label + '%'
+      const text = win?.unlimited ? '∞' : explicit ? quotaValueText(barView.label, direction, t) : barView.label === null ? '—' : barView.label + '%'
       return {
         level,
         pct,
         text,
         label: barView.label,
-        row: el('div', { className: 'cm-mm-row' + (level === 'ok' ? '' : ' ' + level) },
+        row: el('div', { key: label, className: 'cm-mm-row' + (level === 'ok' ? '' : ' ' + level) },
           el('span', { className: 'cm-bbox-label' }, label),
           el('div', { className: 'cm-bbox-bar' },
             el('div', { className: 'cm-bbox-fill', style: { width: barView.width + '%' } })),
@@ -2793,7 +2805,7 @@
       return snap.source === source ? snap : { status: 'idle', windows: {}, fetchedAt: 0 }
     }
 
-    /** Codex 额度侧边栏卡片:明确显示剩余额度和本机时区的重置时间。 */
+    /** Codex uses the same progress rows as MiniMax, explicitly labelled as remaining. */
     function CodexPlanBox(props) {
       const hoverProps = useQuotaHoverRefresh()
       const { state, wide } = props
@@ -2809,27 +2821,28 @@
         title: t('codexQuotaUnavailable'), ...clickableRefreshProps(refresh.busy, refresh.run),
       }, el('div', { className: 'cm-mm-title' }, wide === false ? 'Codex' : t('codexQuotaTitle')),
       el('span', { className: 'cm-hint' }, wide === false ? '—' : t(snap.status === 'idle' || refresh.busy ? 'refreshing' : 'codexQuotaUnavailable')))
-      const views = [['five', 'codexQuotaFive'], ['weekly', 'codexQuotaWeek']].flatMap(([key, label]) => {
+      const views = [['five', 'codexQuotaFive', '5h'], ['weekly', 'codexQuotaWeek', '7d']].flatMap(([key, label, short]) => {
         const win = snap.windows[key]
         if (!win) return []
-        const text = quotaValueText(simpleBarByDirection(win.percent, 'remaining').label, 'remaining', t)
+        const view = miniMaxRow(short, win, 'remaining', t, true)
         const date = new Date(typeof win.resetsAt === 'string' ? win.resetsAt : NaN)
         const reset = Number.isFinite(date.getTime()) ? t('codexQuotaReset', { time: date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) }) : ''
-        return [{ key, label: t(label), text, reset, win }]
+        return [{ ...view, key, short, name: t(label), reset, win }]
       })
       if (!views.length) return null
-      const level = views.some(v => v.win.percent >= 100) ? 'over' : views.some(v => v.win.percent >= 80) ? 'warn' : 'ok'
+      const level = views.some(v => v.pct >= 100) ? 'over' : views.some(v => v.pct >= 80) ? 'warn' : 'ok'
       const detail = [
         t('codexQuotaTitle'),
-        ...views.map(view => view.label + ' · ' + view.text + (view.reset ? ' · ' + miniMaxResetText(view.win, t) : '')),
+        ...views.map(view => view.name + ' · ' + view.text + (view.reset ? ' · ' + miniMaxResetText(view.win, t) : '')),
         snap.fetchedAt > 0 ? t('goQuotaFetchedAt', { time: new Date(snap.fetchedAt).toLocaleTimeString() }) : null,
         ...clickRefreshTipLines(t, refresh),
       ].filter(Boolean).join('\n')
       const body = el(Fragment, null,
-        el('div', { className: 'cm-mm-title' }, t('codexQuotaTitle')),
-        ...views.map(view => el('div', { key: view.key, className: 'cm-codex-window' },
-          el('span', null, view.label + ' ·'), el('strong', null, view.text),
-          view.reset ? el('span', { className: 'cm-mm-reset' }, '· ' + view.reset) : null)))
+        el('div', { className: 'cm-bbox-head cm-codex-head' },
+          el('div', { className: 'cm-mm-title' }, t('codexQuotaTitle')),
+          el('div', { className: 'cm-codex-resets' }, ...views.filter(view => view.reset).map(view =>
+            el('span', { key: view.key, className: 'cm-mm-reset' }, (views.length > 1 ? view.short + ' · ' : '') + view.reset)))),
+        ...views.map(view => view.row))
       const rail = el(Fragment, null, ...views.map(view => el('div', { className: 'cm-bbox-rail cm-num' }, view.text)))
       return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
@@ -2868,7 +2881,11 @@
         ? Math.max(0, Math.min(100, Math.round(Number(win.percent) || 0))) : null
       // 条形方向(issue #67):Plan 卡默认已用方向,剩余方向时填充与标签显示剩余%。
       const planDirection = barDirectionOf(state.config, 'plan')
-      const rows = entries.map(([name, win]) => {
+      // 单行余额来源(WorkBuddy):余额提到标题行右端,正文不再重复一行;
+      // 窗口文本只装数值,标题行自己补「余额:」标签。textWindowOf 只产非空文本,真值检查即可。
+      const titleValue = id === 'workbuddy' && windows.balance?.text
+        ? t('codingPlanWindowBalance') + ': ' + windows.balance.text : null
+      const rows = (titleValue ? entries.filter(([name]) => name !== 'balance') : entries).map(([name, win]) => {
         const pct = pctOf(win)
         if (pct === null) {
           return el('div', { key: name, className: 'cm-mm-row wide' },
@@ -2903,7 +2920,10 @@
           wide === false
             ? el('div', { className: 'cm-bbox-rail cm-num' }, railText)
             : el(Fragment, null,
-              el('div', { className: 'cm-mm-title' }, t(rowDef.labelKey)),
+              // WorkBuddy 有余额时标题行复用宽行样式,余额以正文档贴右端。
+              el('div', { className: titleValue ? 'cm-mm-title cm-mm-row wide' : 'cm-mm-title' },
+                t(rowDef.labelKey),
+                titleValue && el('span', { className: 'cm-mm-text' }, titleValue)),
               ...rows)))
     }
 

@@ -1664,6 +1664,11 @@ vm.runInNewContext(readFileSync(new URL('../lib/client.pricing.js', import.meta.
   window: { __ModuleLoader__: { load: value => { pricingFactory = value.factory } } },
 })
 descriptors.push(...pricingFactory(() => ({})).CONTRIBUTION.descriptors)
+let sessionListFactory
+vm.runInNewContext(readFileSync(new URL('../lib/client.session-list.js', import.meta.url), 'utf8'), {
+  window: { __ModuleLoader__: { load: value => { sessionListFactory = value.factory } } },
+})
+descriptors.push(...sessionListFactory(() => ({})).CONTRIBUTION.descriptors)
 const clientMethods = Array.from(descriptors, d => d.method).sort()
 const serverMethods = TYPERT.invocations.map(i => i.method).sort()
 assert.deepEqual(clientMethods, serverMethods, '客户端 descriptor 与服务端 typert 清单方法一一对齐')
@@ -3841,6 +3846,9 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   assert.ok(planSrc.includes('function codingPlanWindowLabel(name, t)'), '窗口名本地化(fiveHour/weekly/monthly)')
   // 通用卡片样式:宽标签与文本窗口行的 CSS。
   assert.ok(planSrc.includes('.cm-mm-row.wide .cm-bbox-label{') && planSrc.includes('.cm-mm-row.wide .cm-mm-text{'), '通用卡片行样式存在')
+  // 单行余额来源(WorkBuddy):余额并入标题行右端,正文不再重复一行。
+  assert.ok(planSrc.includes("const titleValue = id === 'workbuddy'") && planSrc.includes("entries.filter(([name]) => name !== 'balance')"), '余额从正文窗口行剔除')
+  assert.ok(planSrc.includes("className: titleValue ? 'cm-mm-title cm-mm-row wide' : 'cm-mm-title'"), '标题行右端余额节点(复用通用行样式,零新增 CSS)')
   console.log('[ok] Coding Plan 侧边栏显示(display 门控/通用卡片/双语文案/设置页下拉)通过')
 }
 
@@ -4634,7 +4642,8 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   // 换算点 + Go/Plan 卡片各自传入的方向配置,覆盖语义不变。
   assert.ok(clientSrcV16.includes("BalanceBar, { segments, direction: barDirectionOf") && clientSrcV16.includes("simpleBarByDirection(pct === null") && clientSrcV16.includes("simpleBarByDirection(percent, direction)") && clientSrcV16.includes("barDirectionOf(config, 'go')") && clientSrcV16.includes("barDirectionOf(config, 'plan')"), '余额/预算/Go 条按方向换算填色与标签')
   assert.ok(clientSrcV16.includes("barDirectionOf(state.config, 'plan')") && clientSrcV16.includes("miniMaxRow(t('codingPlanRemain5h'), five, direction") && clientSrcV16.includes("miniMaxRow(t('codingPlanRemain7d'), seven, direction"), 'Plan/MiniMax 额度条按 plan 方向换算')
-  assert.ok(clientSrcV16.includes("quotaValueText(simpleBarByDirection(win.percent, 'remaining').label, 'remaining', t)") && clientSrcV16.includes("className: 'cm-codex-window'"), 'Codex 文本卡始终明确显示剩余额度')
+  // Codex remaining percentages, progress widths and reset placement are exercised
+  // through the actual card in client-issues-127-129 and codex-quota-browser.
   assert.ok(clientSrcV16.includes("barDirectionRemaining") && clientSrcV16.includes("barDirectionUsed") && clientSrcV16.includes("barDirectionsTitle"), '条方向中英文案存在')
   assert.ok(clientSrcV16.includes("segments.rev") && clientSrcV16.includes("cm-dir-row"), '条方向 CSS 与设置 UI 存在')
   console.log('[ok] 一致性重建/路由归类/含 Plan 总额开关(v1.6.0)通过')
@@ -6879,6 +6888,9 @@ await import('./cache-lifecycle.mjs')
 await import('./core-boundaries.mjs')
 await import('./go-credentials.mjs')
 await import('./go-authentication.mjs')
+await import('./commandcode-monthly.mjs')
+await import('./model-labels.mjs')
+await import('./session-list-costs.mjs')
 await import('./balance-credentials.mjs')
 await import('./account-balance.mjs')
 await import('./factory-quota.mjs')
@@ -6915,6 +6927,8 @@ await import('./sidebar-regressions.mjs')
 await import('./gpt-astra-pricing.mjs')
 await import('./pricing-model-matching.mjs')
 await import('./provider-pricing-coverage.mjs')
+await import('./ollama-cloud-pricing.mjs')
+await import('./ollama-cloud-upgrade.mjs')
 await import('./subagent-billing.mjs')
 await import('./billing-integrity.mjs')
 await import('./session-restart.mjs')
@@ -6938,6 +6952,7 @@ await import('./session-log-repair.mjs')
 await import('./client-issues-127-129.mjs')
 await import('./model-quota-cards.mjs')
 await import('./mimo-quota.mjs')
+await import('./workbuddy-quota.mjs')
 await import('./mimo-enable-flow.mjs')
 await import('./mimo-v26-pricing.mjs')
 await import('./host-locale.mjs')

@@ -4,7 +4,8 @@ window.__ModuleLoader__.load({
   factory: require => {
     const React = require('react')
     const { createElement: el, useState, useEffect, useRef, Fragment } = React
-    const prettyProviderKey = key => key.replace(/^zen:/i, 'go:').replace(/^(deepseek(?:-official|-account)?):deepseek-(?:v4(?:\.1)?-)?flash(?:-vision-exp)?$/i, '$1:DeepSeek V4.1 Flash')
+    let modelLabels = () => ({})
+    const prettyProviderKey = key => modelLabels()[key] ?? key.replace(/^zen:/i, 'go:').replace(/^(deepseek(?:-official|-account)?):deepseek-(?:v4(?:\.1)?-)?flash(?:-vision-exp)?$/i, '$1:DeepSeek V4.1 Flash')
     const fields = ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'calls', 'cost', 'apiCost']
     const amount = (row, basis) => basis === 'total' ? row.cost : basis === 'plan' ? Math.max(0, row.cost - row.apiCost) : row.apiCost
     const tokens = row => row.input + row.cacheRead + row.cacheWrite + row.output
@@ -1375,6 +1376,7 @@ window.__ModuleLoader__.load({
           : [readRequest(api, 'getBillingStatistics', query, revision + ':0')])
     }
     async function mount(ctx, source, resolveLocale) {
+      modelLabels = () => source?.getSnapshot?.()?.state?.modelLabels ?? {}
       const getLocale = typeof source === 'function' ? source : () => source && resolveLocale ? resolveLocale(source.getSnapshot().state?.config ?? { activeLocale: source.getSnapshot().locale }) : 'en'
       const unmount = await ctx.get('remote').$mount(CONTRIBUTION)
       ctx.effect(() => () => unmount(), 'cost-meter: statistics contribution')
