@@ -2,6 +2,14 @@
 
 ## 中文
 
+### 修复 Deep Whale 皮肤下峰谷提醒被遮挡、无法点击
+
+峰谷提醒此前仍是侧栏容器内的普通固定浮层。页面内容可能从上方覆盖它，同时提醒会继承宿主容器的鼠标禁用或窗口拖动属性，造成看似“透过去”、按钮无法点击。
+
+现在峰谷提醒和侧栏引导共用浏览器最上层浮层；提醒明确接收鼠标事件并退出窗口拖动区域，保留不透明主题背景。居中、右下角、窄窗口均可点击“知道了”，关闭不依赖设置保存。弹窗之外的页面保持可操作。
+
+本地加载 `dsh-deep-whale` 实际发布的 Maid Atelier `0.1.8` 与 Orca Link `0.1.8` 前端，覆盖亮色、深色、两种位置和三种窗口宽度，共 16 个组合；另检查真实切换时刻的关闭记忆、触屏、键盘以及页面级事件拦截。持续回归使用可复现容器变换、裁切、透明度和层级的本地样式，不依赖下载第三方包。
+
 ### 修复挂件拦截侧栏引导点击
 
 v1.9.7 已解决提示被标题栏和容器遮挡的问题。本轮用实际插件前端组合检查时，进一步复现：鲸鱼挂件使用不透明自定义角色图并与提示按钮重叠时，会在 document 捕获阶段按图像坐标拦截点击，即使提示处于浏览器最上层也会受影响。
@@ -27,6 +35,10 @@ v1.9.7 已解决提示被标题栏和容器遮挡的问题。本轮用实际插�
 更新后完全退出 DSH（包括托盘）再打开。
 
 ## English
+
+Fixes peak/off-peak reminders being painted underneath conversation content or losing pointer interaction with Deep Whale skins. Reminders now share the browser top-layer card used by the sidebar guide, explicitly accept pointer input, avoid native window dragging and retain an opaque theme background. Both center and corner positions remain dismissible without a settings save.
+
+The published Maid Atelier 0.1.8 and Orca Link 0.1.8 browser clients were loaded locally across light/dark themes, both positions and three viewport widths (16 combinations). Real-transition dismissal, touch, keyboard and document-capture interception are also covered. CI uses local stacking/clipping fixtures without downloading third-party packages.
 
 Fixes sidebar-guide actions being intercepted by floating widgets. An actual `dsh-whale-widget@0.4.2` client with an opaque custom avatar can consume document-capture events by image coordinates even when the guide is visually above it.
 

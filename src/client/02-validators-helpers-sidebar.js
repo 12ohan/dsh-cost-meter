@@ -2216,6 +2216,46 @@
         : t('countdownMinute', { m: minutes })
     }
 
+    // Native top-layer placement escapes skin stacking/clipping. Only events inside
+    // this card are handled before document capture listeners used by floating pets.
+    function FloatingCard(props) {
+      const cardRef = useRef(null), actionsRef = useRef(props.actions)
+      actionsRef.current = props.actions
+      useEffect(() => {
+        const card = cardRef.current
+        if (!card) return
+        try {
+          if (typeof card.showPopover === 'function') card.showPopover()
+          else card.removeAttribute('popover')
+        } catch (_) { card.removeAttribute('popover') }
+        let ownsPointer = false
+        const down = event => {
+          if (!card.contains(event.target)) return
+          ownsPointer = true
+          event.stopPropagation()
+        }
+        const up = event => {
+          if (!ownsPointer) return
+          ownsPointer = false
+          event.stopPropagation()
+        }
+        const click = event => {
+          if (!card.contains(event.target)) return
+          event.stopPropagation()
+          const button = event.target.closest?.('[data-cm-action]')
+          if (button && !button.disabled) actionsRef.current[button.dataset.cmAction]?.()
+        }
+        const listeners = [['pointerdown', down], ['pointerup', up], ['pointercancel', up], ['touchstart', down], ['click', click]]
+        for (const [type, handler] of listeners) window.addEventListener?.(type, handler, { capture: true, passive: true })
+        return () => {
+          for (const [type, handler] of listeners) window.removeEventListener?.(type, handler, true)
+          try { card.hidePopover() } catch (_) {}
+        }
+      }, [])
+      const { actions, children, ...attributes } = props
+      return el('div', { ...attributes, ref: cardRef, popover: 'manual' }, children)
+    }
+
     // 预览通道事件名:设置页按钮/控制台经 window.cmPeakAlertPreview(kind) 触发真实组件。
     const PEAK_ALERT_PREVIEW_EVENT = 'cm-peak-alert-preview'
 
@@ -2316,7 +2356,7 @@
       } else return null
       const t = makeT(resolveLocale(config))
       const position = config.peakAlertPosition === 'center' ? 'cm-peak-alert-center' : 'cm-peak-alert-corner'
-      return el('div', { className: 'cm-peak-alert ' + position + ' ' + (intoPeak ? 'cm-peak-alert-peak' : 'cm-peak-alert-offpeak'), role: 'alert' },
+      return el(FloatingCard, { actions: { dismiss }, className: 'cm-peak-alert ' + position + ' ' + (intoPeak ? 'cm-peak-alert-peak' : 'cm-peak-alert-offpeak'), role: 'alert' },
         el('div', { className: 'cm-peak-alert-badge' }, t(intoPeak ? 'peakAlertBadgePeak' : 'peakAlertBadgeOffPeak')),
         el('div', { className: 'cm-peak-alert-title' }, t(intoPeak ? 'peakAlertTitlePeak' : 'peakAlertTitleOffPeak')),
         el('div', { className: 'cm-peak-alert-body' }, t('peakAlertBody', {
@@ -2324,7 +2364,7 @@
           phase: t(intoPeak ? 'peakAlertPhasePeak' : 'peakAlertPhaseOffPeak'),
         })),
         el('div', { className: 'cm-peak-alert-actions' },
-          el('button', { className: 'cm-btn', onClick: dismiss }, t('peakAlertBtn'))))
+          el('button', { type: 'button', className: 'cm-btn', 'data-cm-action': 'dismiss', onClick: dismiss }, t('peakAlertBtn'))))
     }
 
     /** 展开态简洁样式:单行紧凑时段条——细轨道(左橙右蓝,非当前段淡化)+ 标记线 + 右侧倒计时文本。 */
@@ -3187,51 +3227,13 @@
       const [pending, setPending] = useState(false)
       const [failed, setFailed] = useState(false)
       const [dismissed, setDismissed] = useState(false)
-      const cardRef = useRef(null)
-      const actionsRef = useRef({})
       const config = store?.state?.config
       const visible = !!config && !dismissed && !simpleGuideSeen(config)
-      // The browser top layer escapes transformed/clipped sidebar containers from
-      // skins and layout plugins, without blocking the rest of the page.
-      useEffect(() => {
-        const card = cardRef.current
-        if (!visible || !card) return
-        if (typeof card.showPopover !== 'function') { card.removeAttribute('popover'); return }
-        try { card.showPopover() } catch (_) { card.removeAttribute('popover') }
-        return () => { try { card.hidePopover() } catch (_) {} }
-      }, [visible])
       useEffect(() => {
         const hide = () => setDismissed(true)
         window.addEventListener?.(SIMPLE_GUIDE_KEY, hide)
         return () => window.removeEventListener?.(SIMPLE_GUIDE_KEY, hide)
       }, [])
-      // Floating widgets may intercept document capture events by image coordinates,
-      // even when this popover is visually above them. Handle only our own card at
-      // window capture, before those listeners; leave the rest of the page untouched.
-      useEffect(() => {
-        const card = cardRef.current
-        if (!visible || !card) return
-        let ownsPointer = false
-        const down = event => {
-          if (!card.contains(event.target)) return
-          ownsPointer = true
-          event.stopPropagation()
-        }
-        const up = event => {
-          if (!ownsPointer) return
-          ownsPointer = false
-          event.stopPropagation()
-        }
-        const click = event => {
-          if (!card.contains(event.target)) return
-          event.stopPropagation()
-          const button = event.target.closest?.('[data-cm-guide-action]')
-          if (button && !button.disabled) actionsRef.current[button.dataset.cmGuideAction]?.()
-        }
-        const listeners = [['pointerdown', down], ['pointerup', up], ['pointercancel', up], ['touchstart', down], ['click', click]]
-        for (const [type, handler] of listeners) window.addEventListener?.(type, handler, { capture: true, passive: true })
-        return () => { for (const [type, handler] of listeners) window.removeEventListener?.(type, handler, true) }
-      }, [visible])
       if (!visible) return null
       const t = makeT(resolveLocale(config))
       const dismiss = () => {
@@ -3250,15 +3252,14 @@
         } catch (_) { setFailed(true) }
         finally { busyRef.current = false; setPending(false) }
       }
-      actionsRef.current = { close: dismiss, keep: () => choose(false), enable: () => choose(true) }
-      return el('div', { ref: cardRef, popover: 'manual', className: 'cm-qguide', role: 'dialog', 'aria-label': t('sidebarSimpleTitle'), 'aria-busy': pending, onKeyDown: event => { if (event.key === 'Escape') { event.stopPropagation(); dismiss() } } },
+      return el(FloatingCard, { actions: { close: dismiss, keep: () => choose(false), enable: () => choose(true) }, className: 'cm-qguide', role: 'dialog', 'aria-label': t('sidebarSimpleTitle'), 'aria-busy': pending, onKeyDown: event => { if (event.key === 'Escape') { event.stopPropagation(); dismiss() } } },
         el('div', { className: 'cm-bbox-head' }, el('h4', null, t('sidebarSimpleTitle')),
-          el('button', { type: 'button', className: 'cm-btn small', 'aria-label': t('closeGuide'), 'data-cm-guide-action': 'close', onClick: dismiss }, '×')),
+          el('button', { type: 'button', className: 'cm-btn small', 'aria-label': t('closeGuide'), 'data-cm-action': 'close', onClick: dismiss }, '×')),
         el('p', null, t('sidebarSimpleBody')),
         failed ? el('p', { role: 'alert' }, t('sidebarSimpleError')) : null,
         el('div', { className: 'cm-buttons' },
-          el('button', { type: 'button', className: 'cm-btn small', 'data-cm-guide-action': 'keep', disabled: pending, onClick: () => choose(false) }, t('sidebarSimpleOff')),
-          el('button', { type: 'button', className: 'cm-btn small primary', 'data-cm-guide-action': 'enable', disabled: pending, onClick: () => choose(true) }, t('sidebarSimpleOn'))))
+          el('button', { type: 'button', className: 'cm-btn small', 'data-cm-action': 'keep', disabled: pending, onClick: () => choose(false) }, t('sidebarSimpleOff')),
+          el('button', { type: 'button', className: 'cm-btn small primary', 'data-cm-action': 'enable', disabled: pending, onClick: () => choose(true) }, t('sidebarSimpleOn'))))
     }
 
     function QuotaStripGuide(props) {

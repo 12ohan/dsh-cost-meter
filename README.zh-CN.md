@@ -16,7 +16,7 @@
 
 新增 [DeepSeek Search／Fetch API 次数费](docs/web-request-fees.md#中文)，只计有结果的成功请求，并将网页抓取独立分类。
 
-**v1.9.8** 修复鲸鱼挂件等页面级鼠标拦截导致侧栏引导按钮点不动的问题；挂件与提示重叠时也能关闭和选择布局，保留页面其他操作与外部拖动。
+**v1.9.8** 修复峰谷弹窗与 Deep Whale 皮肤组合时被页面压住、无法点击的问题，同时修复鲸鱼挂件拦截侧栏引导按钮；居中和右下角提醒均保持不透明背景并可正常关闭。
 
 配置与验证：[OpenDesign 查询说明](docs/opendesign-billing.md)、[随机端口 / 局域网 / WorkBuddy2API 配置](docs/custom-balance-sources.md)、[透明度修复与性能测量](docs/performance-2026-10-18.md)。
 

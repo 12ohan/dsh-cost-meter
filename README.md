@@ -16,7 +16,7 @@ Per-conversation cost · daily totals · OpenCode Go subscription quota display 
 
 Supports [official Search/Fetch request fees](docs/web-request-fees.md#english), separately from model tokens.
 
-**v1.9.8** prevents floating-widget capture listeners from swallowing sidebar-guide actions, including clicks over an opaque custom avatar. Other page interactions and drags started outside the guide remain available.
+**v1.9.8** fixes peak/off-peak popups being covered or unclickable with Deep Whale skins, and prevents floating widgets from swallowing sidebar-guide actions. Both popup positions retain an opaque theme background and working dismissal buttons.
 
 Configuration and verification: [OpenDesign queries](docs/opendesign-billing.md), [dynamic ports / LAN / WorkBuddy2API setup](docs/custom-balance-sources.md), and [opacity fixes with performance measurements](docs/performance-2026-10-18.md).
 
