@@ -103,6 +103,23 @@ const clamped = parse([
 assert.deepEqual(Object.keys(clamped), ['fiveHour'], '负数与非数值被跳过,数字字符串仍可用')
 assert.equal(clamped.fiveHour.percent, 6)
 
+// 无效类型不能被 Number() 伪装成 0/1:null、空串、纯空白、布尔、数组、对象、十六进制串都要跳过。
+for (const invalid of [null, '', '   ', false, true, [], {}, 'abc', '0x10']) {
+  assert.equal(parse([{ type: 'weekly', percentUsed: invalid }]), null, 'invalid percentUsed: ' + JSON.stringify(invalid))
+}
+// 合法值保留原始百分比含义:0 = 0%、0.5 = 0.5%、1 = 1%(不按 0-1 小数解释)。
+const literal = parse([
+  { type: 'five_hour', percentUsed: 0 },
+  { type: 'weekly', percentUsed: 0.5 },
+  { type: 'monthly', percentUsed: 1 },
+])
+assert.deepEqual(
+  [literal.fiveHour.percent, literal.weekly.percent, literal.monthly.percent],
+  [0, 0.5, 1],
+  '0 / 0.5 / 1 的原义保持不变',
+)
+assert.equal(parse([{ type: 'weekly', percentUsed: ' 6 ' }]).weekly.percent, 6, '带空白的数字字符串可用')
+
 // 完全不可用时不伪造窗口。
 for (const bad of [null, {}, { data: null }, { data: { limits: {} } }, { data: { limits: [] } }, { data: { limits: [{ type: 'unknown', percentUsed: 3 }] } }]) {
   assert.equal(parseClinePassUsage(bad), null, '无可用窗口 → null: ' + JSON.stringify(bad))
@@ -126,6 +143,10 @@ try {
   assert.equal(calls[0].init.headers.authorization, 'Bearer sk-test')
   assert.equal(result.endpoint, ENDPOINT)
   assert.deepEqual(Object.keys(result.windows), ['fiveHour', 'monthly'], '网关少报窗口时照实返回')
+
+  // 审查回归:percentUsed:null 不能被当成成功的 0% 窗口(曾返回 {weekly:{percent:0}})。
+  globalThis.fetch = async () => Response.json({ success: true, data: { limits: [{ type: 'weekly', percentUsed: null }] } })
+  await assert.rejects(queryCodingPlan('clinepass', 'sk-test', 'en', t), /codingPlanNoUsage/)
 
   globalThis.fetch = async () => new Response('', { status: 401 })
   await assert.rejects(
