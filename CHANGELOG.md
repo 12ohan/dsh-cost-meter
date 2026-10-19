@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+- Pending review: correct the Ollama Cloud DeepSeek peak calendar while preserving recorded history. The proposed 1.9.13 changes are detailed below; this version has not been released. Reported by [@LetterXbox](https://github.com/LetterXbox), with reproduction and scope discussion in [#337](https://github.com/Han-1413141/dsh-cost-meter/issues/337).
+- 待评审：修正 Ollama Cloud DeepSeek 峰谷日历并保留历史入账金额。拟议的 1.9.13 改动详见下文，该版本尚未发布。问题由 [@LetterXbox](https://github.com/LetterXbox) 报告，复现与范围讨论见 [#337](https://github.com/Han-1413141/dsh-cost-meter/issues/337)。
+
+## [1.9.13] - 2026-10-19
+
+- 修复 Ollama Cloud 的 DeepSeek V4.1 Flash / V4 Pro 套用 DeepSeek 官方峰谷时段与中国法定假日规则的问题：改按 Ollama 自己的日历计费（周一至周五 12:00–18:00 UTC 为峰时，其余时段与 UTC 周末为谷价，无假日规则）。此前 DeepSeek 工作日 01:00–04:00、06:00–10:00 UTC 按双倍入账，工作日 12:00–18:00 UTC 只记一半，其余时段金额正确。
+- 宿主计费、日志重算与会话投影使用同一规则；单价、缓存价、汇率、价格历史及其他渠道不变。历史价格版本保留各自的时段规则：更新前的调用在加载、回放与明细中保持原金额，仅在「历史费用」按渠道模型手动重算时改用新日历（沿用原汇率）。峰谷状态指示与提醒仍只显示 DeepSeek 官方时段。构建时 CSS 词组打包改为按实测节省逐轮选择，样式内容不变。[更新说明](docs/update-notes-1.9.13.md)
+
 ## [1.9.12] - 2026-10-19
 
 - 恢复左侧预览、右侧调整，根据设置面板自身宽度适配；缩短显示开关、成组排列相关选项，金额与语言收在右侧折叠区，预览画布内部滚动。
