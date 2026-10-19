@@ -4634,7 +4634,8 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   // 换算点 + Go/Plan 卡片各自传入的方向配置,覆盖语义不变。
   assert.ok(clientSrcV16.includes("BalanceBar, { segments, direction: barDirectionOf") && clientSrcV16.includes("simpleBarByDirection(pct === null") && clientSrcV16.includes("simpleBarByDirection(percent, direction)") && clientSrcV16.includes("barDirectionOf(config, 'go')") && clientSrcV16.includes("barDirectionOf(config, 'plan')"), '余额/预算/Go 条按方向换算填色与标签')
   assert.ok(clientSrcV16.includes("barDirectionOf(state.config, 'plan')") && clientSrcV16.includes("miniMaxRow(t('codingPlanRemain5h'), five, direction") && clientSrcV16.includes("miniMaxRow(t('codingPlanRemain7d'), seven, direction"), 'Plan/MiniMax 额度条按 plan 方向换算')
-  assert.ok(clientSrcV16.includes("quotaValueText(simpleBarByDirection(win.percent, 'remaining').label, 'remaining', t)") && clientSrcV16.includes("className: 'cm-codex-window'"), 'Codex 文本卡始终明确显示剩余额度')
+  // Codex remaining percentages, progress widths and reset placement are exercised
+  // through the actual card in client-issues-127-129 and codex-quota-browser.
   assert.ok(clientSrcV16.includes("barDirectionRemaining") && clientSrcV16.includes("barDirectionUsed") && clientSrcV16.includes("barDirectionsTitle"), '条方向中英文案存在')
   assert.ok(clientSrcV16.includes("segments.rev") && clientSrcV16.includes("cm-dir-row"), '条方向 CSS 与设置 UI 存在')
   console.log('[ok] 一致性重建/路由归类/含 Plan 总额开关(v1.6.0)通过')

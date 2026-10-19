@@ -86,6 +86,7 @@ jobs:
           node test/cache-write-price-browser.mjs
           node test/model-stats-browser.mjs
           node test/factory-quota-browser.mjs
+          node test/codex-quota-browser.mjs
           node test/display-settings-browser.mjs
           node test/balance-gateway-browser.mjs
           node test/sidebar-guide-browser.mjs
@@ -120,6 +121,7 @@ jobs:
             .tmp-model-stats-browser/report.json
             .tmp-factory-quota-browser/*.png
             .tmp-factory-quota-browser/report.json
+            .tmp-codex-quota-browser/*
             .tmp-peak-progress-preview/
           if-no-files-found: ignore
           retention-days: 7
