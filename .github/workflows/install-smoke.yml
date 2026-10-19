@@ -245,6 +245,7 @@ jobs:
           export DSH_TEST_NODE_MODULES="$PWD/.tmp-next-host/node_modules"
           node test/host-peer-compatibility.mjs
           node test/verify.mjs
+          node test/go-quota-host.mjs
           node test/market-hot-install.mjs
           node test/codex-compat-http.mjs
           node test/plugin-compatibility-watch.mjs
@@ -287,6 +288,7 @@ jobs:
         run: |
           export DSH_TEST_NODE_MODULES="$PWD/.tmp-market-host/node_modules"
           node test/market-hot-install.mjs
+          node test/go-quota-host.mjs
 
   source-host-codecs:
     runs-on: ubuntu-latest
