@@ -71,6 +71,7 @@ jobs:
           node test/context-costs-regression-browser.mjs
           node test/context-costs-browser.mjs
           node test/session-costs-browser.mjs
+          node test/session-costs-performance-browser.mjs
           node test/statistics-cache.mjs
           node test/statistics-warmup.mjs
           node test/cost-views-browser.mjs
@@ -98,6 +99,7 @@ jobs:
           path: |
             .tmp-context-regression-browser/*.png
             .tmp-display-review/*
+            .tmp-session-costs-performance-after/*
             .tmp-balance-gateway-browser/*
             .tmp-sidebar-guide-browser/*
             .tmp-peak-alert-browser/*

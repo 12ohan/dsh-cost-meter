@@ -222,6 +222,38 @@ try {
   await region('会话内容');assert.equal(await item('turn').getAttribute('data-visible'),'false','saved toggles survive repeated reopening')
   await page.getByLabel('界面语言',{exact:true}).selectOption('en');await page.waitForFunction(()=>window.current().locale==='en')
   await region('Sidebar');await page.evaluate(()=>window.failSave=true);await customize('balance');const placement=page.getByLabel('Placement',{exact:true});await placement.selectOption(await placement.inputValue()==='off'?'both':'off');await page.getByText(/synthetic save failure/).waitFor()
+  // #258 latest feedback: native component options and the active Today tab.
+  // Use the actual upstream Midnight token definition over a light host / dark OS.
+  const midnight=JSON.parse(readFileSync('test/fixtures/issue258/midnight.json','utf8'))
+  await page.emulateMedia({colorScheme:'dark'})
+  await page.evaluate(tokens=>{
+    document.documentElement.style.colorScheme='light'
+    for(const [key,value] of Object.entries(tokens))document.documentElement.style.setProperty(key,value)
+    window.failSave=false
+    const select=document.createElement('select');select.id='unrelated-select';select.innerHTML='<option>Other plugin</option>';document.body.append(select)
+  },midnight.tokens)
+  await region('Sidebar')
+  const picker=page.getByLabel('Customize',{exact:true})
+  await picker.waitFor()
+  const contrast=([a,b])=>{
+    const light=color=>color.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>v/(color.startsWith('color(srgb')?1:255)).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0)
+    const values=[light(a),light(b)].sort((a,b)=>a-b);return(values[1]+.05)/(values[0]+.05)
+  }
+  const options=await picker.locator('option').evaluateAll(nodes=>nodes.map(n=>({text:n.textContent,color:getComputedStyle(n).color,background:getComputedStyle(n).backgroundColor})))
+  assert.ok(options.length>=9)
+  for(const option of options)assert.ok(contrast([option.color,option.background])>=4.5,'#258 option '+option.text)
+  assert.equal(await picker.evaluate(n=>getComputedStyle(n).colorScheme),'light dark','native Windows popup is not forced to the light host scheme')
+  assert.equal(await page.locator('#unrelated-select option').evaluate(n=>getComputedStyle(n).backgroundColor),'rgba(0, 0, 0, 0)','other plugin options remain untouched')
+  await page.locator('#actual-sidebar').evaluate(n=>{n.style.position='static';n.style.left='auto'})
+  const today=page.locator('#actual-sidebar .cm-model-costs .cm-mstats-tab.active').first()
+  if(!await today.count())await page.locator('#actual-sidebar .cm-model-costs .cm-collapse-h').click()
+  await today.waitFor()
+  const active=await today.evaluate(n=>({color:getComputedStyle(n).color,background:getComputedStyle(n).backgroundColor}))
+  // Convert CSS color(srgb) to rgb before checking the blended selected fill.
+  if(active.background.startsWith('color(srgb'))active.background='rgb('+active.background.match(/[\d.]+/g).slice(0,3).map(v=>Math.round(Number(v)*255)).join(',')+')'
+  assert.ok(contrast([active.color,active.background])>=4.5,'#258 selected Today remains readable without hover')
+  await page.screenshot({path:join(output,'issue258-midnight-controls.png'),fullPage:true})
+  await picker.click();await page.screenshot({path:join(output,'issue258-midnight-native-popup.png')});await picker.press('Escape')
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert.deepEqual(previewQueries,[],'preview never starts account or Codex discovery requests')
   const result={themes:2,widths:[1100,720,390],regions:3,normalFontSize:true,skinSurfaces:true,autosave:true,keyboard:true,reopenCount:25,hostConversationNodes:20000,cpuThrottle:4,openMedianMs:Math.round(sorted[Math.floor(sorted.length/2)]),openP95Ms:Math.round(p95),...metrics,externalRequests:external.length,browserErrors:errors.length}
   writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log('[ok] '+JSON.stringify(result))
