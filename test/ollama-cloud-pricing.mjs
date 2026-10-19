@@ -70,6 +70,7 @@ for (const [provider, model] of [['ollama', 'deepseek-v4.1-flash'], ['llm-ollama
   assert.equal(providerPriceEntryFor(provider, model, { ...DEFAULT_PRICE_TABLE, currency: 'USD' }).entry?.peakSchedule, undefined, `${provider}:${model} is not tagged`)
 }
 assert.equal(providerPriceEntryFor('ollama-cloud', 'deepseek-v4.1-flash', { ...AUGUST_PRICE_TABLE, currency: 'USD' }, { mode: 'exact' }).entry?.peakSchedule, undefined, 'only the resolved deepseek-peak entry carries the calendar')
+assert.equal(providerPriceEntryFor('ollama-cloud', 'deepseek-v4-pro', { ...DEFAULT_PRICE_TABLE, currency: 'USD', ollamaPeak: false }).entry.peakSchedule, undefined, 'price versions saved before v1.9.13 keep DeepSeek\'s calendar')
 
 // --- Host: published matrix at every boundary for both models.
 for (const model of models) {
