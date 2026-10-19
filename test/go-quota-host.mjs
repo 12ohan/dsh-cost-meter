@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 assert.ok(process.env.DSH_TEST_NODE_MODULES, 'set DSH_TEST_NODE_MODULES to the actual host dependencies')
@@ -78,5 +78,6 @@ try {
   await peer?.dispose(); await host?.fiber.dispose()
   globalThis.fetch = realFetch; process.chdir(cwd)
   for (const n of names) saved[n] === undefined ? delete process.env[n] : process.env[n] = saved[n]
+  assert.equal(dirname(work), tmpdir())
   rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 }

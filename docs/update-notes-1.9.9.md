@@ -7,7 +7,7 @@
 感谢 [@weimingyu9312](https://github.com/weimingyu9312) 在 [#325](https://github.com/Han-1413141/dsh-cost-meter/issues/325) 报告 Tauri 桌面环境刷新 Go 额度返回 401。
 
 - 单独保存 Key：在 **设置 → 费用 → 额度 → OpenCode Go** 展开配置，编辑凭据并保存，再点击刷新。复制了 `Bearer Key` 时只保留一层 Bearer 认证头；整段请求头、内部空白等无效输入会在本地提示修正。
-- 自动读取：继续按照专用引用、官方 Go 模型路由引用、兼容环境变量、OpenCode 登录态、遗留配置的顺序读取。新增识别 `OPENCODE_AUTH_CONTENT` 和 `XDG_DATA_HOME/opencode/auth.json`，当前有效登录数据优先于旧文件，退出登录后不再复活旧文件中的 Key。
+- 自动读取：继续按照专用引用、官方 Go 模型路由引用、兼容环境变量、OpenCode 登录态、遗留配置的顺序读取。新增识别 `OPENCODE_AUTH_CONTENT` 和 `XDG_DATA_HOME/opencode/auth.json`，当前有效登录数据优先于旧文件；显式数据目录的登录文件缺失或损坏时不再回退旧目录，退出登录后也不再复活旧文件中的 Key。
 - 401 明确提示当前 Key 未通过认证，不再认定没有订阅。只有 403 且官方响应类型为 `EntitlementError` 时，才提示该 Key 所属工作区没有 Go 权限；其他访问拒绝单独显示。
 - 认证失败按照刷新间隔缓存，避免重复请求。手动刷新、保存或清除专用凭据可立即重试；不会在认证失败后偷偷换成另一个账号的 Key。
 - 费用插件保存和清除只操作自己的 `OPENCODE_GO_API_KEY`，不修改模型路由共用凭据。请求固定发送到官方额度 GET 接口，不发模型请求；空窗口不会被当作 0% 用量。
@@ -25,7 +25,7 @@
 Thanks to [@weimingyu9312](https://github.com/weimingyu9312) for reporting an HTTP 401 when refreshing Go quotas in a Tauri desktop environment in [#325](https://github.com/Han-1413141/dsh-cost-meter/issues/325).
 
 - Both dedicated keys and automatic discovery are covered. A pasted Bearer prefix no longer creates a duplicate authorization prefix; invalid full headers are rejected locally.
-- Automatic discovery now reads `OPENCODE_AUTH_CONTENT` and `XDG_DATA_HOME/opencode/auth.json`. Current valid sign-in data takes precedence over older files, including an empty login set after logout. Existing dedicated-key and official model-route priority is preserved.
+- Automatic discovery now reads `OPENCODE_AUTH_CONTENT` and `XDG_DATA_HOME/opencode/auth.json`. Current sign-in data takes precedence over older files, including an empty login set after logout. An explicit data directory never falls back to an older directory when its login file is missing or corrupt. Existing dedicated-key and official model-route priority is preserved.
 - HTTP 401 is reported as failed authentication, not a missing subscription. Only an explicit 403 `EntitlementError` is classified as missing Go workspace entitlement; other access-control failures have a separate message.
 - Authentication failures respect the refresh interval. Manual refresh and saving or clearing a dedicated credential can retry immediately. A failed credential does not silently switch the query to another account.
 - Shared model credentials remain unchanged. Queries use the fixed official GET endpoint, make no inference calls and do not turn missing usage windows into zero usage.

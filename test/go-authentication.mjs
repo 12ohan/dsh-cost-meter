@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { apply } from '../lib/index.js'
 
@@ -61,6 +61,16 @@ try {
   const dataFile = auth(process.env.XDG_DATA_HOME)
   writeFileSync(dataFile, JSON.stringify({ 'opencode-go': { type: 'api', key: ' ' + token + ' ' } }))
   assert.equal((await refresh()).state.config.goQuota.keySource, 'auto')
+  writeFileSync(auth(process.env.XDG_CONFIG_HOME), JSON.stringify({ 'opencode-go': { type: 'api', key: 'fixture-stale-config-key' } }))
+  rmSync(dataFile)
+  for (const body of [null, '{invalid-json']) {
+    if (body !== null) writeFileSync(dataFile, body)
+    const before = calls.length, missingCurrentLogin = await api.refreshGoQuota()
+    assert.equal(missingCurrentLogin.state.goQuota.status, 'off', 'an explicit data directory never falls back to an older account')
+    assert.equal(calls.length, before, 'missing/corrupt current auth data cannot send an old key')
+    assert.equal(missingCurrentLogin.state.config.goQuota.keyConfigured, false)
+  }
+  writeFileSync(dataFile, JSON.stringify({ 'opencode-go': { type: 'api', key: token } }))
   process.env.OPENCODE_AUTH_CONTENT = JSON.stringify({ 'opencode-go': { type: 'api', key: 'Bearer ' + token } })
   writeFileSync(dataFile, JSON.stringify({ 'opencode-go': { type: 'api', key: 'fixture-stale-data-key' } }))
   await refresh() // Environment auth data overrides files, as in OpenCode.
@@ -96,5 +106,6 @@ try {
   for (const dispose of cleanups.reverse()) dispose()
   globalThis.fetch = originalFetch
   for (const n of names) saved[n] === undefined ? delete process.env[n] : process.env[n] = saved[n]
+  assert.equal(dirname(root), tmpdir())
   rmSync(root, { recursive: true, force: true })
 }
