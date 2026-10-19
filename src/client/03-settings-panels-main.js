@@ -683,11 +683,8 @@
 
     /** provider 展示名归一:历史请求携带的 'zen' 是错误叫法,统一展示为 'go'。 */
     const prettyProvider = provider => (provider === 'zen' ? 'go' : provider)
-    const prettyProviderKey = key => {
-      const sep = key.indexOf(':')
-      if (sep <= 0) return key
-      return prettyProvider(key.slice(0, sep).toLowerCase()) + key.slice(sep)
-    }
+    // Labels only: retain the original model ID in ledger keys, pricing and requests.
+    const prettyProviderKey = key => key.replace(/^zen:/i, 'go:').replace(/^(deepseek(?:-official|-account)?):deepseek-(?:v4(?:\.1)?-)?flash(?:-vision-exp)?$/i, '$1:DeepSeek V4.1 Flash')
 
     /** 按模型统计面板:今日/近90天两个口径,费用排行、Token 消耗(堆叠)、缓存命中率、性价比。
      *  纯前端聚合:state.today.byProviderModel 与 state.history[].byProviderModel(宿主已逐次计费)。

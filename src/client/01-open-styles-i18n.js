@@ -344,7 +344,7 @@ window.__ModuleLoader__.load({
       '.cm-footer-stack{display:flex;flex:none;order:-1;flex-direction:column;gap:6px;width:100%;min-width:0;max-width:100%;align-items:stretch;box-sizing:border-box}',
       '.cm-footer-stack.rail{align-items:center;order:1}',
       '.cm-footer-stack .cm-bbox{width:100%;min-width:0}',
-      '.cm-footer-stack .cm-foot{width:100%;box-sizing:border-box}',
+      '.cm-footer-stack .cm-foot{width:100%;box-sizing:border-box}.cm-footer-stack .cm-foot:not(.cm-foot-rail){justify-content:space-between}.cm-model-costs .cm-collapse-h{width:100%}.cm-model-costs .cm-collapse-h>.cm-bal-amt{margin-left:auto}',
       '.cm-footer-stack.compact .cm-bbox{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:12px;row-gap:2px;align-items:center}',
       '.cm-footer-stack.compact .cm-bbox>*{grid-column:1/-1}',
       '.cm-footer-stack.compact .cm-bbox>.cm-mm-row{grid-column:auto}',

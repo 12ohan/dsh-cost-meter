@@ -21,8 +21,9 @@ window.__ModuleLoader__.load({
       const config = draft ?? props.state.config
       const en = locale === 'en', text = (zh, english) => en ? english : zh
       const [region, setRegion] = useState('sidebar'), [expanded, setExpanded] = useState(false)
-      const [selected, setSelected] = useState(null), [selectedPlan, selectPlan] = useState('minimax')
+      const [selected, setSelected] = useState('budget'), [selectedPlan, selectPlan] = useState('minimax'), [stylesOpen, setStylesOpen] = useState(false)
       const select = (key, planId) => { setSelected(key); if (planId) selectPlan(planId) }
+      const chooseRegion = key => { setRegion(key); setSelected(key === 'sidebar' ? 'budget' : key === 'composer' ? 'strip-budget' : 'session-header') }
       const [examples, setExamples] = useState(() => {
         try { return localStorage.getItem('dsh-cost-meter:display-examples') !== 'false' } catch { return true }
       })
@@ -74,12 +75,14 @@ window.__ModuleLoader__.load({
       const planConfig = config.codingPlans?.[selectedPlan] ?? {}
       const planOn = ['both', 'sidebar'].includes(planConfig.display ?? (selectedPlan === 'minimax' ? 'both' : 'settings'))
       registry.plan = { on: planOn, patch: { codingPlans: { ...config.codingPlans, [selectedPlan]: { ...planConfig, display: planOn ? 'settings' : 'both' } } } }
+      registry.customBalance = { on: ['both', 'sidebar'].includes(config.customBalance?.display ?? 'both'), patch: { customBalance: { ...config.customBalance, display: ['both', 'sidebar'].includes(config.customBalance?.display ?? 'both') ? 'settings' : 'both' } } }
+      registry.codex = { on: config.codexQuotaSidebar !== false, patch: { codexQuotaSidebar: config.codexQuotaSidebar === false } }
       const strip = config.quotaStrip ?? {}
       const codex = previewData.state.displayPreviewCodex
       const codexPercentages = codex?.status === 'ok' ? Object.entries(codex.windows ?? {}).map(([key, win]) => ({ key, pct: Number.isFinite(win?.percent) ? Math.max(0, Math.min(100, 100 - win.percent)) : null })) : []
       const codexStrip = item('strip-codex', text('输入框上方 · Codex 额度', 'Above composer · Codex quota'),
-        strip.enabled === true && config.codexQuotaEnabled === true && config.codexQuotaStrip !== false,
-        { codexQuotaStrip: config.codexQuotaStrip === false },
+        strip.enabled === true && config.codexQuotaStrip !== false,
+        { codexQuotaStrip: !(strip.enabled === true && config.codexQuotaStrip !== false), ...(strip.enabled ? {} : { quotaStrip: { ...strip, enabled: true, budget: false, go: false, plans: false, promptSeen: true } }) },
         el('span', { className: 'cm-qchip' }, el('span', { className: 'cm-qlabel' }, 'Codex'),
           ...(codexPercentages.length ? codexPercentages : [{ pct: null }]).map(({ key, pct }, index) => el('span', { key: index, className: 'cm-qseg' },
             el('span', { className: 'cm-qbar' }, el('span', { className: 'cm-qfill', style: { width: (pct ?? 0) + '%' } })),
@@ -89,7 +92,7 @@ window.__ModuleLoader__.load({
         // Enabling one item from a disabled strip must not show its siblings unexpectedly.
         const next = strip.enabled ? { ...strip, [key]: !on } : { ...strip, budget: false, go: false, plans: false, [key]: true }
         const pct = value === null ? null : (config.barDirections?.[kind] ?? 'used') === 'remaining' ? 100 - value : value
-        return item('strip-' + key, text('输入框上方 · ', 'Above composer · ') + label, on, { quotaStrip: { ...next, enabled: true, promptSeen: true } },
+        return item('strip-' + key, text('输入框上方 · ', 'Above composer · ') + label, on, { quotaStrip: { ...next, enabled: true, promptSeen: true }, ...(strip.enabled ? {} : { codexQuotaStrip: false }) },
           el('span', { className: 'cm-qchip' }, el('span', { className: 'cm-qlabel' }, label),
             el('span', { className: 'cm-qbar' }, el('span', { className: 'cm-qfill', style: { width: (pct ?? 0) + '%' } })), el('span', { className: 'cm-qtext' }, percentLabel(pct))))
       }
@@ -105,6 +108,8 @@ window.__ModuleLoader__.load({
       const icon = (name, size = 16) => el(Native[name], { size })
       const corner = item('corner', text('右下角额度', 'Corner quota'), cornerOn, { corner: { ...config.corner, enabled: !cornerOn } },
         el('span', { className: 'cm-corner-chip' }, t('budget') + ' ' + percentLabel(budgetPercent)))
+      registry.badge = { on: config.position === (region === 'conversation' ? 'header' : 'dock'), patch: { position: config.position === (region === 'conversation' ? 'header' : 'dock') ? 'off' : region === 'conversation' ? 'header' : 'dock' } }
+      if (region === 'composer') registry.models = { on: config.sidebarModels?.dock === true, patch: { sidebarModels: { ...config.sidebarModels, dock: config.sidebarModels?.dock !== true } } }
       const regions = [['sidebar', text('侧栏', 'Sidebar')], ['composer', text('输入区', 'Composer')], ['conversation', text('会话内容', 'Conversation')]]
       const scene = region === 'sidebar' ?
         el(SidebarPreview, { renderSidebar: renderPreviewSidebar, config: previewData.config, selected, selectedPlan, select, labels,
@@ -140,20 +145,16 @@ window.__ModuleLoader__.load({
           el('span', null, examples ? text('展示完整效果，示例不计入账本', 'Full preview · example data is not recorded') : text('展示当前数据，缺失内容显示 —', 'Current data · unavailable values show —'))),
         el('div', { className: 'cm-display-region-tabs', role: 'tablist', 'aria-label': text('预览区域', 'Preview area') }, ...regions.map(([key, label], index) =>
           el('button', { key, type: 'button', role: 'tab', id: id + key, 'aria-selected': region === key, 'aria-controls': id + '-panel', tabIndex: region === key ? 0 : -1,
-            onClick: () => { setRegion(key); select(null) }, onKeyDown: event => {
+            onClick: () => chooseRegion(key), onKeyDown: event => {
               if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return
               event.preventDefault()
               const next = event.key === 'Home' ? 0 : event.key === 'End' ? regions.length - 1 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + regions.length) % regions.length
-              setRegion(regions[next][0]); select(null); event.currentTarget.parentElement.children[next].focus()
+              chooseRegion(regions[next][0]); event.currentTarget.parentElement.children[next].focus()
             } }, label))),
-        region === 'sidebar' ? el('div', { className: 'cm-display-toggles', role: 'group', 'aria-label': text('侧栏显示', 'Sidebar visibility') },
-          ...['budget', 'today', 'peak', 'models'].map(key => el('label', { key, className: 'cm-check' },
-            el('input', { type: 'checkbox', 'data-display-toggle': key, checked: registry[key].on, onChange: () => set(registry[key].patch) }),
-            el('span', null, key === 'budget' ? t('budget') : labels[key])))) : null,
         el('div', { className: 'cm-preview cm-region-preview', role: 'tabpanel', id: id + '-panel', 'aria-labelledby': id + region, 'data-region': region },
           el('div', { className: 'cm-preview-workspace' }, el('div', { className: 'cm-preview-scene' }, scene),
             el(DisplayInspector, { props, config, set, selected, selectedPlan, selectPlan, select, labels, registry, text, region, examples, previewData,
-              openQuota: () => { setExpanded(false); props.onNavigate('quotas', selectedPlan) } }))))
+              stylesOpen, setStylesOpen, openQuota: () => { setExpanded(false); props.onNavigate('quotas', selected === 'codex' || selected === 'strip-codex' ? 'codex' : selectedPlan) } }))))
       return el('section', { className: 'cm-display', 'aria-label': text('交互式显示设置', 'Interactive display settings') },
         el('div', { className: 'cm-display-heading' }, el('div', null,
           el('h3', null, text('设置你看到的界面', 'Make the screen yours')),

@@ -25,7 +25,7 @@
       const money = n => formatMoneyUsd(n, state.config)
       const title = t(period === 'history' ? 'modelStatsHistory' : 'modelStatsToday') + ' ' + money(total) + ' · ' + t('modelsCount', { n: rows.length })
       const summary = cfg.summary === 'top' && rows.length ? rows[0].label + ' ' + money(rows[0].cost) : title
-      const summaryNode = cfg.summary === 'top' && rows.length ? el(Fragment, null, el('span', { className: 'cm-bal-label' }, rows[0].label), el('span', { className: 'cm-bal-amt' }, money(rows[0].cost))) : el('span', { className: 'cm-bal-label' }, summary)
+      const summaryNode = el(Fragment, null, el('span', { className: 'cm-bal-label' }, cfg.summary === 'top' && rows.length ? rows[0].label : t(period === 'history' ? 'modelStatsHistory' : 'modelStatsToday')), el('span', { className: 'cm-bal-amt cm-num' }, cfg.summary === 'top' && rows.length ? money(rows[0].cost) : money(total) + ' · ' + t('modelsCount', { n: rows.length })))
       const toggle = () => {
         setOpen(!open)
         try { if (cfg.remember && !preview) window.localStorage.setItem(MODEL_OPEN_KEY, open ? '0' : '1') } catch (_) {}
@@ -52,7 +52,7 @@
       const select = (key, choices) => el('div', { className: 'cm-field', key }, el('label', null, t('models_' + key)), el('select', { className: 'cm-input', value: cfg[key], onChange: e => set(key, e.target.value) }, choices.map(([value, label]) => el('option', { key: value, value }, t(label)))))
       return el('div', { className: 'cm-grid' },
         visibilityControl ? el('div', { className: 'cm-grid-group' }, t('modelsTitle')) : null,
-        ['enabled', 'defaultOpen', 'remember', 'tokens', 'shares', 'dock'].filter(key => visibilityControl || key !== 'enabled').map(key => el('label', { key, className: 'cm-check' }, el('input', { type: 'checkbox', checked: cfg[key], onChange: e => set(key, e.target.checked) }), t('models_' + key))),
+        ['enabled', 'defaultOpen', 'remember', 'tokens', 'shares', 'dock'].filter(key => visibilityControl || key !== 'enabled').map(key => el('label', { key, className: 'cm-check' }, el('input', { type: 'checkbox', role: visibilityControl ? undefined : 'switch', checked: cfg[key], onChange: e => set(key, e.target.checked) }), t('models_' + key))),
         select('period', [['today', 'modelStatsToday'], ['history', 'modelStatsHistory']]),
         select('summary', [['total', 'modelsTotal'], ['top', 'modelsTop']]),
         select('position', [['first', 'modelsFirst'], ['afterBalance', 'modelsAfter'], ['last', 'modelsLast']]),
