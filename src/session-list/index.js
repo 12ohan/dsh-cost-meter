@@ -18,7 +18,7 @@ window.__ModuleLoader__.load({
       })
     }
     const codec = (name, parse) => { const schema = { parse }; return { mode: 'strict', typeSymbol: 'dsh-cost-meter#' + name, schema, create: () => schema } }
-    const CONTRIBUTION = { plugin: 'dsh-cost-meter', descriptors: [{ id: 'dsh-cost-meter#costMeter/getSessionListCosts', service: 'costMeter', namespace: 'costMeter', method: 'getSessionListCosts', invocation: { kind: 'direct' },
+    const CONTRIBUTION = { package: 'dsh-cost-meter-session-list', face: 'host', descriptors: [{ id: 'dsh-cost-meter#costMeter/getSessionListCosts', service: 'costMeter', namespace: 'costMeter', method: 'getSessionListCosts', invocation: { kind: 'direct' },
       parameters: [{ name: 'query', wire: 'query', source: 'json', codec: codec('SessionListQuery', parseQuery) }], result: codec('SessionListCosts', parseRows) }] }
 
     function createBatchReader(read, current) {

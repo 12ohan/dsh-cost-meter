@@ -1376,7 +1376,7 @@ window.__ModuleLoader__.load({
           : [readRequest(api, 'getBillingStatistics', query, revision + ':0')])
     }
     async function mount(ctx, source, resolveLocale) {
-      modelLabels = () => source.getSnapshot().state?.modelLabels ?? {}
+      modelLabels = () => source?.getSnapshot?.()?.state?.modelLabels ?? {}
       const getLocale = typeof source === 'function' ? source : () => source && resolveLocale ? resolveLocale(source.getSnapshot().state?.config ?? { activeLocale: source.getSnapshot().locale }) : 'en'
       const unmount = await ctx.get('remote').$mount(CONTRIBUTION)
       ctx.effect(() => () => unmount(), 'cost-meter: statistics contribution')

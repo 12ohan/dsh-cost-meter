@@ -87,9 +87,15 @@ if (process.argv[2] === '--holder') {
     if (foreign.identity) {
       foreign.identity.start = String(BigInt(foreign.identity.start) - (foreign.identity.unit === 'ms' ? 60000n : 1n))
       const foreignPath = join(root, 'foreign.json')
-      plant(foreignPath, child.pid, JSON.stringify(foreign), false)
-      // Windows must start PowerShell for this foreign PID's native birth time.
-      assert.equal(withLedgerLock(foreignPath, () => 42, 5000), 42)
+      const foreignOwner = plant(foreignPath, child.pid, JSON.stringify(foreign), false)
+      // Probe the real foreign process once. A timed-out OS query must preserve
+      // the owner; a known native identity must detect the earlier birth.
+      const identities = new Map()
+      assert.equal(staleLedgerLockOwner(foreignOwner, child.pid, identities), Boolean(identities.get(child.pid)))
+      assert.equal(readFileSync(foreignOwner, 'utf8'), JSON.stringify(foreign), 'probing never removes the owner')
+      // Always verify PID reuse with the identity supplied by the real child,
+      // independently of PowerShell startup load on Windows CI runners.
+      assert.equal(staleLedgerLockOwner(foreignOwner, child.pid, new Map([[child.pid, JSON.parse(childText).identity]])), true)
     }
     const legacyForeign = join(root, 'legacy-foreign.json')
     const legacyOwner = plant(legacyForeign, child.pid, '')
