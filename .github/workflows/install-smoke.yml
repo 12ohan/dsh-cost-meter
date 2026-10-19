@@ -68,6 +68,8 @@ jobs:
           mkdir -p .tmp-billion-matrix
           npm pack dsh-codex-subscription@3.1.1 --ignore-scripts --pack-destination .tmp-billion-matrix
           DSH_TEST_CODEX_PACKAGE="$PWD/.tmp-billion-matrix/dsh-codex-subscription-3.1.1.tgz" node test/codex-subscription-published.mjs
+          npm pack @eddyskywalker/dsh-chatgpt-subscription@0.29.0 --ignore-scripts --pack-destination .tmp-billion-matrix
+          DSH_TEST_CHATGPT_PACKAGE="$PWD/.tmp-billion-matrix/eddyskywalker-dsh-chatgpt-subscription-0.29.0.tgz" node test/chatgpt-subscription-quota.mjs
           node test/context-costs.mjs --host
           node test/context-costs-client.mjs
           node test/context-costs-lifecycle.mjs

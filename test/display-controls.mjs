@@ -56,8 +56,11 @@ assert.equal(config.sidebarTodayMetric, 'tokens', 'the inspector still controls 
 for (const selected of ['codex', 'strip-codex']) {
   const tree = inspect(selected)
   assert.equal(nodes(tree).filter(node => node.props.role === 'switch').length, 0, 'account and placement toggles are not duplicated within Codex controls')
-  control(tree, 'Data source').props.onChange({ target: { value: 'subscription' } })
-  assert.equal(config.codexQuotaSource, 'subscription')
+  for (const source of ['subscription', 'chatgpt']) {
+    assert.ok(control(tree, 'Data source').children.some(node => node.props?.value === source))
+    control(tree, 'Data source').props.onChange({ target: { value: source } })
+    assert.equal(config.codexQuotaSource, source)
+  }
   assert.equal(config.codexQuotaEnabled, false, 'display changes do not enable account queries')
 }
 console.log('[ok] display controls: per-account visibility/placement, no query enablement, independent selection, targeted navigation and separate today control')
