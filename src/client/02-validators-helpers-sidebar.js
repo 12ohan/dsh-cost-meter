@@ -156,7 +156,7 @@
         codexQuotaEnabled: v.codexQuotaEnabled === true,
         codexQuotaSidebar: v.codexQuotaSidebar !== false,
         codexQuotaStrip: v.codexQuotaStrip !== false,
-        codexQuotaSource: ['connect', 'subscription'].includes(v.codexQuotaSource) ? v.codexQuotaSource : 'auto',
+        codexQuotaSource: ['connect', 'subscription', 'chatgpt'].includes(v.codexQuotaSource) ? v.codexQuotaSource : 'auto',
         // Codex 订阅兼容(契约 B-5):用户已关闭一次性提示 / 已应用历史归类的时点。
         // 直通白名单缺失会导致关闭后重开页面又弹提示,或应用后状态行回落「未应用」。
         codexCompatPromptDismissed: v.codexCompatPromptDismissed === true,
@@ -2704,8 +2704,8 @@
     }
 
     // ── ChatGPT PLUS(Codex)额度(issue #59 / dsh-codex-subscription)──────────
-    // 数据源二选一:dsh-codex-connect 的只读状态路由,或 dsh-codex-subscription 的
-    // 宿主 Connection RPC。两条均只读,启用后查询失败保留提示与重试入口。
+    // 数据源:dsh-codex-subscription RPC、dsh-chatgpt-subscription HTTP、connect 状态。
+    // 只查询额度,启用后查询失败保留提示与重试入口。
 
     const CODEX_STATUS_PATH = '/plugins/dsh-openai-codex/auth/status'
     const CODEX_WINDOWS = { 18000: 'five', 604800: 'weekly' }
@@ -2756,7 +2756,7 @@
     const notifyCodexQuota = () => { for (const fn of codexQuotaCache.listeners) { try { fn() } catch { /* 订阅方异常不扩散 */ } } }
 
     /**
-     * 探测 Codex 额度。auto 优先 subscription,失败回退 connect;非 force 且同一数据源
+     * 探测 Codex 额度。auto 按 subscription → chatgpt → connect 顺序回退;
      * 成功缓存 5 分钟,失败 1 分钟后可重试。
      */
     async function fetchCodexQuota(force = false, enabled = false, source = 'auto') {
@@ -2770,8 +2770,11 @@
       const task = Promise.resolve().then(async () => {
         let windows = {}
         try {
-          if (source !== 'connect') windows = await fetchCodexSubscription(force) ?? {}
-          if (Object.keys(windows).length === 0 && source !== 'subscription') {
+          if (source === 'auto' || source === 'subscription') windows = await fetchCodexSubscription(force) ?? {}
+          if (Object.keys(windows).length === 0 && (source === 'auto' || source === 'chatgpt')) {
+            try { windows = await (await require.async('./client.codex.js')).readChatgptQuota(force) ?? {} } catch {}
+          }
+          if (Object.keys(windows).length === 0 && (source === 'auto' || source === 'connect')) {
             const resp = await fetch(CODEX_STATUS_PATH, { credentials: 'same-origin', headers: { accept: 'application/json' }, signal: AbortSignal.timeout(8000) })
             if (resp.ok) windows = parseCodexStatus(await resp.json().catch(() => null)) ?? {}
           }

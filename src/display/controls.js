@@ -108,9 +108,9 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
   }
   if (selected === 'codex' || selected === 'strip-codex') controls = [
     choice(text('数据源', 'Data source'), config.codexQuotaSource ?? 'auto',
-      [['auto', text('自动检测', 'Auto-detect')], ['connect', 'dsh-codex-connect'], ['subscription', 'dsh-codex-subscription']],
+      [['auto', text('自动检测', 'Auto-detect')], ['connect', 'dsh-codex-connect'], ['subscription', 'dsh-codex-subscription'], ['chatgpt', 'dsh-chatgpt-subscription']],
       value => set({ codexQuotaSource: value })),
-    el('p', { className: 'cm-inspector-note cm-inspector-help' }, text('自动检测优先 dsh-codex-subscription，失败回退 dsh-codex-connect。', 'Auto prefers dsh-codex-subscription, then falls back to dsh-codex-connect.')),
+    el('p', { className: 'cm-inspector-note cm-inspector-help' }, text('自动检测依次尝试 dsh-codex-subscription、dsh-chatgpt-subscription、dsh-codex-connect。', 'Auto tries dsh-codex-subscription, dsh-chatgpt-subscription, then dsh-codex-connect.')),
     config.codexQuotaEnabled !== true ? el('p', { className: 'cm-inspector-note' }, text('先在账户与额度设置中启用 Codex 额度。', 'Enable Codex quota in account and quota settings first.')) : null,
     el('button', { type: 'button', className: 'cm-btn small', onClick: openQuota }, text('账户与额度设置 →', 'Account and quota settings →'))]
   if (selected === 'general') controls = [

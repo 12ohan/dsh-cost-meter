@@ -25,7 +25,11 @@ import React from ${JSON.stringify(req.resolve('react'))};
 import {createRoot} from ${JSON.stringify(req.resolve('react-dom/client'))};
 window.__ModuleLoader__={load:mod=>window.connectionUI=mod.factory(()=>({}))};
 ${connectionSource}
-window.__ModuleLoader__={load:mod=>window.costUI=mod.factory(name=>name==='react'?React:{Tooltip:({children})=>children})};
+const costRequire=name=>name==='react'?React:{Tooltip:({children})=>children};
+costRequire.async=async path=>{if(path!=='./client.codex.js')throw Error('Unexpected chunk');return window.codexUI};
+window.__ModuleLoader__={load:mod=>window.codexUI=mod.factory(costRequire)};
+${readFileSync('lib/client.codex.js', 'utf8')}
+window.__ModuleLoader__={load:mod=>window.costUI=mod.factory(costRequire)};
 ${readFileSync('lib/client.js', 'utf8')}
 let state=${JSON.stringify(state)};const entries=new Map(),disposers=[];const services={};
 const context={fiber:{uid:1},remote:{$mount:async()=>()=>{}},on:()=>()=>{},inject:(names,fn)=>{if(names.every(name=>services[name]))fn(context)},provide:(name,value)=>services[name]=value,
@@ -45,7 +49,8 @@ const root=createRoot(document.getElementById('root'));root.render(React.createE
 `
 const compiled = await build({ stdin: { contents: code, resolveDir: process.cwd(), loader: 'js' }, bundle: true, write: false, format: 'esm', platform: 'browser' })
 let signedIn = false, hasFive = true, reset = Date.parse('2026-10-25T00:10:00Z') / 1000
-const calls = []
+const calls = [], chatgptCalls = []
+let chatgptSignedIn = false, chatgptHasFive = true
 const server = createServer(async (request, response) => {
   if (request.url === '/app.js') { response.setHeader('content-type', 'text/javascript'); return response.end(compiled.outputFiles[0].contents) }
   if (request.url === '/api/codex-subscription/usage') {
@@ -56,6 +61,17 @@ const server = createServer(async (request, response) => {
     return response.end(JSON.stringify({ type: 'server-response', rpcId: message.rpcId, result: signedIn
       ? { ok: true, value: { rateLimits: [{ id: 'codex', windows: [...hasFive ? [{ windowSeconds: 18000, remainingPercent: 60, resetsAt: Date.parse('2026-10-19T10:10:00Z') / 1000 }] : [], { windowSeconds: 604800, remainingPercent: 83, resetsAt: reset }] }] } }
       : { ok: false, error: { code: 'internal', message: 'ChatGPT subscription is not signed in', details: { issues: [] } } } }))
+  }
+  if (request.url === '/api/dsh-chatgpt-subscription/status' || request.url === '/api/dsh-chatgpt-subscription/quota/refresh') {
+    const force = request.url.endsWith('/quota/refresh')
+    assert.equal(request.method, force ? 'POST' : 'GET')
+    chatgptCalls.push({ force })
+    const quota = { state: chatgptSignedIn ? 'ready' : 'signed-out', buckets: [{ id: 'codex', windows: [
+      ...chatgptHasFive ? [{ usedPercent: 66, windowDurationMins: 300, resetsAt: 1792404600 }] : [],
+      { usedPercent: 21, windowDurationMins: 10080, resetsAt: 1792887000 },
+    ] }] }
+    response.setHeader('content-type', 'application/json')
+    return response.end(JSON.stringify(force ? chatgptSignedIn ? { ok: true, value: quota } : { ok: false } : { ok: true, value: { authenticated: chatgptSignedIn, quota } }))
   }
   if (request.url !== '/') { response.statusCode = 404; return response.end() }
   response.setHeader('content-type', 'text/html; charset=utf-8')
@@ -159,8 +175,42 @@ try {
   await workbuddy.screenshot({ path: join(output, 'workbuddy-balance.png') })
   await page.evaluate(() => window.configure({ codingPlans: { workbuddy: { enabled: false, display: 'sidebar' } } }))
   await workbuddy.waitFor({ state: 'detached' })
+  const oldCalls = calls.length
+  await page.evaluate(() => window.configure({ codexQuotaSource: 'chatgpt', codexQuotaSidebar: true, codexQuotaStrip: true }))
+  await card.getByText(/未取得额度/).waitFor()
+  assert.equal(chatgptCalls.length, 1, 'both display positions share one ChatGPT status read')
+  chatgptSignedIn = true
+  await page.clock.fastForward(61_000)
+  await card.getByText('剩余 34%', { exact: true }).waitFor()
+  await card.getByText('剩余 79%', { exact: true }).waitFor()
+  await page.locator('#composer').getByText(/周 剩余 79%/).waitFor()
+  assert.equal(calls.length, oldCalls, 'explicit ChatGPT quota never reads the other subscription account')
+  assert.equal(await card.locator('.cm-mm-row .cm-bbox-fill').evaluateAll(nodes => nodes.map(n => n.style.width).join(',')), '34%,79%')
+  await card.screenshot({ path: join(output, 'chatgpt-quota-dual.png') })
+  chatgptHasFive = false
+  await card.click(); await page.waitForFunction(() => document.querySelector('[data-cm-display="codex"]').getAttribute('aria-busy') === 'false')
+  assert.equal(chatgptCalls.at(-1).force, true, 'click uses the ChatGPT refresh endpoint')
+  assert.doesNotMatch(await card.innerText(), /5h/)
+  assert.equal(await page.locator('#composer .cm-qseg').count(), 1)
+  chatgptSignedIn = false
+  await card.click(); await card.getByText(/未取得额度/).waitFor()
+  assert.equal(calls.length, oldCalls, 'a signed-out explicit source keeps its retry entry')
+  chatgptSignedIn = true
+  await card.click(); await card.getByText('剩余 79%', { exact: true }).waitFor()
+  signedIn = false
+  const chatgptCount = chatgptCalls.length
+  await page.evaluate(() => window.configure({ codexQuotaSource: 'auto' }))
+  await page.waitForFunction(() => document.querySelector('[data-cm-display="codex"]').getAttribute('aria-busy') === 'false')
+  await card.getByText('剩余 79%', { exact: true }).waitFor()
+  assert.equal(calls.length, oldCalls + 1, 'auto first checks the original subscription RPC')
+  assert.equal(chatgptCalls.length, chatgptCount + 1, 'auto recovers through ChatGPT when the first source is signed out')
+  await card.screenshot({ path: join(output, 'chatgpt-quota-weekly.png') })
+  await page.evaluate(() => window.configure({ codexQuotaSidebar: false, codexQuotaStrip: false }))
+  const stopped = chatgptCalls.length
+  await page.clock.fastForward(360_000)
+  assert.equal(chatgptCalls.length, stopped, 'hiding both ChatGPT quota positions stops reads')
   assert.deepEqual(errors, []); assert.deepEqual(external, [])
-  writeFileSync(join(output, 'result.json'), JSON.stringify({ passed: true, calls: calls.length, layouts, remainingBars: true, resetTopRight: true, weeklyOnly: true, missingReset: true, externalRequests: 0, browserErrors: errors }, null, 2))
+  writeFileSync(join(output, 'result.json'), JSON.stringify({ passed: true, calls: calls.length, chatgptCalls, layouts, remainingBars: true, resetTopRight: true, weeklyOnly: true, missingReset: true, externalRequests: 0, browserErrors: errors }, null, 2))
   await page.evaluate(() => window.dispose())
-  console.log('[ok] Codex quota: shipped asset + DSH Connection RPC, retry after login, both windows and disable cleanup')
+  console.log('[ok] Codex quota: shipped assets, DSH Connection RPC and ChatGPT HTTP, login recovery, both windows, source fallback and disable cleanup')
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)) }

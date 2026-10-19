@@ -1,8 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## [1.9.14] - 2026-10-19
 
-- 新增 Cline Pass(cline.bot)为第 15 家 Coding Plan:官方 `GET /api/v1/users/me/plan/usage-limits` 的 5 小时/周/月窗口(返回的 `percentUsed` 已是已用百分比),侧栏以一张卡片逐行展示,窗口数量随订阅实际返回;注册 provider、端点与解析器,凭据目标 `CLINE_PASS_API_KEY`,plan/API 双轨别名 `clinepass` / `cline-pass`,补中英文案与端点白名单,测试见 `test/clinepass-quota.mjs`。
+- 支持 `@eddyskywalker/dsh-chatgpt-subscription` 的 Codex 额度：读取当前账号的实际 5 小时、周窗口及重置时间，复用侧栏和输入区额度条；点击刷新调用插件的额度刷新接口。
+- 新增 `chatgpt` 数据源，自动检测依次尝试 `dsh-codex-subscription`、ChatGPT 订阅插件、`dsh-codex-connect`；固定来源失败时保留登录与重试提示。查询按需加载、合并并缓存，关闭显示后停止检查。[更新说明](docs/update-notes-1.9.14.md)
 
 ## [1.9.13] - 2026-10-19
 

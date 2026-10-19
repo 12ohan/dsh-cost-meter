@@ -63,7 +63,11 @@ const server = createServer(async (request, response) => {
       requests.push({ method, ms: Math.round(performance.now() - start), calls: value.totalCalls, cost: value.cost })
       response.setHeader('content-type', 'application/json'); response.end(JSON.stringify(value))
     } else { response.setHeader('content-type', 'text/html; charset=utf-8'); response.end('<!doctype html><html><head><meta charset="utf-8"></head><body><div id="root"></div><script src="/app.js"></script></body></html>') }
-  } catch (e) { errors.push(String(e)); response.statusCode = 500; response.end(String(e)) }
+  } catch (e) {
+    errors.push(String(e))
+    response.statusCode = 500
+    response.end('Test fixture request failed')
+  }
 })
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
 const origin = 'http://127.0.0.1:' + server.address().port
