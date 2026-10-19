@@ -1,5 +1,10 @@
 # dsh-cost-meter 版本更新历史
 
+## v1.9.15(2026-10-19)—— 皮肤透明度选项与 Cline Pass 额度
+
+- 新增默认关闭的“跟随皮肤透明度”：费用页复用设置窗口背景，统计正文共用弹窗背景；浮层保留至少 90% 不透明度。关闭后恢复现有遮挡效果。感谢 [@MuFeng262](https://github.com/MuFeng262) 在 [issue #345](https://github.com/Han-1413141/dsh-cost-meter/issues/345) 报告液态玻璃色块问题、定位强制 alpha 的原因并提出可选开关。
+- 支持 Cline Pass 5 小时、周、月额度，汇总在一张卡片中；补齐前后端套餐名称识别，拒绝无效额度类型。感谢 [@kongxiangyiren](https://github.com/kongxiangyiren) 在 [PR #343](https://github.com/Han-1413141/dsh-cost-meter/pull/343) 提供实现和回归测试。[更新说明](update-notes-1.9.15.md)
+
 ## v1.9.14(2026-10-19)—— ChatGPT 订阅插件 Codex 额度
 
 - 支持 `@eddyskywalker/dsh-chatgpt-subscription` 当前账号的 5 小时、周额度与重置时间，侧栏和输入区沿用现有剩余额度显示。

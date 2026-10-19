@@ -31,8 +31,9 @@ window.__ModuleLoader__={load:mod=>window.peakUI=mod.factory(()=>React)};
 ${readFileSync('lib/client.peak.js', 'utf8')}
 window.__ModuleLoader__={load:mod=>window.displayUI=mod.factory(()=>React)};
 ${readFileSync('lib/client.display.js', 'utf8')}
-const Display=window.displayUI.mount({effect:()=>{}}),{CostSection,parseConfig,SidebarFooter}=window.mainUI.preview;
+const {CostSection,parseConfig,SidebarFooter}=window.mainUI.preview;
 let state=${literal(state)};state.config=parseConfig(state.config,'config');window.patches=[];window.listeners=new Set();window.failSave=false;window.mounts=0;
+const Display=window.displayUI.mount({effect:()=>{}},{getSnapshot:()=>({state}),subscribe:fn=>{window.listeners.add(fn);return()=>window.listeners.delete(fn)}});
 const publish=()=>{for(const fn of window.listeners)fn({...state});return state};
 window.current=()=>state.config;window.setConfig=patch=>{state={...state,config:parseConfig({...state.config,...patch},'config')};publish()};
 window.changeLocale=locale=>window.setConfig({locale});
@@ -92,6 +93,12 @@ try {
     window.MutationObserver=class extends Observe{active=false;observe(...args){if(args[1]?.attributeFilter?.includes('data-theme')&&!this.active){window.previewObservers++;this.active=true}return super.observe(...args)}disconnect(){if(this.active){window.previewObservers--;this.active=false}return super.disconnect()}}
   })
   await page.getByRole('tab',{name:'显示',exact:true}).click();await page.locator('.cm-display').waitFor()
+  const skinSwitch = page.getByRole('checkbox', { name: '跟随皮肤透明度', exact: true })
+  await skinSwitch.check()
+  await page.waitForFunction(() => window.current().followSkinTransparency === true && getComputedStyle(document.querySelector('.cm-section')).backgroundColor === 'rgba(0, 0, 0, 0)')
+  await page.screenshot({ path: join(output, 'skin-transparency-zh.png'), fullPage: true })
+  await skinSwitch.uncheck()
+  await page.waitForFunction(() => window.current().followSkinTransparency === false && getComputedStyle(document.querySelector('.cm-section')).backgroundColor !== 'rgba(0, 0, 0, 0)')
   const region=async name=>page.getByRole('tab',{name,exact:true}).click()
   const item=key=>page.locator('.cm-preview [data-display="'+key+'"]')
   const selectStyle=async label=>{if(['标准','紧凑','简洁'].includes(label)&&await page.locator('.cm-style-thumbnail').count()===0)await page.locator('.cm-inspector-layout').click();await page.getByRole('button',{name:label,exact:true}).click()}
@@ -262,6 +269,10 @@ try {
   assert.ok(p95<1000,'opening stays responsive under 4x CPU throttle: '+p95)
   await region('会话内容');assert.equal(await item('turn').getAttribute('data-visible'),'false','saved toggles survive repeated reopening')
   await page.locator('.cm-display-general summary').click();await page.getByLabel('界面语言',{exact:true}).selectOption('en');await page.waitForFunction(()=>window.current().locale==='en')
+  const enSkinSwitch = page.getByRole('checkbox', { name: 'Follow skin transparency', exact: true })
+  await enSkinSwitch.check();await page.waitForFunction(() => window.current().followSkinTransparency === true)
+  await page.screenshot({ path: join(output, 'skin-transparency-en.png'), fullPage: true })
+  await enSkinSwitch.uncheck();await page.waitForFunction(() => window.current().followSkinTransparency === false)
   await region('Sidebar');await page.evaluate(()=>window.failSave=true);await customize('balance');const placement=page.getByLabel('Placement',{exact:true});await page.getByRole('switch',{name:'Show this component',exact:true}).click();await page.getByText(/synthetic save failure/).waitFor()
   // #258 latest feedback: native component options and the active Today tab.
   // Use the actual upstream Midnight token definition over a light host / dark OS.
