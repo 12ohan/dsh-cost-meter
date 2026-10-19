@@ -12,6 +12,8 @@
 - 认证失败按照刷新间隔缓存，避免重复请求。手动刷新、保存或清除专用凭据可立即重试；不会在认证失败后偷偷换成另一个账号的 Key。
 - 费用插件保存和清除只操作自己的 `OPENCODE_GO_API_KEY`，不修改模型路由共用凭据。请求固定发送到官方额度 GET 接口，不发模型请求；空窗口不会被当作 0% 用量。
 
+另外在与报告一致的 DSH `0.2.0-rc.2` 内核中，使用真实 Cordis Loader、凭据库和 Typert RPC 验证保存、清除、刷新、401 后恢复及环境／目录自动读取，全部通过；该集成测试已加入 CI 的 `0.2.0-rc.2` 与 `0.2.1-rc.2` 两个宿主。
+
 本地测试覆盖单独保存和自动读取两种流程，以及轮换、清除、环境登录态覆盖、数据目录、401/403、缓存、恢复与脱敏。测试使用隔离凭据和官方响应结构，不代表已经取得报告者在其 Tauri 环境的复测结果；原 issue 保留等待该环境确认。
 
 依据：[OpenCode 登录态读取源码](https://github.com/anomalyco/opencode/blob/fc7e4cf93e660ad5ddabb0c48ecc99e934ebfe95/packages/opencode/src/auth/index.ts)、[数据目录源码](https://github.com/anomalyco/opencode/blob/fc7e4cf93e660ad5ddabb0c48ecc99e934ebfe95/packages/core/src/global.ts)、[官方 Go 文档](https://opencode.ai/docs/go/)。
@@ -27,6 +29,8 @@ Thanks to [@weimingyu9312](https://github.com/weimingyu9312) for reporting an HT
 - HTTP 401 is reported as failed authentication, not a missing subscription. Only an explicit 403 `EntitlementError` is classified as missing Go workspace entitlement; other access-control failures have a separate message.
 - Authentication failures respect the refresh interval. Manual refresh and saving or clearing a dedicated credential can retry immediately. A failed credential does not silently switch the query to another account.
 - Shared model credentials remain unchanged. Queries use the fixed official GET endpoint, make no inference calls and do not turn missing usage windows into zero usage.
+
+An actual DSH 0.2.0-rc.2 kernel also passes the real Cordis loader, local credential store and Typert RPC save/clear/refresh, 401 recovery and env/XDG discovery checks. CI runs the integration test on both 0.2.0-rc.2 and 0.2.1-rc.2.
 
 Local service tests cover both credential flows, rotation, clearing, auth overrides, paths, 401/403 classification, caching, recovery and redaction with isolated credentials. The reporter's Tauri environment has not yet been retested, so the original issue remains open for confirmation.
 
