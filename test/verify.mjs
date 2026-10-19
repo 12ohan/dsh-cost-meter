@@ -1664,6 +1664,11 @@ vm.runInNewContext(readFileSync(new URL('../lib/client.pricing.js', import.meta.
   window: { __ModuleLoader__: { load: value => { pricingFactory = value.factory } } },
 })
 descriptors.push(...pricingFactory(() => ({})).CONTRIBUTION.descriptors)
+let sessionListFactory
+vm.runInNewContext(readFileSync(new URL('../lib/client.session-list.js', import.meta.url), 'utf8'), {
+  window: { __ModuleLoader__: { load: value => { sessionListFactory = value.factory } } },
+})
+descriptors.push(...sessionListFactory(() => ({})).CONTRIBUTION.descriptors)
 const clientMethods = Array.from(descriptors, d => d.method).sort()
 const serverMethods = TYPERT.invocations.map(i => i.method).sort()
 assert.deepEqual(clientMethods, serverMethods, '客户端 descriptor 与服务端 typert 清单方法一一对齐')
@@ -6880,6 +6885,9 @@ await import('./cache-lifecycle.mjs')
 await import('./core-boundaries.mjs')
 await import('./go-credentials.mjs')
 await import('./go-authentication.mjs')
+await import('./commandcode-monthly.mjs')
+await import('./model-labels.mjs')
+await import('./session-list-costs.mjs')
 await import('./balance-credentials.mjs')
 await import('./account-balance.mjs')
 await import('./factory-quota.mjs')

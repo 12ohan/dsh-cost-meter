@@ -15,7 +15,9 @@ vm.runInNewContext(source.replace('exports.apply = apply', 'exports.test = { pre
 })
 const ui = factory(name => name === 'react' ? { createElement: el, Fragment: 'fragment', useEffect() {}, useState: () => [stateIndex++ === 0 ? value : '', () => {}] } : {}).test
 const stats = readFileSync(new URL('../src/statistics/index.js', import.meta.url), 'utf8')
-const statisticsLabel = vm.runInNewContext(stats.match(/const prettyProviderKey = [^\n]+/)[0] + '\nprettyProviderKey')
+const modelLabels = () => ({ 'qoder-global:dfmodel': 'Qoder Global:DeepSeek-Flash' })
+const statisticsLabel = vm.runInNewContext(stats.match(/const prettyProviderKey = [^\n]+/)[0] + '\nprettyProviderKey', { modelLabels })
+assert.equal(statisticsLabel('qoder-global:dfmodel'), 'Qoder Global:DeepSeek-Flash')
 for (const provider of ['deepseek', 'deepseek-official', 'deepseek-account']) for (const model of ['deepseek-flash', 'deepseek-v4-flash', 'deepseek-v4-flash-vision-exp', 'deepseek-v4.1-flash']) {
   const key = provider + ':' + model
   assert.equal(ui.prettyProviderKey(key), provider + ':DeepSeek V4.1 Flash')

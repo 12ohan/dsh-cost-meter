@@ -1,6 +1,6 @@
 // The footer is the real renderer. Selection outlines are a separate local layer,
 // so they cannot change direct-child selectors or the compact card layout.
-function SidebarPreview({ renderSidebar, config, displayConfig = config, selected, selectedPlan, select, labels, appearance, text, icon, visibility }) {
+function SidebarPreview({ renderSidebar, config, displayConfig = config, selected, selectedPlan, select, labels, appearance, text, icon, visibility, listPreview }) {
   const body = React.useRef(null), [targets, setTargets] = useState([])
   const preview = React.useMemo(() => sidebarPreviewConfig(config, selected), [config, selected])
   const parts = sidebarPreviewParts(displayConfig, selected, text)
@@ -44,6 +44,7 @@ function SidebarPreview({ renderSidebar, config, displayConfig = config, selecte
   return el('div', { className: 'cm-preview-sidebar', style: appearance },
     el('div', { className: 'cm-preview-region-head' }, el('span', null, icon('IconPanelLeftOutlineRegular'), text('侧栏底部', 'Sidebar footer'))),
     el('div', { className: 'cm-preview-history', 'aria-hidden': true }, icon('IconFolderCloseRegular'), text('工作区', 'Workspace'), el('span', null, '···')),
+    listPreview,
     el('div', { className: 'cm-sidebar-canvas' },
       el('div', { ref: body, className: 'cm-sidebar-live', inert: '' }, renderSidebar(preview),
         supplemental ? el('div', { className: 'cm-preview-supplement', 'data-preview-hidden': true },

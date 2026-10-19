@@ -137,6 +137,8 @@
         // showSessionId 曾遗漏于本白名单:checkbox 能保存但读侧恒 undefined,
         // 会话列表附显 ID 自上线以来实际从未生效(v1.5.38 起一并修复)。
         showSessionId: v.showSessionId === true,
+        sessionListCosts: v.sessionListCosts === true,
+        sessionListCostPeriod: v.sessionListCostPeriod === 'today' ? 'today' : 'total',
         hideOfficialBalance: v.hideOfficialBalance === true,
         hideBudget: v.hideBudget === true,
         hideTodayCost: v.hideTodayCost === true,
@@ -486,6 +488,7 @@
         // 价格表版本号:宿主在版本未变时会省略 config.prices(占载荷 56%),
         // 客户端据此沿用上一份,并按同一版本号回传以避免重复下发。
         pricesRev: typeof v.pricesRev === 'string' ? v.pricesRev : undefined,
+        modelLabels: Object.fromEntries(Object.entries(v.modelLabels ?? {}).filter(([, label]) => typeof label === 'string')),
         reconcile: v.reconcile === null || v.reconcile === undefined ? undefined : { ok: v.reconcile.ok === true, message: typeof v.reconcile.message === 'string' ? v.reconcile.message : '' },
         // 手改过价格的 OpenRouter 模型 id(缺失/畸形回落空表:不显示任何锁定标记)。
         priceLockIds: Array.isArray(v.priceLockIds) ? v.priceLockIds.filter(id => typeof id === 'string') : [],

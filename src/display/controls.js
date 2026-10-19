@@ -1,3 +1,16 @@
+    function ModelSidebarSettings({ draft, setDraft, t, visibilityControl = true, numInput }) {
+      const cfg = { enabled: false, period: 'today', topN: 5, summary: 'total', position: 'last', defaultOpen: false, remember: true, tokens: false, shares: true, refreshSeconds: 60, dock: false, ...draft?.sidebarModels }
+      const set = (key, value) => { if (draft) setDraft({ ...draft, sidebarModels: { ...cfg, [key]: value } }) }
+      const select = (key, choices) => el('div', { className: 'cm-field', key, 'data-model-field': key }, el('label', null, t('models_' + key)), el('select', { className: 'cm-input', value: cfg[key], onChange: e => set(key, e.target.value) }, choices.map(([value, label]) => el('option', { key: value, value }, t(label)))))
+      return el('div', { className: 'cm-grid' },
+        visibilityControl ? el('div', { className: 'cm-grid-group' }, t('modelsTitle')) : null,
+        ['enabled', 'defaultOpen', 'remember', 'tokens', 'shares', 'dock'].filter(key => visibilityControl || key !== 'enabled').map(key => el('label', { key, className: 'cm-check', 'data-model-field': key }, el('input', { type: 'checkbox', role: visibilityControl ? undefined : 'switch', checked: cfg[key], onChange: e => set(key, e.target.checked) }), t('models_' + key))),
+        select('period', [['today', 'modelStatsToday'], ['history', 'modelStatsHistory']]),
+        select('position', [['first', 'modelsFirst'], ['afterBalance', 'modelsAfter'], ['last', 'modelsLast']]),
+        select('summary', [['total', 'modelsTotal'], ['top', 'modelsTop']]),
+        ['topN', 'refreshSeconds'].map(key => el('div', { key, className: 'cm-field' }, el('label', null, t('models_' + key)), numInput({ value: cfg[key] }, v => set(key, Math.max(key === 'topN' ? 1 : 10, Math.min(key === 'topN' ? 10 : 60, Math.floor(v))))))))
+    }
+
 // Real footer markup, clipped and scaled only in the small style selector.
 // The editable scene itself always stays at its normal size.
 function SidebarStyleSample({ render, config, mode, data, examples }) {
@@ -69,12 +82,15 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
       [['both', text('倒计时 + 切换时间', 'Countdown + switch time')], ['countdown', text('只看倒计时', 'Countdown')], ['switch', text('只看切换时间', 'Switch time')]], value => set({ peakTimeDisplay: value })), { 'data-display-option': 'peak-time' }) : null]
   if (selected === 'models') {
     const names = { models_remember: text('记住展开', 'Remember'), models_tokens: 'Token', models_shares: text('费用占比', 'Cost share') }
-    controls = [props.renderModelsSettings({ visibilityControl: false, t: key => names[key] ?? t(key) })]
+    controls = [el(ModelSidebarSettings, { ...props, visibilityControl: false, t: key => names[key] ?? t(key) })]
     if (region === 'composer') controls = [choice(text('统计周期', 'Period'), config.sidebarModels?.period ?? 'today',
       [['today', t('modelStatsToday')], ['history', t('modelStatsHistory')]], value => nested('sidebarModels', { period: value })),
       el('p', { className: 'cm-inspector-note' }, text('显示花费最高的模型。侧栏明细在“侧栏”页调整。', 'Shows the highest-cost model. Customize sidebar details in Sidebar.'))]
   }
   if (selected === 'badge') controls = sessionControls()
+  if (selected === 'sessionList') controls = [choice(text('统计周期', 'Period'), config.sessionListCostPeriod ?? 'total',
+    [['total', text('累计', 'Total')], ['today', text('今日', 'Today')]], value => set({ sessionListCostPeriod: value })),
+    el('p', { className: 'cm-inspector-note' }, text('只读取可见会话的账本费用，沿用金额口径。窄栏不显示。', 'Reads ledger amounts for visible sessions using the current cost basis. Hidden in the narrow rail.'))]
   if (selected === 'corner') controls = [['goRolling', 'cornerGoRolling'], ['goWeekly', 'cornerGoWeekly'], ['goMonthly', 'cornerGoMonthly'], ['budget', 'cornerBudget']]
     .map(([key, label]) => check(t(label), config.corner?.[key] !== false, value => nested('corner', { [key]: value })))
   if (selected?.startsWith('strip-')) controls = [direction(selected === 'strip-plans' ? 'plan' : selected.slice(6))]
@@ -115,7 +131,7 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
   const scope = region === 'sidebar' ? text('在侧栏显示', 'Show in sidebar') : region === 'composer' ? text('在输入区显示', 'Show in composer') : text('在会话内容显示', 'Show in conversation')
   return el('aside', { className: 'cm-display-inspector cm-inspector-unified', 'data-component': selected ?? '', 'aria-label': text('外观与组件设置', 'Appearance and component settings') },
     field(text('调整组件', 'Customize'), el('select', { className: 'cm-input', value: selected ?? '', onChange: event => select(event.target.value) },
-      ...(region === 'sidebar' ? ['budget','balance','today','peak','models','go','plan','customBalance','codex'] : region === 'composer' ? ['strip-budget','strip-go','strip-plans','strip-codex','session-dock','badge','corner','models'] : ['session-header','badge','turn']).map(key => el('option', { key, value: key }, labels[key])))),
+      ...(region === 'sidebar' ? ['sessionList','budget','balance','today','peak','models','go','plan','customBalance','codex'] : region === 'composer' ? ['strip-budget','strip-go','strip-plans','strip-codex','session-dock','badge','corner','models'] : ['session-header','badge','turn']).map(key => el('option', { key, value: key }, labels[key])))),
     selection ? el('div', { className: 'cm-inspector-visibility', title: scope }, check(text('显示此组件', 'Show this component'), selection.on, () => set(selection.patch), { 'data-display-toggle': selected })) : null,
     selected ? el('div', { className: 'cm-inspector-controls', key: selected, 'data-inspector': selected }, ...controls) : null,
     region === 'sidebar' ? el('button', { type: 'button', className: 'cm-inspector-layout', 'aria-expanded': stylesOpen, onClick: () => setStylesOpen?.(!stylesOpen) }, text('侧栏布局', 'Sidebar layout'), el('span', null, text(mode === 'simple' ? '简洁' : mode === 'compact' ? '紧凑' : '标准', mode === 'simple' ? 'Simple' : mode === 'compact' ? 'Compact' : 'Standard'), stylesOpen ? ' ▴' : ' ▾')) : null,

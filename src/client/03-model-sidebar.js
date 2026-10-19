@@ -2,7 +2,7 @@
     const MODEL_SIDEBAR_DEFAULTS = { enabled: false, period: 'today', topN: 5, summary: 'total', position: 'last', defaultOpen: false, remember: true, tokens: false, shares: true, refreshSeconds: 60, dock: false }
     const MODEL_OPEN_KEY = 'dsh-cost-meter:models-open'
     function sidebarModelRows(state, period, t) {
-      return modelStatsRows(state, state.config, t, period).map(r => ({ ...r, label: r.key === 'deepseek:legacy' ? r.label : prettyProviderKey(r.key), cost: displayCostOf(r, state.config) }))
+      return modelStatsRows(state, state.config, t, period).map(r => ({ ...r, label: state.modelLabels?.[r.key] ?? (r.key === 'deepseek:legacy' ? r.label : prettyProviderKey(r.key)), cost: displayCostOf(r, state.config) }))
         .sort((a, b) => b.cost - a.cost || b.tokens - a.tokens || a.key.localeCompare(b.key))
     }
     function SidebarModelCosts({ state, wide, preview = false }) {
@@ -45,16 +45,4 @@
             el('div', { className: 'cm-bbox-head' }, el('span', { className: 'cm-bal-label', title: r.label }, r.label), el('span', { className: 'cm-num cm-bal-amt' }, money(r.cost))),
             cfg.shares ? el('div', { className: 'cm-bbox-bar', title: (total > 0 ? r.cost / total * 100 : 0).toFixed(1) + '%' }, el('div', { className: 'cm-bbox-fill', style: { width: (total > 0 ? r.cost / total * 100 : 0) + '%' } })) : null,
             cfg.tokens ? el('div', { className: 'cm-mstats-note' }, t('modelStatsInput') + ' ' + formatTokens(r.input) + ' · ' + t('modelStatsCache') + ' ' + formatTokens(r.cacheRead + r.cacheWrite) + ' · ' + t('modelStatsOutput') + ' ' + formatTokens(r.output)) : null)) : el('span', { className: 'cm-note' }, t('modelStatsEmpty'))) : null)
-    }
-    function ModelSidebarSettings({ draft, setDraft, t, visibilityControl = true }) {
-      const cfg = { ...MODEL_SIDEBAR_DEFAULTS, ...draft?.sidebarModels }
-      const set = (key, value) => { if (draft) setDraft({ ...draft, sidebarModels: { ...cfg, [key]: value } }) }
-      const select = (key, choices) => el('div', { className: 'cm-field', key, 'data-model-field': key }, el('label', null, t('models_' + key)), el('select', { className: 'cm-input', value: cfg[key], onChange: e => set(key, e.target.value) }, choices.map(([value, label]) => el('option', { key: value, value }, t(label)))))
-      return el('div', { className: 'cm-grid' },
-        visibilityControl ? el('div', { className: 'cm-grid-group' }, t('modelsTitle')) : null,
-        ['enabled', 'defaultOpen', 'remember', 'tokens', 'shares', 'dock'].filter(key => visibilityControl || key !== 'enabled').map(key => el('label', { key, className: 'cm-check', 'data-model-field': key }, el('input', { type: 'checkbox', role: visibilityControl ? undefined : 'switch', checked: cfg[key], onChange: e => set(key, e.target.checked) }), t('models_' + key))),
-        select('period', [['today', 'modelStatsToday'], ['history', 'modelStatsHistory']]),
-        select('position', [['first', 'modelsFirst'], ['afterBalance', 'modelsAfter'], ['last', 'modelsLast']]),
-        select('summary', [['total', 'modelsTotal'], ['top', 'modelsTop']]),
-        ['topN', 'refreshSeconds'].map(key => el('div', { key, className: 'cm-field' }, el('label', null, t('models_' + key)), numInput({ value: cfg[key] }, v => set(key, Math.max(key === 'topN' ? 1 : 10, Math.min(key === 'topN' ? 10 : 60, Math.floor(v))))))))
     }

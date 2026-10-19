@@ -733,8 +733,8 @@
           const tokens = b.input + b.output + b.cacheRead + b.cacheWrite + b.reasoning
           const hitDen = b.cacheRead + b.input
           return {
-            label: key === 'deepseek:legacy' ? t('modelStatsLegacy')
-              : (provider === 'deepseek' || provider === '' ? model : prettyProvider(provider) + ':' + model),
+            label: state.modelLabels?.[key] ?? (key === 'deepseek:legacy' ? t('modelStatsLegacy')
+              : (provider === 'deepseek' || provider === '' ? model : prettyProvider(provider) + ':' + model)),
             key, ...b, tokens,
             // 计费方式(issue #64):plan=订阅额度(费用为等值口径),api=按量计费。
             cls: billingClassOfLocal(provider, model, config),
@@ -2241,8 +2241,7 @@
             return el('div', { className: 'cm-footer-stack' + (simple ? ' simple' : preview.sidebarStyle === 'compact' ? ' compact' : '') },
               el(BudgetBoxContent, { state: sampleState, wide: true, summary: simple }),
               el(MiniMaxPlanCard, { five: windows.five ?? { percent: 24 }, seven: windows.seven ?? { percent: 18 }, fetchedAt: 0, t, wide: true, direction: barDirectionOf(preview, 'plan') }))
-          },
-          renderModelsSettings: options => el(ModelSidebarSettings, { draft, setDraft, t, ...options }) }))
+          } }))
         : null,
         // ── 价格:峰谷计价、价格表、模型名匹配、官方价格同步、OpenRouter 公开报价 ──
         tab === 'pricing' ? el('div', { key: 'pricing', className: 'cm-pricing-page' },
@@ -2419,7 +2418,7 @@
       }
       const pages = {}
       const loadPage = name => {
-        if (!pages[name]) pages[name] = require.async('./client.' + name + '.js').then(module => module.mount(ctx, store, resolveLocale)).catch(error => { delete pages[name]; throw error })
+        if (!pages[name]) pages[name] = require.async('./client.' + name + '.js').then(module => module.mount(ctx, store, resolveLocale, { formatMoneyUsd, displayCostOf, formatTokens })).catch(error => { delete pages[name]; throw error })
         return pages[name]
       }
       const api = {
@@ -2611,6 +2610,7 @@
       let lastPeakAlert = null
       const sync = () => {
         const state = store.getSnapshot().state
+        if (state?.config?.sessionListCosts) void loadPage('session-list').catch(() => {})
         const position = state?.config?.position ?? 'dock'
         const showToday = state?.config?.sidebar !== false && state?.config?.hideTodayCost !== true
         const balanceDisplay = state?.config?.balance?.display ?? 'both'

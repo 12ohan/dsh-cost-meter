@@ -2,9 +2,17 @@
 
 ## 中文
 
+### 会话列表、模型名称和额度
+
+- 在“费用 → 显示 → 侧栏 → 会话列表金额”开启行末金额，支持累计／今日及 Token 悬停说明，默认关闭。可见行合并查询、缓存并定时刷新，隐藏页面停止定时查询。
+- 模型花费与统计页读取宿主模型目录中的可读名称；统计键、价格匹配和已记录金额保持原样。
+- CommandCode 使用当前账期用量和剩余额度计算月使用比例；辅助接口失败时继续显示余额。
+- Codex 侧栏和输入区显示剩余额度进度条，侧栏同时显示本机时间的重置日期。
+- 修复本轮费用 RPC 未传递显示币种的问题，验证已有 OpenCode Go 凭据更新、401 状态清理与重试行为。Go 验证使用隔离测试数据，未读取报告者账户。
+
 ### Ollama Cloud 使用自己的峰谷时段
 
-Ollama Cloud 的 DeepSeek V4.1 Flash 与 V4 Pro 和 DeepSeek 官方同价，但峰谷日历不同：**周一至周五 12:00（含）至 18:00（不含）UTC 为峰时；其余时段与整个 UTC 周末为谷价；不适用中国法定假日**（[Ollama 价格页](https://registry.ollama.com/pricing)，2026-10-19 核对）。DeepSeek 官方仍为北京时间工作日 01:00–04:00、06:00–10:00 UTC 峰时，周末与法定假日全天谷价（[DeepSeek 价格页](https://api-docs.deepseek.com/quick_start/pricing/)）。
+Ollama Cloud 的 DeepSeek V4.1 Flash 与 V4 Pro 和 DeepSeek 官方同价，但峰谷日历不同：**周一至周五 12:00（含）至 18:00（不含）UTC 为峰时；其余时段与整个 UTC 周末为谷价；不适用中国法定假日**（[Ollama 价格页](https://registry.ollama.com/pricing)，2026-10-19 核对）。DeepSeek 官方仍按北京时间判断工作日，对应 01:00–04:00、06:00–10:00 UTC 峰时，周末与法定假日全天谷价（[DeepSeek 价格页](https://api-docs.deepseek.com/quick_start/pricing/)）。
 
 `ollama-cloud` 没有独立价格表，会自动匹配 DeepSeek 主表并沿用官方时段。因此此前：
 
@@ -24,7 +32,7 @@ Ollama Cloud 的 DeepSeek V4.1 Flash 与 V4 Pro 和 DeepSeek 官方同价，但�
 
 ### 构建
 
-主客户端超出 DSH STORE 单文件上限前只剩 145 字节。CSS 词组打包改为每轮按当前打包文本重新计数，选择实测节省最多的词组；构建继续逐字节校验解包后的样式与 esbuild 输出一致，界面与样式不变。`lib/client.js` 为 261,996 字节，低于 262,144 字节上限。
+主客户端超出 DSH STORE 单文件上限前只剩 145 字节。CSS 词组打包改为每轮按当前打包文本重新计数，选择实测节省最多的词组；构建继续逐字节校验解包后的样式与 esbuild 输出一致，界面与样式不变。模型显示设置移入按需加载的显示模块。`lib/client.js` 为 261,266 字节，低于 262,144 字节上限。
 
 ### 历史费用
 
@@ -33,6 +41,14 @@ Ollama Cloud 的 DeepSeek V4.1 Flash 与 V4 Pro 和 DeepSeek 官方同价，但�
 更新后完全退出 DSH（包括托盘）再打开。
 
 ## English
+
+### Session list, model names and quotas
+
+- Optional session-row amounts show total or today's cost and token details on hover. The feature is off by default, batches visible rows, caches results, and pauses periodic reads when the page is hidden.
+- Model cost cards and statistics use readable names from the host catalog while retaining original aggregation keys and prices.
+- CommandCode monthly usage combines billing-period consumption with remaining credits; failed auxiliary reads retain the balance display.
+- Codex cards show remaining-quota progress and local reset times. Turn-cost RPC now forwards the display currency.
+- Existing OpenCode Go authentication, credential replacement and retry handling pass isolated regression tests; the reporter's live account was not accessed.
 
 ### Ollama Cloud uses its own peak calendar
 
@@ -56,7 +72,7 @@ This release:
 
 ### Build
 
-The main client was 145 bytes below the DSH STORE per-file bound. CSS phrase packing now re-counts candidates in the packed text each round and takes the largest measured saving. The build still checks that the unpacked stylesheet matches esbuild's output byte for byte; the UI and styles are unchanged. `lib/client.js` is 261,996 bytes, below the 262,144-byte bound.
+The main client was 145 bytes below the DSH STORE per-file bound. CSS phrase packing now re-counts candidates in the packed text each round and takes the largest measured saving. The build still checks that the unpacked stylesheet matches esbuild's output byte for byte; the UI and styles are unchanged. Model display settings now load with the display module. `lib/client.js` is 261,266 bytes, below the 262,144-byte bound.
 
 ### Recorded history
 

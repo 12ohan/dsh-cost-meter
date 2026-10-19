@@ -1,12 +1,13 @@
 # Changelog
 
-## [Unreleased]
-
-- Pending review: correct the Ollama Cloud DeepSeek peak calendar while preserving recorded history. The proposed 1.9.13 changes are detailed below; this version has not been released. Reported by [@LetterXbox](https://github.com/LetterXbox), with reproduction and scope discussion in [#337](https://github.com/Han-1413141/dsh-cost-meter/issues/337).
-- 待评审：修正 Ollama Cloud DeepSeek 峰谷日历并保留历史入账金额。拟议的 1.9.13 改动详见下文，该版本尚未发布。问题由 [@LetterXbox](https://github.com/LetterXbox) 报告，复现与范围讨论见 [#337](https://github.com/Han-1413141/dsh-cost-meter/issues/337)。
-
 ## [1.9.13] - 2026-10-19
 
+- 新增会话列表行末金额，默认关闭，支持累计／今日、显示币种和金额精度，悬停查看 Token；可见行合并查询并缓存，收起侧栏时隐藏。感谢 [@2JumpSinA](https://github.com/2JumpSinA) 在 [#332](https://github.com/Han-1413141/dsh-cost-meter/issues/332) 提出需求与交互建议。
+- CommandCode 根据当前账期用量和余额计算月额度使用率，辅助查询失败时保留余额。感谢 [@YQLiu-git](https://github.com/YQLiu-git) 在 [#334](https://github.com/Han-1413141/dsh-cost-meter/issues/334) 提供接口、样例与计算方法。
+- 统计页和模型花费卡使用宿主模型目录中的可读名称，保留原始统计键。感谢 [@ArseneLupins](https://github.com/ArseneLupins) 在 [#335](https://github.com/Han-1413141/dsh-cost-meter/issues/335) 报告第三方模型名称问题。
+- 修复本轮费用 RPC 丢失显示币种参数的问题。感谢 [@CelicaRTX](https://github.com/CelicaRTX) 在 [#338](https://github.com/Han-1413141/dsh-cost-meter/issues/338) 提供问题定位与修复建议。
+- 合入 [PR #339](https://github.com/Han-1413141/dsh-cost-meter/pull/339) 的 Codex 额度进度条与重置时间显示；修复异步余额测试及 Windows 锁测试的等待方式。复核 [@weimingyu9312](https://github.com/weimingyu9312) 在 [#325](https://github.com/Han-1413141/dsh-cost-meter/issues/325) 报告的 OpenCode Go 401：现有认证处理通过回归，旧失败状态不会阻止更换凭据后重试。
+- 感谢 [@LetterXbox](https://github.com/LetterXbox) 在 [#337](https://github.com/Han-1413141/dsh-cost-meter/issues/337) 提供 Ollama Cloud 问题复现，并在 [PR #336](https://github.com/Han-1413141/dsh-cost-meter/pull/336) 提交日历修复、历史兼容与测试。
 - 修复 Ollama Cloud 的 DeepSeek V4.1 Flash / V4 Pro 套用 DeepSeek 官方峰谷时段与中国法定假日规则的问题：改按 Ollama 自己的日历计费（周一至周五 12:00–18:00 UTC 为峰时，其余时段与 UTC 周末为谷价，无假日规则）。此前 DeepSeek 工作日 01:00–04:00、06:00–10:00 UTC 按双倍入账，工作日 12:00–18:00 UTC 只记一半，其余时段金额正确。
 - 宿主计费、日志重算与会话投影使用同一规则；单价、缓存价、汇率、价格历史及其他渠道不变。历史价格版本保留各自的时段规则：更新前的调用在加载、回放与明细中保持原金额，仅在「历史费用」按渠道模型手动重算时改用新日历（沿用原汇率）。峰谷状态指示与提醒仍只显示 DeepSeek 官方时段。构建时 CSS 词组打包改为按实测节省逐轮选择，样式内容不变。[更新说明](docs/update-notes-1.9.13.md)
 

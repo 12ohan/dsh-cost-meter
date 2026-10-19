@@ -88,7 +88,8 @@ if (process.argv[2] === '--holder') {
       foreign.identity.start = String(BigInt(foreign.identity.start) - (foreign.identity.unit === 'ms' ? 60000n : 1n))
       const foreignPath = join(root, 'foreign.json')
       plant(foreignPath, child.pid, JSON.stringify(foreign), false)
-      assert.equal(withLedgerLock(foreignPath, () => 42, 100), 42)
+      // Windows must start PowerShell for this foreign PID's native birth time.
+      assert.equal(withLedgerLock(foreignPath, () => 42, 5000), 42)
     }
     const legacyForeign = join(root, 'legacy-foreign.json')
     const legacyOwner = plant(legacyForeign, child.pid, '')
