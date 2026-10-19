@@ -97,6 +97,9 @@ import {
 } from '../lib/coding-plans.js'
 import { extractByRule } from '../lib/custom-balance.js'
 
+// Wait for the static multi-process fixtures before probing Windows native IDs.
+await import('./ledger-lock-compatibility.mjs')
+
 // Fixture credentials must never reach live APIs. Tests override this guard with
 // explicit in-process mocks; the optional public pricing smoke is read-only opt-in.
 const defaultFetch = globalThis.fetch
