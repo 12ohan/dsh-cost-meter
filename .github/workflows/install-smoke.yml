@@ -207,6 +207,8 @@ jobs:
           export DSH_TEST_NODE_MODULES="$PWD/.tmp-native-search-host/node_modules"
           node test/native-search-host.mjs
           node test/web-request-host.mjs
+          node scripts/fetch-search-api-fixture.mjs
+          node test/search-api-host.mjs
           node test/native-search-proxy.mjs
           mkdir -p .tmp-native-package
           npm pack --pack-destination .tmp-native-package
@@ -276,6 +278,8 @@ jobs:
           node test/context-costs-regression-browser.mjs
           node test/native-search-host.mjs
           node test/web-request-host.mjs
+          node scripts/fetch-search-api-fixture.mjs
+          node test/search-api-host.mjs
           node test/codex-quota-browser.mjs
       - name: Install the packed plugin and start the real Web host
         run: |

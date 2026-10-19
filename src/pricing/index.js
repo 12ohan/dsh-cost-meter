@@ -9,7 +9,7 @@ window.__ModuleLoader__.load({
     let createPortal = null
     try { createPortal = require('react-dom')?.createPortal ?? null } catch {}
     const runFields = ['at', 'before', 'after', 'days', 'sessions', 'skipped']
-    const isRequestKey = key => ['deepseek-official:deepseek-web-search', 'deepseek-official:deepseek-web-fetch'].includes(key)
+    const isRequestKey = key => ['deepseek-official:deepseek-web-search', 'deepseek-official:deepseek-web-fetch', 'deepseek-official:deepseek-search-api', 'deepseek-official:deepseek-fetch-api', 'deepseek-official:deepseek-search-server'].includes(key)
     const historySchema = { parse: value => {
       if (!Array.isArray(value) || !value.every(row => runFields.every(key => Number.isFinite(row?.[key]) && row[key] >= 0) && (row.model === undefined || typeof row.model === 'string'))) throw new Error('Invalid recalculation history')
       return value

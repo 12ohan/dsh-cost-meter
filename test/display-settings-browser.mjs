@@ -8,6 +8,7 @@ import { build } from 'esbuild'
 import { sanitizeConfig, applyConfigPatch, zeroDay } from '../lib/store.js'
 import { stateSchema } from '../lib/typert.host.js'
 import { javascriptLiteral as literal } from '../scripts/javascript-literal.mjs'
+import { checkTodayAndOrder } from './today-sidebar-order-checks.mjs'
 import { checkDisplayPreview } from './display-preview-checks.mjs'
 
 const modules = resolve(process.env.DSH_TEST_UI_MODULES ?? '.tmp-pr240-host/node_modules')
@@ -31,6 +32,8 @@ window.__ModuleLoader__={load:mod=>window.peakUI=mod.factory(()=>React)};
 ${readFileSync('lib/client.peak.js', 'utf8')}
 window.__ModuleLoader__={load:mod=>window.displayUI=mod.factory(()=>React)};
 ${readFileSync('lib/client.display.js', 'utf8')}
+window.__ModuleLoader__={load:mod=>window.orderUI=mod.factory(()=>React)};
+${readFileSync('lib/client.sidebar-order.js', 'utf8')}
 const {CostSection,parseConfig,SidebarFooter}=window.mainUI.preview;
 let state=${literal(state)};state.config=parseConfig(state.config,'config');window.patches=[];window.listeners=new Set();window.failSave=false;window.mounts=0;
 const Display=window.displayUI.mount({effect:()=>{}},{getSnapshot:()=>({state}),subscribe:fn=>{window.listeners.add(fn);return()=>window.listeners.delete(fn)}});
@@ -39,6 +42,7 @@ window.current=()=>state.config;window.setConfig=patch=>{state={...state,config:
 window.changeLocale=locale=>window.setConfig({locale});
 const api={loadDisplay:async()=>Display,loadCommunity:async()=>()=>null,loadStatistics:async()=>()=>null,updateConfig:async patch=>{
   if(window.failSave)throw Error('synthetic save failure');const config=await window.saveConfig(patch);window.patches.push(patch);state={...state,config:parseConfig(config,'config')};return publish()}};
+window.orderUI.mount({effect:()=>{}},{getSnapshot:()=>({state}),subscribe:fn=>{window.listeners.add(fn);return()=>window.listeners.delete(fn)}},config=>config?.locale??'zh',{updateConfig:patch=>api.updateConfig(patch)});
 function useCost(){const[value,setValue]=React.useState(state);React.useEffect(()=>{window.listeners.add(setValue);return()=>window.listeners.delete(setValue)},[]);return{state:value,status:'ready'}}
 window.attachFixtureSidebar=container=>createRoot(container).render(h(SidebarFooter,{useCost,api,wide:true}));
 function App(){return h(React.Fragment,null,h(CostSection,{useCost,api}),h('div',{id:'actual-sidebar',style:{position:'fixed',left:-2000,width:352,fontSize:14,lineHeight:1.6}},h(SidebarFooter,{useCost,api,wide:true})))}
@@ -99,6 +103,7 @@ try {
   await page.screenshot({ path: join(output, 'skin-transparency-zh.png'), fullPage: true })
   await skinSwitch.uncheck()
   await page.waitForFunction(() => window.current().followSkinTransparency === false && getComputedStyle(document.querySelector('.cm-section')).backgroundColor !== 'rgba(0, 0, 0, 0)')
+  await checkTodayAndOrder(page, output)
   const region=async name=>page.getByRole('tab',{name,exact:true}).click()
   const item=key=>page.locator('.cm-preview [data-display="'+key+'"]')
   const selectStyle=async label=>{if(['标准','紧凑','简洁'].includes(label)&&await page.locator('.cm-style-thumbnail').count()===0)await page.locator('.cm-inspector-layout').click();await page.getByRole('button',{name:label,exact:true}).click()}
@@ -134,7 +139,7 @@ try {
   const parity=async()=>{
     await page.evaluate(()=>{document.getElementById('actual-sidebar').style.width=document.querySelector('.cm-sidebar-live').getBoundingClientRect().width+'px'})
     const values=await page.evaluate(()=>{
-      const snapshot=hostRoot=>{const root=hostRoot.querySelector(':scope > .cm-footer-stack')??hostRoot;const host=root.getBoundingClientRect();return [...root.querySelectorAll('.cm-footer-stack > *,[data-cm-display],.cm-bbox-head,.cm-bbox-line,.cm-bbox-bar')].map(n=>{const r=n.getBoundingClientRect();return{class:n.className,text:n.dataset.cmDisplay==='peak'?n.textContent.replace(/\d+/g,'#'):n.textContent,x:Math.round(r.x-host.x),y:Math.round(r.y-host.y),w:Math.round(r.width),h:Math.round(r.height)}})}
+      const snapshot=hostRoot=>{const root=hostRoot.querySelector(':scope > .cm-footer-stack')??hostRoot;const host=root.getBoundingClientRect();return [...root.querySelectorAll('.cm-footer-stack > *,[data-cm-display],.cm-bbox-head,.cm-bbox-line,.cm-bbox-bar')].filter(n=>!n.matches('.cm-order-handle,.cm-order-status')).map(n=>{const r=n.getBoundingClientRect();return{class:n.className,text:n.dataset.cmDisplay==='peak'?n.textContent.replace(/\d+/g,'#'):n.textContent,x:Math.round(r.x-host.x),y:Math.round(r.y-host.y),w:Math.round(r.width),h:Math.round(r.height)}})}
       return[snapshot(document.querySelector('.cm-sidebar-live')),snapshot(document.getElementById('actual-sidebar'))]
     })
     assert.deepEqual(values[0],values[1],'preview and real sidebar share exact card layout')

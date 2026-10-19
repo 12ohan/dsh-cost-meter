@@ -2421,7 +2421,7 @@
       }
       const pages = {}
       const loadPage = name => {
-        if (!pages[name]) pages[name] = require.async('./client.' + name + '.js').then(module => module.mount(ctx, store, resolveLocale, { formatMoneyUsd, displayCostOf, formatTokens })).catch(error => { delete pages[name]; throw error })
+        if (!pages[name]) pages[name] = require.async('./client.' + name + '.js').then(module => module.mount(ctx, store, resolveLocale, { formatMoneyUsd, displayCostOf, formatTokens, updateConfig: patch => api.updateConfig(patch) })).catch(error => { delete pages[name]; throw error })
         return pages[name]
       }
       const api = {
@@ -2429,7 +2429,7 @@
         loadOpenRouter: () => loadPage('openrouter'),
         loadCommunity: () => loadPage('community'),
         loadPricing: () => loadPage('pricing'),
-        loadDisplay: () => loadPage('display'),
+        loadDisplay: () => Promise.all([loadPage('display'), loadPage('sidebar-order')]).then(([view]) => view),
         loadCodex: () => loadPage('codex'),
         reload,
         updateConfig: async patch => {
@@ -2614,7 +2614,6 @@
       const sync = () => {
         const state = store.getSnapshot().state
         if (state?.config?.sessionListCosts) void loadPage('session-list').catch(() => {})
-        if (state?.config?.followSkinTransparency) void loadPage('display').catch(() => {})
         const position = state?.config?.position ?? 'dock'
         const showToday = state?.config?.sidebar !== false && state?.config?.hideTodayCost !== true
         const balanceDisplay = state?.config?.balance?.display ?? 'both'
@@ -2627,6 +2626,8 @@
           || Object.values(state?.config?.codingPlans ?? {}).some(side)
           || (state?.config?.gatewayQuotas?.sources ?? []).some(side)
           || visibleCustomEntries(state, state?.config).length > 0
+        if (state?.config?.followSkinTransparency) void loadPage('display').catch(() => {})
+        if (footer && require.async) void loadPage('sidebar-order').catch(() => {})
         const cornerEnabled = state?.config?.corner?.enabled === true || state?.config?.sidebarModels?.dock === true
         const sectionLocale = resolveLocale(state?.config || { activeLocale: store.getSnapshot().locale })
         const usagePosition = state?.config?.usage?.position ?? 'cost'

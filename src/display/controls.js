@@ -1,6 +1,6 @@
     function ModelSidebarSettings({ draft, setDraft, t, visibilityControl = true, numInput }) {
       const cfg = { enabled: false, period: 'today', topN: 5, summary: 'total', position: 'last', defaultOpen: false, remember: true, tokens: false, shares: true, refreshSeconds: 60, dock: false, ...draft?.sidebarModels }
-      const set = (key, value) => { if (draft) setDraft({ ...draft, sidebarModels: { ...cfg, [key]: value } }) }
+      const set = (key, value) => { if (draft) setDraft({ ...draft, ...(key === 'position' ? { sidebarOrder: [] } : {}), sidebarModels: { ...cfg, [key]: value } }) }
       const select = (key, choices) => el('div', { className: 'cm-field', key, 'data-model-field': key }, el('label', null, t('models_' + key)), el('select', { className: 'cm-input', value: cfg[key], onChange: e => set(key, e.target.value) }, choices.map(([value, label]) => el('option', { key: value, value }, t(label)))))
       return el('div', { className: 'cm-grid' },
         visibilityControl ? el('div', { className: 'cm-grid-group' }, t('modelsTitle')) : null,
@@ -44,8 +44,10 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
   const direction = (kind, label = t('barDirectionsTitle')) => React.cloneElement(choice(label, config.barDirections?.[kind] ?? (kind === 'balance' ? 'remaining' : 'used'),
     [['used', t('barDirectionUsed')], ['remaining', t('barDirectionRemaining')]], value => nested('barDirections', { [kind]: value })), { 'data-inspector-wide': true })
   const display = key => field(text('显示位置', 'Placement'), el('select', { className: 'cm-input', value: config[key]?.display === 'off' ? 'sidebar' : config[key]?.display ?? 'both', onChange: e => set({ [key]: { ...config[key], display: e.target.value }, ...(key === 'balance' ? { hideOfficialBalance: false } : {}) }) }, ...displayOptions(t).filter(option => option.props.value !== 'off')))
-  const todayControls = () => [
-    choice(t('sidebarTodayMetric'), config.sidebarTodayMetric ?? 'cost', [['cost', t('sidebarTodayCost')], ['tokens', t('sidebarTodayTokens')]], value => set({ sidebarTodayMetric: value }))]
+  const todayControls = () => ['cost', 'tokens'].map(kind => {
+    const mode = config.sidebarTodayMetric ?? 'cost', other = kind === 'cost' ? 'tokens' : 'cost'
+    return check(kind === 'cost' ? t('sidebarTodayCost') : t('sidebarTodayTokens'), mode !== other, enabled => set({ sidebarTodayMetric: enabled ? mode === other ? 'both' : kind : other }), { 'data-display-option': 'today-' + kind, disabled: mode === kind })
+  })
   const sessionControls = () => [
     choice(t('positionLabel'), config.position === 'off' ? region === 'conversation' ? 'header' : 'dock' : config.position ?? 'dock', [['dock', t('positionDock')], ['header', t('positionHeader')]], value => set({ position: value })),
     check(t('sessionCostCompact'), config.sessionCostCompact === true, value => set({ sessionCostCompact: value })),

@@ -238,7 +238,7 @@ console.log('[ok] 浏览器端 bundle 语法门禁(client.js vm 编译)通过')
   // 挂载:SidebarFooter 早退条件与节点插入都包含网关卡片(此前整条路径无 gateway 分支)。
   assert.ok(src96.includes('!showToday && !peakOn && gatewayNodes.length === 0) return null'), 'issue #96:SidebarFooter 早退条件纳入网关卡片与独立峰谷条')
   assert.ok(src96.includes('nodes.push(...gatewayNodes)'), 'issue #96:SidebarFooter 节点序列插入网关卡片(计划卡之后、Codex 之前)')
-  assert.ok(src96.indexOf('nodes.push(...gatewayNodes)') > src96.indexOf('MiniMaxPlanBox, { state, wide, api: api }') && src96.indexOf('nodes.push(...gatewayNodes)') < src96.indexOf('el(CodexPlanBox'), 'issue #96:网关卡片排序在计划卡之后、Codex 探测卡之前')
+  assert.ok(src96.indexOf('nodes.push(...gatewayNodes)') > src96.indexOf("MiniMaxPlanBox, { key: 'plan:' + id, state, wide, api: api }") && src96.indexOf('nodes.push(...gatewayNodes)') < src96.indexOf('el(CodexPlanBox'), 'issue #96:网关卡片排序在计划卡之后、Codex 探测卡之前')
   // 行渲染:复用 MiniMax 行(已用口径/告警阈值一致),Provider 前缀与 credits 兜底都在。
   assert.ok(/function GatewayQuotaBox[\s\S]*miniMaxRow\(name, win, direction, t\)/.test(src96), 'issue #96:网关卡片行渲染复用 miniMaxRow(与计划卡同口径)')
   assert.ok(/function GatewayQuotaBox[\s\S]*GATEWAY_PROVIDER_LABELS\[account\.provider\]/.test(src96), 'issue #96:多账号时行标签带 Provider 前缀')
@@ -1340,7 +1340,7 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   assert.ok(clientSource.includes('hideOfficialBalanceLabel') && clientSource.includes('hideTodayCostLabel'), '开关文案存在(zh/en)')
   assert.ok(clientSource.includes('hideOfficialBalance: v.hideOfficialBalance === true'), 'parseConfig 白名单含 hideOfficialBalance(读侧不剥离)')
   assert.ok(clientSource.includes('hideTodayCost: v.hideTodayCost === true'), 'parseConfig 白名单含 hideTodayCost(读侧不剥离)')
-  assert.ok(clientSource.includes("sidebarTodayMetric: v.sidebarTodayMetric === 'tokens'") && displaySource.includes("setField('sidebarTodayMetric'"), '今日指标双端接线')
+  assert.ok(clientSource.includes("sidebarTodayMetric: ['tokens', 'both'].includes") && displaySource.includes("setField('sidebarTodayMetric'"), '今日指标双端接线')
   assert.ok(clientSource.includes('showSessionId: v.showSessionId === true'), 'parseConfig 白名单补齐 showSessionId(既有缺陷修复)')
   // v1.5.38 的隐私模式遮罩已整体移除。
   assert.ok(!clientSource.includes('hideAmounts'), '客户端不再含 hideAmounts 隐私遮罩')
@@ -1426,7 +1426,7 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   assert.ok(clientSource.includes("useClickRefresh(api ? () => api.refreshCodingPlan('minimax') : null)"), 'MiniMax 图框接 refreshCodingPlan(minimax)')
   const footerSource = clientSource.match(/function renderSidebarFooter\(state, wide, api, preview = false\) \{([\s\S]*?)\n    \}/)?.[0] ?? ''
   assert.equal((footerSource.match(/api: api/g) ?? []).length, 6, '共享侧栏六类图框透传 api')
-  assert.ok(footerSource.includes('el(CodexPlanBox, { state, wide, api, preview })') && clientSource.includes('renderSidebarFooter(state, !!props.wide, props.api)'), '实际侧栏传入 api，预览显式禁用查询')
+  assert.ok(footerSource.includes("el(CodexPlanBox, { key: 'codex', state, wide, api, preview })") && clientSource.includes('renderSidebarFooter(state, !!props.wide, props.api)'), '实际侧栏传入 api，预览显式禁用查询')
   // 可点击语义与视觉反馈:a11y(role/tabIndex/aria-busy/键盘)、CSS(cursor/hover/busy 呼吸)。
   assert.ok(clientSource.includes('const clickableRefreshProps = (busy, run) => ({'), '可点击属性 helper 存在')
   assert.ok(clientSource.includes("role: 'button'") && clientSource.includes("tabIndex: 0") && clientSource.includes("'aria-busy': busy ? 'true' : 'false'"), 'role=button + tabIndex + aria-busy')
@@ -3842,8 +3842,8 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   // 侧边栏:按 display 门控的循环 + MiniMax 专用卡片 + 通用 CodingPlanBox。
   assert.ok(planSrc.includes('const sidebarPlanIds = CODING_PLAN_ROWS'), '侧边栏按 CODING_PLAN_ROWS 遍历厂商')
   assert.ok(planSrc.includes("entry.display !== 'sidebar' && entry.display !== 'both'"), '侧边栏门控 display=sidebar/both')
-  assert.ok(planSrc.includes('el(MiniMaxPlanBox, { state, wide, api: api })'), 'MiniMax 沿用专用 5h/7d 卡片(issue #37 起透传 api 支持点击刷新)')
-  assert.ok(planSrc.includes('el(CodingPlanBox, { id, state, wide, api: api })'), '其余厂商走通用 CodingPlanBox')
+  assert.ok(planSrc.includes("el(MiniMaxPlanBox, { key: 'plan:' + id, state, wide, api: api })"), 'MiniMax 沿用专用 5h/7d 卡片(issue #37 起透传 api 支持点击刷新)')
+  assert.ok(planSrc.includes("el(CodingPlanBox, { key: 'plan:' + id, id, state, wide, api: api })"), '其余厂商走通用 CodingPlanBox')
   assert.ok(planSrc.includes('function CodingPlanBox(props)'), '通用卡片组件定义存在')
   assert.ok(planSrc.includes('function codingPlanWindowLabel(name, t)'), '窗口名本地化(fiveHour/weekly/monthly)')
   // 通用卡片样式:宽标签与文本窗口行的 CSS。
@@ -4618,7 +4618,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   assert.ok(clientSrcV16.includes('function displayCostOf'), 'displayCostOf 辅助存在')
   assert.ok(clientSrcV16.includes('displayCostOf(state.today, config)'), '概览卡片走展示口径')
   assert.ok(!clientSrcV16.includes("moneyCostOf(state.today)"), '旧 moneyCostOf 卡片消费点已全部替换')
-  assert.ok(clientSrcV16.includes("showTotalWithPlan: v.showTotalWithPlan === true"), '读侧白名单')
+  assert.ok(clientSrcV16.includes("'showTotalWithPlan'"), '读侧白名单')
   assert.ok(clientSrcV16.includes("setField('showTotalWithPlan'") === false, '设置页旧勾选已移除')
   assert.ok(clientSrcV16.includes('cm-cards-toggle') && clientSrcV16.includes("setDraft({ ...base, showTotalWithPlan"), '概览卡片下快捷开关写回(自动保存即时生效)')
   assert.ok(clientSrcV16.includes('cardsTogglePlanTotal'), '开关中英文案存在')
@@ -6949,6 +6949,7 @@ await import('./billing-statistics-client.mjs')
 await import('./client-style-injection.mjs')
 await import('./native-search-history.mjs')
 await import('./web-request-billing.mjs')
+await import('./search-versions.mjs')
 await import('./versioned-session-logs.mjs')
 await import('./session-log-repair.mjs')
 await import('./client-issues-127-129.mjs')

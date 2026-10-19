@@ -137,31 +137,21 @@
         // showSessionId 曾遗漏于本白名单:checkbox 能保存但读侧恒 undefined,
         // 会话列表附显 ID 自上线以来实际从未生效(v1.5.38 起一并修复)。
         showSessionId: v.showSessionId === true,
-        sessionListCosts: v.sessionListCosts === true,
-        sessionListCostPeriod: v.sessionListCostPeriod === 'today' ? 'today' : 'total',
         hideOfficialBalance: v.hideOfficialBalance === true,
-        hideBudget: v.hideBudget === true,
         hideTodayCost: v.hideTodayCost === true,
+        sessionListCostPeriod: v.sessionListCostPeriod === 'today' ? 'today' : 'total',
         modelStatistics: v.modelStatistics ?? {},
-        ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'followSkinTransparency'], value => value === true),
-        sessionCostCompact: v.sessionCostCompact === true,
-        contextCostsEnabled: v.contextCostsEnabled === true,
-        contextCostsPromptSeen: v.contextCostsPromptSeen === true,
-        sidebarTodayMetric: v.sidebarTodayMetric === 'tokens' ? 'tokens' : 'cost',
+        ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'followSkinTransparency', 'sessionListCosts', 'hideBudget', 'sessionCostCompact', 'contextCostsEnabled', 'contextCostsPromptSeen', 'showTotalWithPlan', 'sidebarSimple', 'sidebarSimplePromptSeen', 'codexQuotaEnabled', 'codexCompatPromptDismissed', 'includeSubagentCost', 'peakEnabled', 'peakAlertWebNotify', 'peakProgressPromptSeen'], value => value === true),
+        sidebarTodayMetric: ['tokens', 'both'].includes(v.sidebarTodayMetric) ? v.sidebarTodayMetric : 'cost',
+        sidebarOrder: Array.isArray(v.sidebarOrder) ? v.sidebarOrder : [],
         statisticsBasis: v.statisticsBasis,
-        showTotalWithPlan: v.showTotalWithPlan === true,
-        sidebarSimple: v.sidebarSimple === true,
-        sidebarSimplePromptSeen: v.sidebarSimplePromptSeen === true,
         sidebarModels: Object.fromEntries(Object.entries(MODEL_SIDEBAR_DEFAULTS).map(([k, v0]) => [k, v.sidebarModels?.[k] ?? v0])),
-        codexQuotaEnabled: v.codexQuotaEnabled === true,
         codexQuotaSidebar: v.codexQuotaSidebar !== false,
         codexQuotaStrip: v.codexQuotaStrip !== false,
         codexQuotaSource: ['connect', 'subscription', 'chatgpt'].includes(v.codexQuotaSource) ? v.codexQuotaSource : 'auto',
         // Codex 订阅兼容(契约 B-5):用户已关闭一次性提示 / 已应用历史归类的时点。
         // 直通白名单缺失会导致关闭后重开页面又弹提示,或应用后状态行回落「未应用」。
-        codexCompatPromptDismissed: v.codexCompatPromptDismissed === true,
         codexCompatHistoryAppliedAt: num0(v.codexCompatHistoryAppliedAt),
-        includeSubagentCost: v.includeSubagentCost === true,
         sidebarStyle: v.sidebarStyle === 'compact' ? 'compact' : 'standard',
         priceMatchDismissed: Array.isArray(v.priceMatchDismissed) ? v.priceMatchDismissed.filter(key => typeof key === 'string') : [],
         // 官方价格币种(issue #47):读侧白名单缺失会导致下拉选择保存后读不回。
@@ -172,7 +162,6 @@
         exchangeRate: needNum(v.exchangeRate, path + '.exchangeRate'),
         exchangeRateAuto: v.exchangeRateAuto !== false,
         fxRates: v.fxRates, exchangeRateDate: v.exchangeRateDate ?? '', exchangeRateCheckedAt: v.exchangeRateCheckedAt ?? 0,
-        peakEnabled: v.peakEnabled === true,
         peakEffectiveAt: typeof v.peakEffectiveAt === 'string' ? v.peakEffectiveAt : '',
         peakWindows: Array.isArray(v.peakWindows)
           ? v.peakWindows.map((w, i) => ({ start: needNum(w.start, path + '.peakWindows[' + i + '].start'), end: needNum(w.end, path + '.peakWindows[' + i + '].end') }))
@@ -183,10 +172,8 @@
         peakAlertAhead: Number.isFinite(v.peakAlertAhead) && v.peakAlertAhead >= 1 && v.peakAlertAhead <= 30 ? v.peakAlertAhead : 2,
         peakAlertTarget: v.peakAlertTarget === 'peak' || v.peakAlertTarget === 'offpeak' ? v.peakAlertTarget : 'both',
         peakAlertPosition: v.peakAlertPosition === 'center' ? 'center' : 'corner',
-        peakAlertWebNotify: v.peakAlertWebNotify === true,
         peakStyle: ['classic', 'progress'].includes(v.peakStyle) ? v.peakStyle : 'compact',
         peakTimeDisplay: ['countdown', 'switch'].includes(v.peakTimeDisplay) ? v.peakTimeDisplay : 'both',
-        peakProgressPromptSeen: v.peakProgressPromptSeen === true,
         priceMatch: v.priceMatch === 'exact' ? 'exact' : 'auto',
         priceOverrides: (() => {
           const out = {}
@@ -3021,7 +3008,7 @@
       const rail = el('div', { className: 'cm-bbox-rail cm-num' }, railText)
       return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', {
-          ...hoverProps, className: 'cm-bbox cm-mm clickable' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''),
+          ...hoverProps, 'data-cm-display': 'gateway', 'data-cm-source': source.id, className: 'cm-bbox cm-mm clickable' + (level === 'ok' ? '' : ' ' + level) + (wide === false ? ' rail' : '') + (refresh.busy ? ' busy' : ''),
           ...clickableRefreshProps(refresh.busy, refresh.run),
         }, wide === false ? el(Fragment, null, rail, switchBtn) : body))
     }
@@ -3034,7 +3021,7 @@
         if (source.enabled === false || (source.display !== 'sidebar' && source.display !== 'both')) continue
         const live = snaps.find(q => q.id === source.id)
         if (!live || (live.status !== 'ok' && live.status !== 'partial' && live.status !== 'stale') || live.accounts.length === 0) continue
-        nodes.push(el(GatewayQuotaBox, { source, snapshot: live, state, wide, api }))
+        nodes.push(el(GatewayQuotaBox, { key: 'gateway:' + source.id, source, snapshot: live, state, wide, api }))
       }
       return nodes
     }
@@ -3366,9 +3353,10 @@
     }
 
     function sidebarTodayValue(today, config, t) {
-      return config.sidebarTodayMetric === 'tokens'
-        ? formatTokens(['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning'].reduce((sum, key) => sum + (Number(today?.[key]) || 0), 0)) + ' ' + t('tokensUnit')
-        : formatMoneyUsd(displayCostOf(today, config), config)
+      const mode = config.sidebarTodayMetric ?? 'cost'
+      return el('span', { className: 'cm-today-values', 'data-both': mode === 'both' },
+        mode !== 'tokens' ? el('span', { 'data-cm-today': 'cost' }, formatMoneyUsd(displayCostOf(today, config), config)) : null,
+        mode !== 'cost' ? el('span', { 'data-cm-today': 'tokens' }, formatTokens(['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning'].reduce((sum, key) => sum + (Number(today?.[key]) || 0), 0)) + ' ' + t('tokensUnit')) : null)
     }
 
     function BudgetBoxContent(props) {
@@ -3483,36 +3471,28 @@
       const simple = config.sidebarSimple === true
       const compactWide = !simple && wide && config.sidebarStyle === 'compact'
       const nodes = []
-      if (simple && wide && showToday) nodes.push(el('div', { 'data-cm-display': 'today', className: 'cm-simple-summary' },
+      if (simple && wide && showToday) nodes.push(el('div', { key: 'today', 'data-cm-display': 'today', className: 'cm-simple-summary' },
         el('span', null, t('today')), el('span', { className: 'cm-num' }, sidebarTodayValue(state.today, config, t))))
-      if (showBalanceBar) nodes.push(el(BalanceBox, { state, wide, api: api }))
-      else if (showBalance) nodes.push(el(BalanceRowContent, { state, wide, api: api }))
-      if (showCustomBalanceBar) nodes.push(el(CustomBalanceBox, { state, wide, api: api }))
-      else if (showCustomBalance) nodes.push(el(CustomBalanceRowContent, { state, wide, api: api }))
+      if (showBalanceBar) nodes.push(el(BalanceBox, { key: 'balance', state, wide, api: api }))
+      else if (showBalance) nodes.push(el(BalanceRowContent, { key: 'balance', state, wide, api: api }))
+      if (showCustomBalanceBar) nodes.push(el(CustomBalanceBox, { key: 'customBalance', state, wide, api: api }))
+      else if (showCustomBalance) nodes.push(el(CustomBalanceRowContent, { key: 'customBalance', state, wide, api: api }))
       const afterBalance = nodes.length
       if (plansOn) nodes.push(...sidebarPlanIds.map(id => id === 'minimax'
-        ? el(MiniMaxPlanBox, { state, wide, api: api })
-        : el(CodingPlanBox, { id, state, wide, api: api })))
+        ? el(MiniMaxPlanBox, { key: 'plan:' + id, state, wide, api: api })
+        : el(CodingPlanBox, { key: 'plan:' + id, id, state, wide, api: api })))
       nodes.push(...gatewayNodes)
-      if (codexOn) nodes.push(el(CodexPlanBox, { state, wide, api, preview }))
-      if (goOk && budgetOn && wide && !simple) {
-        // 同时出现:合并为一张卡片(Go 在上、预算在下,细分隔线),各自保留预警色与自己的详细信息开关。
-        const goView = goBoxBody(state, config, t)
-        const budgetView = budgetBoxBody(state, config, t)
-        const level = goView.level === 'over' || budgetView.level === 'over' ? 'over'
-          : goView.level === 'warn' || budgetView.level === 'warn' ? 'warn' : 'ok'
-        nodes.push(el('div', { className: 'cm-bbox cm-bbox-pair' + (level === 'ok' ? '' : ' ' + level) },
-          el('div', { 'data-cm-display': 'go', className: 'cm-bbox-section' + (goView.level === 'ok' ? '' : ' ' + goView.level) }, goView.body),
-          el('div', { className: 'cm-bbox-divider' }),
-          el('div', { 'data-cm-display': 'budget', className: 'cm-bbox-section' + (budgetView.level === 'ok' ? '' : ' ' + budgetView.level) }, budgetView.body)))
-      } else {
-        if (goOk) nodes.push(el(GoQuotaBox, { state, wide }))
-        if (budgetOn) nodes.push(el(BudgetBoxContent, { state, wide, summary: simple && wide }))
-      }
-      if (showToday && !(simple && wide)) nodes.push(el(BudgetBoxContent, { state, wide, todayOnly: true }))
+      if (codexOn) nodes.push(el(CodexPlanBox, { key: 'codex', state, wide, api, preview }))
+      if (goOk) nodes.push(el(GoQuotaBox, { key: 'go', state, wide }))
+      if (budgetOn) nodes.push(el(BudgetBoxContent, { key: 'budget', state, wide, summary: simple && wide }))
+      if (showToday && !(simple && wide)) nodes.push(el(BudgetBoxContent, { key: 'today', state, wide, todayOnly: true }))
       // Each display target owns its visibility; hiding another card cannot hide it.
-      if (peakOn) nodes.push(wide ? peakNoticeEl(state, config, t) : peakNoticeRailEl(state, config, t))
+      if (peakOn) nodes.push(el(Fragment, { key: 'peak' }, wide ? peakNoticeEl(state, config, t) : peakNoticeRailEl(state, config, t)))
       if (modelsOn) nodes.splice(config.sidebarModels.position === 'first' ? 0 : config.sidebarModels.position === 'afterBalance' ? afterBalance : nodes.length, 0,
         el(SidebarModelCosts, { key: 'models', state, wide, preview }))
+      if (config.sidebarOrder?.length) {
+        const rank = node => { const index = config.sidebarOrder.indexOf(node.key); return index < 0 ? 999 : index }
+        nodes.sort((a, b) => rank(a) - rank(b))
+      }
       return el('div', { ...(simple ? { tabIndex: 0, role: 'region', 'aria-label': t('sidebarSimple') } : {}), className: 'cm-footer-stack' + (wide ? '' : ' rail') + (compactWide ? ' compact' : '') + (simple ? ' simple' : '') }, ...nodes)
     }

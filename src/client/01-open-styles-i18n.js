@@ -381,6 +381,7 @@ window.__ModuleLoader__.load({
       // Theme backgrounds may carry alpha. Flatten owned surfaces without changing host tokens.
       'body{--cm-opaque-base:#fff}body[data-ds-dark-theme],body[data-theme=dark],html[data-theme=dark] body{--cm-opaque-base:#151517}',
       '.cm-section,.cm-stat-dialog,.cm-qguide,.cm-peak-alert,.cm-footer-stack.simple{background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base,#fff)) r g b / 1)}',
+      '.cm-today-values{display:inline-flex;flex-wrap:wrap;justify-content:flex-end;gap:2px 8px;min-width:0;max-width:100%}.cm-today-values>span{white-space:nowrap}.cm-today-values[data-both=true]>[data-cm-today=tokens]{font-size:11px;color:var(--dsw-alias-label-secondary)}',
       '.cm-simple-summary{background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-1,var(--dsw-alias-bg-base,#fff)) r g b / 1)}',
     ].join('\n')
     // 样式表注入。**按内容比对,不按 id 去重**:客户端插件热更新(DSH 的 client HMR,不刷新
