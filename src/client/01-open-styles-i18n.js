@@ -136,7 +136,7 @@ window.__ModuleLoader__.load({
       '.cm-field{display:flex;flex-direction:column;gap:6px;min-width:0}',
       '.cm-field label{font-size:12px;color:var(--dsw-alias-label-secondary)}',
       // #258: 原生下拉选项不会继承 select 的背景；皮肤为深色、宿主仍为浅色时会出现白字白底。
-      '.cm-input,.cm-input option{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base)}.cm-input{font:inherit;font-size:13px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:6px 10px;outline:none}',
+      '.cm-input,.cm-input option,.cm-input optgroup{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base)}.cm-input{font:inherit;font-size:13px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:6px 10px;outline:none}.cm-input:is(select){color-scheme:light dark}.cm-input:is(select) :is(option,optgroup){color:var(--dsw-alias-label-primary)!important;background:var(--dsw-alias-bg-base)!important;background:rgb(from var(--dsw-alias-bg-base) r g b / 1)!important}',
       '.cm-input:focus{border-color:var(--dsw-alias-state-business-primary)}',
       '.cm-input.narrow{max-width:120px}',
       '.cm-range-row{display:flex;align-items:center;gap:10px}',
@@ -248,7 +248,7 @@ window.__ModuleLoader__.load({
       '.cm-vendor-display{display:inline-flex;align-items:center;gap:4px;font-weight:400;font-size:11px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}',
       '.cm-mstats-tabs{display:flex;gap:8px;margin-bottom:8px}',
       '.cm-mstats-tab{background:none;border:1px solid var(--dsw-alias-border-l1);border-radius:999px;padding:2px 12px;font-size:12px;color:var(--dsw-alias-label-secondary);cursor:pointer}',
-      '.cm-mstats-tab.active{background:var(--dsw-alias-state-business-primary);border-color:var(--dsw-alias-state-business-primary);color:var(--dsw-alias-bg-base);font-weight:600}',
+      '.cm-model-costs .cm-mstats-tab.active{background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 14%,var(--dsw-alias-bg-base));border-color:var(--dsw-alias-state-business-primary);color:var(--dsw-alias-label-primary);font-weight:600}',
       '.cm-mstats-h{margin:10px 0 4px;font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}',
       '.cm-mstats-row{display:grid;grid-template-columns:minmax(90px,170px) 1fr auto;gap:8px;align-items:center;font-size:11px;line-height:1.7}',
       '.cm-mstats-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary)}',

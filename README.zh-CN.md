@@ -16,7 +16,7 @@
 
 新增 [DeepSeek Search／Fetch API 次数费](docs/web-request-fees.md#中文)，只计有结果的成功请求，并将网页抓取独立分类。
 
-**v1.9.10** 优化 Windows 账本写入启动：无锁竞争时不再同步启动 PowerShell。修正新旧版本混用时的锁身份判断，恢复 PID 复用后的旧锁回收，避免误删仍在使用的锁。
+**v1.9.10** 优化费用明细冷打开（4,800 次调用及嵌套子代理的浏览器实测为 835 ms），修复午夜黑皮肤控件，并优化 Windows 账本锁启动与新旧版本兼容。
 
 配置与验证：[OpenDesign 查询说明](docs/opendesign-billing.md)、[随机端口 / 局域网 / WorkBuddy2API 配置](docs/custom-balance-sources.md)、[透明度修复与性能测量](docs/performance-2026-10-18.md)。
 

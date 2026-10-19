@@ -16,7 +16,7 @@ Per-conversation cost · daily totals · OpenCode Go subscription quota display 
 
 Supports [official Search/Fetch request fees](docs/web-request-fees.md#english), separately from model tokens.
 
-**v1.9.10** removes synchronous PowerShell startup from uncontended Windows ledger writes. Versioned lock metadata keeps old and new plugin processes mutually exclusive, while unit-aware checks recover locks left behind after PID reuse.
+**v1.9.10** speeds up cold conversation details (835 ms for 4,800 calls with nested subagents in the measured browser test), fixes Midnight skin controls, and removes uncontended Windows lock startup blocking while preserving old/new lock compatibility.
 
 Configuration and verification: [OpenDesign queries](docs/opendesign-billing.md), [dynamic ports / LAN / WorkBuddy2API setup](docs/custom-balance-sources.md), and [opacity fixes with performance measurements](docs/performance-2026-10-18.md).
 
