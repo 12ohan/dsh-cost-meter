@@ -1514,6 +1514,7 @@
       { id: 'volcengine', labelKey: 'codingPlanVolcengine' },
       { id: 'qwen', labelKey: 'codingPlanQwen' },
       { id: 'mimo', labelKey: 'codingPlanMimo' },
+      { id: 'workbuddy', labelKey: 'wbT' },
       { id: 'factory', labelKey: 'codingPlanFactory' },
     ]
 
