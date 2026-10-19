@@ -2230,6 +2230,7 @@
           planOptions: CODING_PLAN_ROWS.map(row => [row.id, t(row.labelKey)]),
           onNavigate: (page, plan) => { setQuotaTarget(plan); setTab(page) },
           renderSidebar: (preview, data = state) => renderSidebarFooter({ ...data, config: preview }, true, undefined, true),
+          renderCorner: data => el(CornerChips, { useCost: () => ({ state: data }) }),
           renderStyleSample: (preview, data = state, examples = true) => {
             if (!examples) return renderSidebarFooter({ ...data, config: preview }, true, undefined, true)
             const simple = preview.sidebarSimple === true

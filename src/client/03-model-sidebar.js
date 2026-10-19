@@ -49,12 +49,12 @@
     function ModelSidebarSettings({ draft, setDraft, t, visibilityControl = true }) {
       const cfg = { ...MODEL_SIDEBAR_DEFAULTS, ...draft?.sidebarModels }
       const set = (key, value) => { if (draft) setDraft({ ...draft, sidebarModels: { ...cfg, [key]: value } }) }
-      const select = (key, choices) => el('div', { className: 'cm-field', key }, el('label', null, t('models_' + key)), el('select', { className: 'cm-input', value: cfg[key], onChange: e => set(key, e.target.value) }, choices.map(([value, label]) => el('option', { key: value, value }, t(label)))))
+      const select = (key, choices) => el('div', { className: 'cm-field', key, 'data-model-field': key }, el('label', null, t('models_' + key)), el('select', { className: 'cm-input', value: cfg[key], onChange: e => set(key, e.target.value) }, choices.map(([value, label]) => el('option', { key: value, value }, t(label)))))
       return el('div', { className: 'cm-grid' },
         visibilityControl ? el('div', { className: 'cm-grid-group' }, t('modelsTitle')) : null,
-        ['enabled', 'defaultOpen', 'remember', 'tokens', 'shares', 'dock'].filter(key => visibilityControl || key !== 'enabled').map(key => el('label', { key, className: 'cm-check' }, el('input', { type: 'checkbox', role: visibilityControl ? undefined : 'switch', checked: cfg[key], onChange: e => set(key, e.target.checked) }), t('models_' + key))),
+        ['enabled', 'defaultOpen', 'remember', 'tokens', 'shares', 'dock'].filter(key => visibilityControl || key !== 'enabled').map(key => el('label', { key, className: 'cm-check', 'data-model-field': key }, el('input', { type: 'checkbox', role: visibilityControl ? undefined : 'switch', checked: cfg[key], onChange: e => set(key, e.target.checked) }), t('models_' + key))),
         select('period', [['today', 'modelStatsToday'], ['history', 'modelStatsHistory']]),
-        select('summary', [['total', 'modelsTotal'], ['top', 'modelsTop']]),
         select('position', [['first', 'modelsFirst'], ['afterBalance', 'modelsAfter'], ['last', 'modelsLast']]),
+        select('summary', [['total', 'modelsTotal'], ['top', 'modelsTop']]),
         ['topN', 'refreshSeconds'].map(key => el('div', { key, className: 'cm-field' }, el('label', null, t('models_' + key)), numInput({ value: cfg[key] }, v => set(key, Math.max(key === 'topN' ? 1 : 10, Math.min(key === 'topN' ? 10 : 60, Math.floor(v))))))))
     }

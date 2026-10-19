@@ -12,6 +12,7 @@ window.__ModuleLoader__.load({
     const Native = Object.fromEntries(Object.entries(fallbackNative).map(([name, component]) => [name, hostNative[name] ?? component]))
     const css = 'DISPLAY_STYLE_SOURCE'
     /* DISPLAY_APPEARANCE_SOURCE */
+    /* DISPLAY_PARTS_SOURCE */
     /* DISPLAY_SIDEBAR_SOURCE */
     /* DISPLAY_CONTROLS_SOURCE */
     /* DISPLAY_EXAMPLES_SOURCE */
@@ -22,8 +23,8 @@ window.__ModuleLoader__.load({
       const en = locale === 'en', text = (zh, english) => en ? english : zh
       const [region, setRegion] = useState('sidebar'), [expanded, setExpanded] = useState(false)
       const [selected, setSelected] = useState('budget'), [selectedPlan, selectPlan] = useState('minimax'), [stylesOpen, setStylesOpen] = useState(false)
-      const select = (key, planId) => { setSelected(key); if (planId) selectPlan(planId) }
-      const chooseRegion = key => { setRegion(key); setSelected(key === 'sidebar' ? 'budget' : key === 'composer' ? 'strip-budget' : 'session-header') }
+      const select = (key, planId) => { setSelected(key); setStylesOpen(false); if (planId) selectPlan(planId) }
+      const chooseRegion = key => { setRegion(key); setStylesOpen(false); setSelected(key === 'sidebar' ? 'budget' : key === 'composer' ? 'strip-budget' : 'session-header') }
       const [examples, setExamples] = useState(() => {
         try { return localStorage.getItem('dsh-cost-meter:display-examples') !== 'false' } catch { return true }
       })
@@ -46,6 +47,7 @@ window.__ModuleLoader__.load({
       const goPercent = previewData.state.goQuota?.rolling?.percent ?? null
       const planPercent = Object.values(previewData.state.codingPlans ?? {}).flatMap(plan => Object.values(plan.windows ?? {})).find(win => Number.isFinite(win?.percent))?.percent ?? null
       const percentLabel = value => value === null ? '—' : Number(value.toFixed(1)) + '%'
+      const inner = (key, on, ...children) => el(key.startsWith('corner-') ? 'div' : 'span', { className: 'cm-preview-part', 'data-display-part': key, 'data-preview-hidden': !on }, ...children)
       const set = patch => setDraft(previous => ({ ...(previous ?? config), ...patch }))
 
       const item = (key, label, on, patch, content, extra = '') => {
@@ -56,7 +58,7 @@ window.__ModuleLoader__.load({
         title: label + text(' · 点击调整', ' · Click to customize'),
         onClick: () => select(key),
         onKeyDown: event => { if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); select(key) } },
-      }, el('span', { className: 'cm-display-item-content', inert: '' }, content),
+      }, el('div', { className: 'cm-display-item-content', inert: '', 'data-placeholder': label + ' —' }, content),
       el('span', { className: 'cm-display-item-tag', 'aria-hidden': true }, text('点击调整', 'Customize')))
         return node
       }
@@ -99,22 +101,27 @@ window.__ModuleLoader__.load({
       const session = position => item('session-' + position, text(position === 'header' ? '顶部费用明细' : '输入框下方费用明细', position === 'header' ? 'Header cost details' : 'Composer cost details'), config[position === 'header' ? 'hideSessionCostHeader' : 'hideSessionCostDock'] !== true,
         { [position === 'header' ? 'hideSessionCostHeader' : 'hideSessionCostDock']: config[position === 'header' ? 'hideSessionCostHeader' : 'hideSessionCostDock'] !== true },
         el('span', { className: 'cm-btn cm-stat-entry' }, text('费用明细', 'Cost details')))
-      const badge = position => (config.position === 'header' ? 'header' : 'dock') === position
-        ? item('badge', text('会话费用摘要', 'Session cost summary'), config.position !== 'off', { position: config.position === 'off' ? position : 'off' },
+      const badge = position => item('badge', text('会话费用摘要', 'Session cost summary'), config.position === position, { position: config.position === position ? 'off' : position },
           el('span', { className: 'cm-root cm-session-cost' }, el('span', { className: 'cm-session-amount' }, t('sessionLineCompact', { amount: examples ? money(.32) : '—' })),
-            config.sessionCostCompact === true ? null : el('span', { className: 'cm-session-detail' }, examples ? text(' · 输入 128K · 输出 4K', ' · In 128K · Out 4K') : text(' · 暂无会话缓存', ' · No cached session data')))) : null
+            inner('session-detail', config.sessionCostCompact !== true, el('span', { className: 'cm-session-detail' }, examples ? text(' · 输入 128K · 输出 4K', ' · In 128K · Out 4K') : text(' · 暂无会话缓存', ' · No cached session data')))))
       const cornerOn = config.corner?.enabled === true
       const native = (name, ...children) => el('div', { className: 'cm-native-' + name }, ...children)
       const icon = (name, size = 16) => el(Native[name], { size })
+      const cornerSample = (key, model = false) => props.renderCorner({ ...previewData.state, config: { ...previewData.config,
+        sidebarModels: { ...config.sidebarModels, dock: model },
+        corner: { enabled: !model, budget: false, goRolling: false, goWeekly: false, goMonthly: false, [key]: true } } })
       const corner = item('corner', text('右下角额度', 'Corner quota'), cornerOn, { corner: { ...config.corner, enabled: !cornerOn } },
-        el('span', { className: 'cm-corner-chip' }, t('budget') + ' ' + percentLabel(budgetPercent)))
+        el('div', { className: 'cm-preview-corner' }, ...[['goRolling', 'Go 5h'], ['goWeekly', text('Go 周', 'Go week')], ['goMonthly', text('Go 月', 'Go month')], ['budget', t('budgetShort')]].map(([key, label]) =>
+          React.cloneElement(inner('corner-' + key, config.corner?.[key] === true, cornerSample(key)), { 'data-placeholder': label + ' —' }))))
+      const dockModel = region === 'composer' ? item('models', text('模型花费', 'Model costs'), config.sidebarModels?.dock === true,
+        { sidebarModels: { ...config.sidebarModels, dock: config.sidebarModels?.dock !== true } }, cornerSample('model', true)) : null
       registry.badge = { on: config.position === (region === 'conversation' ? 'header' : 'dock'), patch: { position: config.position === (region === 'conversation' ? 'header' : 'dock') ? 'off' : region === 'conversation' ? 'header' : 'dock' } }
       if (region === 'composer') registry.models = { on: config.sidebarModels?.dock === true, patch: { sidebarModels: { ...config.sidebarModels, dock: config.sidebarModels?.dock !== true } } }
       const regions = [['sidebar', text('侧栏', 'Sidebar')], ['composer', text('输入区', 'Composer')], ['conversation', text('会话内容', 'Conversation')]]
       const scene = region === 'sidebar' ?
         el(SidebarPreview, { renderSidebar: renderPreviewSidebar, config: previewData.config, selected, selectedPlan, select, labels,
-          visibility: examples ? { balance: balanceOn, budget: registry.budget.on, today: todayOn,
-            go: registry.go.on, peak: registry.peak.on, models: registry.models.on, plan: planOn } : null,
+          displayConfig: config, visibility: { balance: balanceOn, budget: registry.budget.on, today: todayOn,
+            go: registry.go.on, peak: registry.peak.on, models: registry.models.on, plan: planOn, customBalance: registry.customBalance.on, codex: registry.codex.on },
           appearance: { ...appearance.sidebar, ...(appearance.sidebarFooterWidth ? { maxWidth: appearance.sidebarFooterWidth + 28 } : {}) }, text, icon }) : region === 'composer' ?
         el('div', { className: 'cm-preview-composer' },
           el('div', { className: 'cm-preview-region-head' }, el('span', null, icon('IconPlusOutlineRegular'), text('输入区域', 'Composer area'))),
@@ -125,7 +132,7 @@ window.__ModuleLoader__.load({
               native('input-trailing', native('model', examples ? 'DeepSeek-V41-Flash' : text('当前模型', 'Current model'), icon('IconChevronDownOutlineRegular', 12)), icon('IconMicrophoneOutlineRegular', 20), native('input-primary', icon('IconSendOutlineRegular', 24))))),
           native('input-dock', el('span', { className: 'cm-native-dock-stat', 'aria-hidden': true }, icon('IconGaugeOutlineRegular', 14), examples ? text('2 轮 6 步 · 273 tok/s', '2 turns · 6 steps · 273 tok/s') : '—'),
             el('span', { className: 'cm-native-dock-stat', 'aria-hidden': true }, icon('IconDatabaseOutlineRegular', 14), examples ? text('128K tok · 缓存命中 98%', '128K tok · 98% cache') : '—'),
-            session('dock'), badge('dock'), corner,
+            session('dock'), badge('dock'), corner, dockModel,
             el('span', { className: 'cm-native-dock-context', 'aria-hidden': true }, el('i', { className: 'cm-native-context-ring' }), examples ? '29%' : '—'))) :
         el('div', { className: 'cm-preview-conversation' },
           el('div', { className: 'cm-native-chat-header', style: appearance.header },
@@ -163,8 +170,7 @@ window.__ModuleLoader__.load({
         expanded ? el('dialog', { ref: dialogRef, className: 'cm-display-dialog', 'aria-label': text('桌面显示预览', 'Desktop display preview'),
           onCancel: event => { event.preventDefault(); event.stopPropagation(); setExpanded(false) }, onKeyDown: event => { if(event.key==='Escape')event.stopPropagation() } },
           el('div', { className: 'cm-display-dialog-head' }, text('显示设置', 'Display settings'),
-            el('button', { type: 'button', className: 'cm-display-dialog-close', 'aria-label': text('关闭预览', 'Close preview'), autoFocus: true, onClick: () => setExpanded(false) }, icon('IconCloseOutlineRegular'))), preview) : preview,
-        el(DisplayInspector, { props, config, set, selected: 'general', text, general: true }))
+            el('button', { type: 'button', className: 'cm-display-dialog-close', 'aria-label': text('关闭预览', 'Close preview'), autoFocus: true, onClick: event => { event.stopPropagation(); setExpanded(false) } }, icon('IconCloseOutlineRegular', 18))), el('div', { className: 'cm-display-dialog-body' }, preview)) : preview)
     }
 
     class DisplayBoundary extends React.Component {
