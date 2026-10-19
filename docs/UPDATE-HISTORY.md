@@ -1,5 +1,10 @@
 # dsh-cost-meter 版本更新历史
 
+## v1.9.14(2026-10-19)—— ChatGPT 订阅插件 Codex 额度
+
+- 支持 `@eddyskywalker/dsh-chatgpt-subscription` 当前账号的 5 小时、周额度与重置时间，侧栏和输入区沿用现有剩余额度显示。
+- 自动检测加入该插件，也可指定 `chatgpt` 来源；登录后恢复查询，点击手动刷新，只返回周窗口的账号不显示 5 小时额度。查询使用已登录插件，不发送模型请求。[更新说明](update-notes-1.9.14.md)
+
 ## v1.9.13(2026-10-19)—— 会话列表金额、额度显示与计费修复
 
 - 新增 WorkBuddy 官方积分余额，读取本地登录文件，支持个人与企业账号；默认关闭。感谢 [@SternChiri](https://github.com/SternChiri) 在 [PR #341](https://github.com/Han-1413141/dsh-cost-meter/pull/341) 提供实现和测试，凭据与计费适配源自 [@corrinehu 的 dsh-workbuddy-connect](https://github.com/corrinehu/dsh-workbuddy-connect)，已保留 MIT 许可。
