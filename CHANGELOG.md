@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- 新增 Cline Pass(cline.bot)为第 15 家 Coding Plan:官方 `GET /api/v1/users/me/plan/usage-limits` 的 5 小时/周/月窗口(返回的 `percentUsed` 已是已用百分比),侧栏以一张卡片逐行展示,窗口数量随订阅实际返回;注册 provider、端点与解析器,凭据目标 `CLINE_PASS_API_KEY`,plan/API 双轨别名 `clinepass` / `cline-pass`,补中英文案与端点白名单,测试见 `test/clinepass-quota.mjs`。
+
 ## [1.9.13] - 2026-10-19
 
 - 新增 WorkBuddy 官方积分余额，读取本地登录文件，支持个人与企业账号；默认关闭。感谢 [@SternChiri](https://github.com/SternChiri) 在 [PR #341](https://github.com/Han-1413141/dsh-cost-meter/pull/341) 提供实现和测试，凭据与计费适配源自 [@corrinehu 的 dsh-workbuddy-connect](https://github.com/corrinehu/dsh-workbuddy-connect)，已保留 MIT 许可。
