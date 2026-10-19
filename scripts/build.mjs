@@ -144,12 +144,19 @@ const cssPhrases = [], cssTokenBase = 0x0180
 const cssTokenRange = `[${String.fromCharCode(cssTokenBase)}-${String.fromCharCode(cssTokenBase + 127)}]`
 assert.ok(!new RegExp(cssTokenRange).test(compactCss), 'CSS packing markers must be unused')
 let packedCss = compactCss
-for (const [phrase] of cssCandidates) {
-  const count = packedCss.split(phrase).length - 1, bytes = Buffer.byteLength(phrase)
-  if (count * (bytes - 2) - bytes - 1 < 12) continue
-  packedCss = packedCss.replaceAll(phrase, String.fromCharCode(cssTokenBase + cssPhrases.length))
-  cssPhrases.push(phrase)
-  if (cssPhrases.length === 128) break
+// Greedy by measured saving: each round re-counts every candidate in the already
+// packed text (earlier tokens change later counts) and takes the largest positive
+// net gain. Ties keep the deterministic candidate order above.
+while (cssPhrases.length < 128) {
+  let best = null, bestGain = 0
+  for (const [phrase] of cssCandidates) {
+    const count = packedCss.split(phrase).length - 1, bytes = Buffer.byteLength(phrase)
+    const gain = count * (bytes - 2) - bytes - 1
+    if (gain > bestGain) { best = phrase; bestGain = gain }
+  }
+  if (best === null) break
+  packedCss = packedCss.replaceAll(best, String.fromCharCode(cssTokenBase + cssPhrases.length))
+  cssPhrases.push(best)
 }
 assert.equal(packedCss.replace(new RegExp(cssTokenRange, 'g'), token => cssPhrases[token.charCodeAt(0) - cssTokenBase]), compactCss)
 src = src.replace(cssMatch[0], () => `const cssPhrases=${javascriptLiteral(cssPhrases.join('~'))}.split("~");const css=${javascriptLiteral(packedCss)}.replace(/${cssTokenRange}/g,token=>cssPhrases[token.charCodeAt(0)-${cssTokenBase}])`)

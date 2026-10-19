@@ -766,13 +766,17 @@
     }
     /** 峰谷时代分界(与 lib/pricing.js LEGACY_BASE_BOUNDARY 同步):此前按当时基础价计费。 */
     const LEGACY_BASE_BOUNDARY_MS = Date.parse('2026-08-16T16:00:00Z')
+    /** Ollama Cloud 峰谷日历生效时刻 2026-08-31T00:00:00Z(与 lib/pricing.js OLLAMA_CLOUD_PEAK_EFFECTIVE_AT 同步)。 */
+    const OLLAMA_CLOUD_PEAK_EFFECTIVE_MS = 1788134400000
     function tierFor(entry, atMs, peak) {
       const base = priceAt(entry, atMs) ?? { cacheHit: 0, cacheMiss: 0, output: 0 }
       const asTier = (price, path = 'base') => ({ reasoning: 0, ...multipliedTier(price, base, path) })
-      if (base.billingMode === 'utc-peak') {
-        if (peak?.enabled !== true || !Number.isFinite(atMs)) return asTier(base)
+      // Go 与 Ollama Cloud 按 UTC 工作日计峰谷(与 lib/pricing.js tierFor 同分支)。
+      const ollama = base.peakSchedule === 'ollama'
+      if (ollama || base.billingMode === 'utc-peak') {
+        if (peak?.enabled !== true || !Number.isFinite(atMs) || (ollama && atMs < OLLAMA_CLOUD_PEAK_EFFECTIVE_MS)) return asTier(base)
         const date = new Date(atMs), day = date.getUTCDay(), hour = date.getUTCHours()
-        const high = day > 0 && day < 6 && ((hour >= 1 && hour < 4) || (hour >= 6 && hour < 10))
+        const high = day > 0 && day < 6 && (ollama ? hour >= 12 && hour < 18 : (hour >= 1 && hour < 4) || (hour >= 6 && hour < 10))
         return asTier((high ? base.peak : base.offPeak) ?? base, (high ? base.peak : base.offPeak) ? (high ? 'peak' : 'offPeak') : 'base')
       }
       // 峰谷时代之前按当时的基础价计费(历史正确;与 lib/pricing.js tierFor 同分支,
@@ -1262,7 +1266,12 @@
         const modelId = separator > 0 ? providerKey.slice(separator + 1) : providerKey
         const resolved = resolveClientPrice(provider, modelId, config)
         if (resolved.priced) {
-          const c = costOfBuckets(byModel[providerKey], tierFor(normalizeClientPrice(resolved.entry), now, { ...peak, enabled: ['deepseek-peak', 'utc-peak'].includes(resolved.billingMode) && peak.enabled }))
+          const entry = normalizeClientPrice(resolved.entry)
+          // Ollama Cloud 的 DeepSeek 模型使用自有峰谷日历;provider/model 归一化与 lib/pricing.js
+          // providerPriceEntryFor 的 peakSchedule 标记同口径(trim、小写、剥离 llm- 前缀)。
+          if (entry && resolved.billingMode === 'deepseek-peak'
+            && /^\s*(llm-)?ollama-cloud\s*:\s*deepseek-v4(\.1-flash|-pro)\s*$/.test(providerKey.toLowerCase())) entry.peakSchedule = 'ollama'
+          const c = costOfBuckets(byModel[providerKey], tierFor(entry, now, { ...peak, enabled: ['deepseek-peak', 'utc-peak'].includes(resolved.billingMode) && peak.enabled }))
           const billed = usdFromCostLocal(c, resolved.currency, cnyRate)
           total += billed
           if (billingClassOfLocal(provider, modelId, config) === 'api') api += billed
