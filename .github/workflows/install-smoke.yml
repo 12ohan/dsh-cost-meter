@@ -29,11 +29,11 @@ jobs:
           npm install -g pnpm
           pnpm install --frozen-lockfile
           mkdir -p .tmp-billion-matrix
-          npm pack billion-context@0.1.181 billion-context@0.1.190 billion-context@0.1.197 --ignore-scripts --pack-destination .tmp-billion-matrix
+          npm pack billion-context@0.1.181 billion-context@0.1.190 billion-context@0.1.197 billion-context@0.1.201 --ignore-scripts --pack-destination .tmp-billion-matrix
       - name: Verify automatic interface compatibility and actual native/proxy billing
         run: |
           node test/billion-context-compatibility.mjs
-          for version in 0.1.181 0.1.190 0.1.197; do
+          for version in 0.1.181 0.1.190 0.1.197 0.1.201; do
             DSH_TEST_BILLION_PACKAGE="$PWD/.tmp-billion-matrix/billion-context-$version.tgz" node test/billion-context-billing.mjs
             DSH_TEST_BILLION_PACKAGE="$PWD/.tmp-billion-matrix/billion-context-$version.tgz" node test/billion-context-auto.mjs
           done
@@ -65,6 +65,9 @@ jobs:
           export DSH_CONTEXT_068="$PWD/.tmp-context-068/package/lib/client.js"
           export CM_TEST_BROWSER=/usr/bin/google-chrome
           test -x "$CM_TEST_BROWSER" || (sudo apt-get update && sudo apt-get install -y google-chrome-stable)
+          mkdir -p .tmp-billion-matrix
+          npm pack dsh-codex-subscription@3.1.1 --ignore-scripts --pack-destination .tmp-billion-matrix
+          DSH_TEST_CODEX_PACKAGE="$PWD/.tmp-billion-matrix/dsh-codex-subscription-3.1.1.tgz" node test/codex-subscription-published.mjs
           node test/context-costs.mjs --host
           node test/context-costs-client.mjs
           node test/context-costs-lifecycle.mjs
@@ -260,6 +263,9 @@ jobs:
           mkdir -p .tmp-context-068
           npm pack dsh-context@0.68.1 --ignore-scripts --pack-destination .tmp-context-068
           tar -xzf .tmp-context-068/dsh-context-0.68.1.tgz -C .tmp-context-068
+          mkdir -p .tmp-billion-matrix
+          npm pack dsh-codex-subscription@3.1.1 --ignore-scripts --pack-destination .tmp-billion-matrix
+          DSH_TEST_CODEX_PACKAGE="$PWD/.tmp-billion-matrix/dsh-codex-subscription-3.1.1.tgz" node test/codex-subscription-published.mjs
           node test/context-costs.mjs --host
           node test/context-costs-regression-browser.mjs
           node test/native-search-host.mjs

@@ -1594,7 +1594,7 @@
 
     function modelCostDetail(usage, config) {
       return Object.entries(usage?.byProviderModel ?? {}).filter(([, row]) => row.input || row.output || row.cacheRead || row.cacheWrite || row.reasoning)
-        .map(([id, row]) => id + ' ' + formatMoneyUsd(displayCostOf(row, { ...config, showTotalWithPlan: true }), config)).join('; ')
+        .map(([id, row]) => prettyProviderKey(id) + ' ' + formatMoneyUsd(displayCostOf(row, { ...config, showTotalWithPlan: true }), config)).join('; ')
     }
 
     function TurnCost(props) {
@@ -1617,7 +1617,7 @@
       const money = n => formatMoneyUsd(n, { ...config, decimals: Math.max(8, config.decimals ?? 2) })
       const kinds = en ? { model: 'Model call', compaction: 'Context compaction', search: 'Native search', fetch: 'Web fetch' } : { model: '模型调用', compaction: '上下文压缩', search: '原生搜索', fetch: '网页抓取' }
       const rowView = (row, i) => el('div', { key: i, style: { marginBottom: 4, overflowWrap: 'anywhere' } },
-        row.provider + ':' + row.model + ' · ' + (names[row.bucket] || (row.bucket === 'fetchRequests' ? (en ? 'Fetch requests' : '抓取请求') : (en ? 'Search requests' : '搜索请求'))) + (row.plan ? ' (Plan)' : '') + ': ' + (row.requests ? row.requests + (en ? ' requests' : ' 次') : row.tokens.toLocaleString()) + ' × ' + (row.priced ? money(row.rate) : '?') + (row.requests ? ' ≈ ' : ' / 1,000,000 ≈ ') + (row.priced ? money(row.cost) : '?'),
+        prettyProviderKey(row.provider + ':' + row.model) + ' · ' + (names[row.bucket] || (row.bucket === 'fetchRequests' ? (en ? 'Fetch requests' : '抓取请求') : (en ? 'Search requests' : '搜索请求'))) + (row.plan ? ' (Plan)' : '') + ': ' + (row.requests ? row.requests + (en ? ' requests' : ' 次') : row.tokens.toLocaleString()) + ' × ' + (row.priced ? money(row.rate) : '?') + (row.requests ? ' ≈ ' : ' / 1,000,000 ≈ ') + (row.priced ? money(row.cost) : '?'),
         !row.priced ? (en ? ' (price unavailable)' : '（未配置价格）') : row.bucket === 'reasoning' && row.rate === 0 ? (en ? ' (no separate charge)' : '（不单独收费）') : '')
       return el('details', { className: 'cm-note', style: { fontSize: 12, marginTop: 6 } },
         el('summary', { style: { cursor: 'pointer' }, title: en ? 'Log estimate at configured prices; session cost uses recorded ledger amounts.' : '本轮按日志和配置价格估算，本会话按账本已入账金额汇总。' }, en ? 'Turn cost' : '本轮费用', value?.found ? ' ≈ ' + money(displayCostOf(value, config)) + (value.rows.some(r => !r.priced) ? (en ? ' + unpriced usage' : ' + 未定价用量') : '') : value?.inherited ? (en ? ' · inherited history' : ' · 继承历史') : error ? ' ⚠' : ''),
@@ -1627,7 +1627,7 @@
             value.rows.map(rowView),
             el('details', null, el('summary', { style: { cursor: 'pointer' } }, (en ? 'Individual calls' : '逐次调用明细') + ' (' + value.calls.length + ')'),
               value.calls.map((call, i) => el('details', { key: i, style: { margin: '6px 0' } },
-                el('summary', { style: { cursor: 'pointer', overflowWrap: 'anywhere' } }, '#' + (i + 1) + ' ' + kinds[call.kind] + ' · ' + call.provider + ':' + call.model + ' · ' + new Date(call.atMs).toLocaleTimeString() + ' · ' + (call.plan ? 'Plan ' : 'API ') + (call.priced ? '≈ ' + money(call.cost) : (en ? 'price unavailable' : '未配置价格')) + (call.longContext ? (en ? ' · long context' : ' · 长上下文价格') : '')),
+                el('summary', { title: call.provider + ':' + call.model, style: { cursor: 'pointer', overflowWrap: 'anywhere' } }, '#' + (i + 1) + ' ' + kinds[call.kind] + ' · ' + prettyProviderKey(call.provider + ':' + call.model) + ' · ' + new Date(call.atMs).toLocaleTimeString() + ' · ' + (call.plan ? 'Plan ' : 'API ') + (call.priced ? '≈ ' + money(call.cost) : (en ? 'price unavailable' : '未配置价格')) + (call.longContext ? (en ? ' · long context' : ' · 长上下文价格') : '')),
                 call.metering ? el('p', null, 'billion-context · ' + call.metering.upstream + (call.metering.attempt > 1 ? (en ? ' · Retry ' : ' · 重试 ') + call.metering.attempt : '') + (!call.metering.complete ? (en ? ' · partial usage' : ' · 用量回执不完整') : '')) : null,
                 call.rows.map(rowView))))))
     }
@@ -3397,7 +3397,7 @@
       ].join('; ')
       return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { 'data-cm-display': 'today', className: 'cm-foot' + (wide ? '' : ' cm-foot-rail') },
-          wide ? el(Fragment, null, t('today'), ' ', el('span', { className: 'cm-num' }, todayValue)) : el(WalletIcon, { size: 16 })))
+          wide ? el(Fragment, null, el('span', null, t('today')), el('span', { className: 'cm-num cm-bal-amt' }, todayValue)) : el(WalletIcon, { size: 16 })))
     }
 
     function SidebarFooter(props) {

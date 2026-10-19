@@ -93,9 +93,9 @@ try {
   await page.getByRole('tab',{name:'显示',exact:true}).click();await page.locator('.cm-display').waitFor()
   const region=async name=>page.getByRole('tab',{name,exact:true}).click()
   const item=key=>page.locator('.cm-preview [data-display="'+key+'"]')
-  const selectStyle=async label=>page.getByRole('button',{name:label,exact:true}).click()
+  const selectStyle=async label=>{if(['标准','紧凑','简洁'].includes(label)&&await page.locator('.cm-style-thumbnail').count()===0)await page.locator('.cm-inspector-layout').click();await page.getByRole('button',{name:label,exact:true}).click()}
   const customize=async key=>{await item(key).first().click({position:{x:8,y:8}});await page.locator('[data-inspector="'+key+'"]').waitFor()}
-  const toggle=async key=>{const direct=page.locator('[data-display-toggle="'+key+'"]');if(await direct.count())await direct.click();else{await customize(key);const placement=page.getByLabel('显示位置',{exact:true});if(await placement.count()){const current=await placement.getAttribute('value')??await placement.evaluate(n=>n.value);await placement.selectOption(['sidebar','both'].includes(current)?key==='balance'?'off':'settings':'both')}else await page.getByRole('checkbox',{name:'显示此组件',exact:true}).click()}}
+  const toggle=async key=>{await page.getByLabel('调整组件',{exact:true}).selectOption(key);await page.locator('[data-display-toggle="'+key+'"]').click()}
   const examples=page.getByRole('checkbox',{name:'使用示例数据',exact:true})
   assert.equal(await examples.isChecked(),true,'examples are on by default')
   assert.equal(await page.locator('.cm-display-model-options,.cm-display-details').count(),0,'options live in the inspector instead of folded forms')
@@ -103,6 +103,8 @@ try {
   await page.waitForFunction(()=>document.querySelector('.cm-preview-sidebar').style.backgroundColor==='rgb(238, 243, 248)')
   assert.equal(await page.locator('.cm-preview-sidebar').evaluate(n=>getComputedStyle(n).borderRadius),'19px','current skin surface is reused')
   assert.equal(await page.locator('.cm-sidebar-live').evaluate(n=>Math.round(n.getBoundingClientRect().width)),324,'preview follows the actual footer width')
+  assert.equal(await page.locator('.cm-display-toggles').count(),0,'visibility controls are only in the right inspector')
+  await page.locator('.cm-inspector-layout').click()
   const previews=page.locator('.cm-style-thumbnail')
   assert.equal(await previews.count(),3)
   for(const preview of await previews.all()) assert.equal(await preview.locator('.cm-mm-row .cm-bbox-bar').count(),2,'each style preview uses real quota progress rows')
@@ -129,8 +131,38 @@ try {
     })
     assert.deepEqual(values[0],values[1],'preview and real sidebar share exact card layout')
   }
-  for(const mode of ['标准','紧凑','简洁']){await selectStyle(mode);await page.waitForTimeout(650);await parity()}
+  for(const mode of ['标准','紧凑','简洁']){await selectStyle(mode);await page.waitForTimeout(650);await parity()
+    const alignment=await page.locator('.cm-sidebar-live .cm-foot:not(.cm-foot-rail),.cm-sidebar-live .cm-model-costs .cm-collapse-h').evaluateAll(nodes=>nodes.filter(n=>n.querySelector(':scope > .cm-bal-amt')).map(n=>{const r=n.getBoundingClientRect(),a=n.querySelector(':scope > .cm-bal-amt').getBoundingClientRect();return Math.abs(r.right-parseFloat(getComputedStyle(n).paddingRight)-a.right)}))
+    assert.ok(alignment.length>=(mode==='简洁'?1:2)&&alignment.every(gap=>gap<=2),mode+' today and model summary amounts align at the right edge: '+alignment)
+  }
+  for(const name of ['侧栏','输入区','会话内容']){
+    await region(name)
+    const picker=page.getByLabel('调整组件',{exact:true})
+    for(const key of await picker.locator('option').evaluateAll(nodes=>nodes.map(n=>n.value))){
+      await picker.selectOption(key)
+      const master=page.getByRole('switch',{name:'显示此组件',exact:true})
+      assert.equal(await master.count(),1,name+'/'+key+' has exactly one master switch')
+      const before=await master.isChecked()
+      await master.click();await page.waitForTimeout(80);assert.equal(await master.isChecked(),!before)
+      await master.click();await page.waitForTimeout(80);assert.equal(await master.isChecked(),before)
+      const switches=await page.locator('.cm-inspector-unified .cm-check input').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect(),l=n.parentElement.getBoundingClientRect();return l.right-r.right}))
+      assert.ok(switches.every(gap=>Math.abs(gap)<=1),'every switch is aligned to the right: '+name+'/'+key)
+    }
+  }
+  const configureStrip=async enabled=>{
+    await page.evaluate(async enabled=>{const patch={quotaStrip:{...window.current().quotaStrip,enabled,budget:true,go:!enabled,plans:true},codexQuotaStrip:true};await window.saveConfig(patch);window.setConfig(patch);window.remount()},enabled)
+    await page.getByRole('tab',{name:'显示',exact:true}).click();await region('输入区')
+  }
+  await configureStrip(false)
+  await toggle('strip-codex');await page.waitForFunction(()=>window.current().quotaStrip.enabled&&window.current().codexQuotaStrip)
+  assert.deepEqual(await page.evaluate(()=>[window.current().quotaStrip.budget,window.current().quotaStrip.go,window.current().quotaStrip.plans]),[false,false,false],'enabling Codex from a disabled strip hides all siblings')
+  await configureStrip(false)
+  await toggle('strip-budget');await page.waitForFunction(()=>window.current().quotaStrip.enabled&&window.current().quotaStrip.budget)
+  assert.deepEqual(await page.evaluate(()=>[window.current().quotaStrip.go,window.current().quotaStrip.plans,window.current().codexQuotaStrip]),[false,false,false],'enabling budget from a disabled strip keeps Codex and other siblings hidden')
+  await configureStrip(true)
+  await region('侧栏')
   await selectStyle('紧凑');await page.waitForFunction(()=>window.current().sidebarStyle==='compact'&&!window.current().sidebarSimple)
+  await page.getByLabel('调整组件',{exact:true}).selectOption('balance')
   assert.equal(await item('budget').evaluate(n=>getComputedStyle(n).borderTopStyle),'dashed')
   const positions=await page.evaluate(()=>[document.querySelector('.cm-preview-sidebar').getBoundingClientRect().right,document.querySelector('.cm-display-inspector').getBoundingClientRect().left])
   assert.ok(positions[1]>positions[0],'style controls are on the right')
@@ -139,12 +171,12 @@ try {
   await toggle('balance');await page.waitForFunction(()=>window.current().hideOfficialBalance===false)
   await toggle('budget');await page.waitForFunction(()=>window.current().hideBudget===true);assert.equal(saved.budget.enabled,true)
   await toggle('budget');await page.waitForFunction(()=>window.current().hideBudget===false)
-  await page.locator('[data-display-toggle=today]').uncheck();await page.waitForFunction(()=>window.current().sidebar===false)
+  await page.getByLabel('调整组件',{exact:true}).selectOption('today');await page.locator('[data-display-toggle=today]').uncheck();await page.waitForFunction(()=>window.current().sidebar===false)
   await page.locator('[data-display-toggle=today]').check();await page.waitForFunction(()=>window.current().sidebar===true)
-  await customize('models');await page.getByRole('checkbox',{name:'默认展开',exact:true}).check();await page.waitForFunction(()=>window.current().sidebarModels.defaultOpen)
+  await customize('models');await page.getByRole('switch',{name:'默认展开',exact:true}).check();await page.waitForFunction(()=>window.current().sidebarModels.defaultOpen)
   assert.equal(await page.locator('.cm-sidebar-live .cm-collapse-h').getAttribute('aria-expanded'),'true')
   await page.locator('.cm-display').screenshot({path:join(output,'models-inspector.png')})
-  await page.getByRole('checkbox',{name:'默认展开',exact:true}).uncheck();await page.waitForFunction(()=>!window.current().sidebarModels.defaultOpen)
+  await page.getByRole('switch',{name:'默认展开',exact:true}).uncheck();await page.waitForFunction(()=>!window.current().sidebarModels.defaultOpen)
   await customize('peak');await selectStyle('进度条');await page.waitForFunction(()=>window.current().peakStyle==='progress')
   await page.locator('.cm-sidebar-live .cm-peak-progress').waitFor()
   await page.getByLabel('显示时间',{exact:true}).selectOption('switch');await page.waitForFunction(()=>window.current().peakTimeDisplay==='switch')
@@ -158,7 +190,7 @@ try {
   assert.equal(await page.getByLabel('调整组件',{exact:true}).locator('option[value=""]').count(),0,'instruction is not an option after selection')
   assert.equal(await page.getByText('点击左侧虚线框',{exact:true}).count(),0)
   await region('输入区');await customize('badge')
-  assert.equal(await page.getByRole('checkbox',{name:'仅显示金额',exact:true}).count(),1)
+  assert.equal(await page.getByRole('switch',{name:'仅显示金额',exact:true}).count(),1)
   assert.equal(await page.getByText('悬停查看费用分项。',{exact:true}).count(),1)
   await examples.check();await region('侧栏')
   await page.getByLabel('调整组件',{exact:true}).selectOption('codex')
@@ -166,14 +198,14 @@ try {
   assert.equal(await page.evaluate(()=>window.current().codexQuotaEnabled),false,'Codex example uses a supplied snapshot without enabling discovery')
   await region('输入区')
   await page.getByLabel('调整组件',{exact:true}).selectOption('strip-codex')
-  assert.equal(await page.getByRole('checkbox',{name:'显示此组件',exact:true}).count(),0,'Codex has independent explicit switches instead of a duplicate generic toggle')
+  assert.equal(await page.getByRole('switch',{name:'显示此组件',exact:true}).count(),1,'Codex uses the same single master switch as every component')
   await page.locator('[data-display=strip-codex]').waitFor()
-  await page.getByRole('checkbox',{name:'在输入区显示 Codex 额度',exact:true}).uncheck()
+  await page.getByRole('switch',{name:'显示此组件',exact:true}).uncheck()
   await page.waitForFunction(()=>window.current().codexQuotaStrip===false)
   assert.equal(await page.evaluate(()=>window.current().codexQuotaSidebar),true,'composer visibility keeps the sidebar preference')
   assert.equal(await page.evaluate(()=>window.current().codexQuotaEnabled),false,'display controls never enable discovery')
   await page.locator('.cm-display').screenshot({path:join(output,'codex-composer-inspector.png')})
-  await page.getByRole('checkbox',{name:'在输入区显示 Codex 额度',exact:true}).check()
+  await page.getByRole('switch',{name:'显示此组件',exact:true}).check()
   await page.waitForFunction(()=>window.current().codexQuotaStrip===true)
   await region('侧栏')
   await page.getByLabel('调整组件',{exact:true}).selectOption('customBalance')
@@ -221,7 +253,7 @@ try {
   assert.ok(p95<1000,'opening stays responsive under 4x CPU throttle: '+p95)
   await region('会话内容');assert.equal(await item('turn').getAttribute('data-visible'),'false','saved toggles survive repeated reopening')
   await page.getByLabel('界面语言',{exact:true}).selectOption('en');await page.waitForFunction(()=>window.current().locale==='en')
-  await region('Sidebar');await page.evaluate(()=>window.failSave=true);await customize('balance');const placement=page.getByLabel('Placement',{exact:true});await placement.selectOption(await placement.inputValue()==='off'?'both':'off');await page.getByText(/synthetic save failure/).waitFor()
+  await region('Sidebar');await page.evaluate(()=>window.failSave=true);await customize('balance');const placement=page.getByLabel('Placement',{exact:true});await page.getByRole('switch',{name:'Show this component',exact:true}).click();await page.getByText(/synthetic save failure/).waitFor()
   // #258 latest feedback: native component options and the active Today tab.
   // Use the actual upstream Midnight token definition over a light host / dark OS.
   const midnight=JSON.parse(readFileSync('test/fixtures/issue258/midnight.json','utf8'))

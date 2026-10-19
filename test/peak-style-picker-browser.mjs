@@ -58,14 +58,13 @@ try{
   const field=page.getByLabel('显示时间',{exact:true})
   let cards=await choices.boundingBox(),time=await field.boundingBox()
   assert.ok(time.y>=cards.y+cards.height,'time options are below all style choices')
-  assert.ok(time.width>=200&&time.width<=224,'the inspector keeps a compact readable width')
+  assert.ok(time.width>=260,'the unified inspector has enough width for readable controls')
   assert.ok(cards.height<=240,'the three style choices use a compact vertical layout')
   assert.ok(await choices.locator('.cm-peak-choice-heading strong').evaluateAll(nodes=>nodes.every(node=>parseFloat(getComputedStyle(node).fontSize)<=11)),'compact labels use the smaller font')
   for(const width of [900,620,560]){
     await page.locator('#root').evaluate((node,width)=>node.style.width=width+'px',width)
     const scene=await page.locator('.cm-preview-scene').boundingBox(),inspector=await page.locator('.cm-display-inspector[data-component=peak]').boundingBox()
-    assert.ok(inspector.x>=scene.x+scene.width,'settings stay beside the preview at container width '+width)
-    assert.ok(Math.abs(inspector.y-scene.y)<4,'settings stay aligned at the top at container width '+width)
+    if(width>=900){assert.ok(inspector.x>=scene.x+scene.width,'desktop controls stay on the right');assert.ok(Math.abs(inspector.y-scene.y)<4,'desktop controls align at the top')}else assert.ok(inspector.y>=scene.y+scene.height,'narrow settings stack with readable controls at '+width)
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
     await page.locator('.cm-region-preview').screenshot({path:join(output,`side-by-side-${width}.png`)})
   }
@@ -105,6 +104,6 @@ try{
     await page.locator('.cm-display-inspector[data-component=peak]').screenshot({path:join(output,`inspector-${theme}-${width}.png`)})
   }
   assert.deepEqual(errors,[]);assert.deepEqual(external,[])
-  writeFileSync(join(output,'report.json'),JSON.stringify({passed:true,themes:2,widths:[1100,720,390],desktopContainerWidths:[900,620,560],sideBySide:true,inspectorWidth:220,maxChoicesHeight:240,enlargedTextOverflowFixed:true,fullTextOnHover:true,actualStyleComponents:3,separateTimeControls:true,keyboard:true,exampleSettingsNotSaved:true,errors,external},null,2))
+  writeFileSync(join(output,'report.json'),JSON.stringify({passed:true,themes:2,widths:[1100,720,390],desktopContainerWidths:[900,620,560],sideBySide:true,narrowStacked:true,inspectorMinWidth:260,maxChoicesHeight:240,enlargedTextOverflowFixed:true,fullTextOnHover:true,actualStyleComponents:3,separateTimeControls:true,keyboard:true,exampleSettingsNotSaved:true,errors,external},null,2))
   console.log('[ok] Peak style picker: three real samples, visible selection, separate full-width time controls, keyboard and responsive themes; no example writes or external requests')
 }finally{await browser.close();await new Promise(done=>server.close(done))}

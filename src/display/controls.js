@@ -19,22 +19,22 @@ function PeakStyleSample({ render, config, data, style }) {
   return el('span', { className: 'cm-peak-choice-sample', 'aria-hidden': true, inert: '' }, sample)
 }
 
-function DisplayInspector({ props, config, set, selected, selectedPlan, selectPlan, openQuota, select, labels, registry, text, region, general = false, examples, previewData }) {
+function DisplayInspector({ props, config, set, selected, selectedPlan, selectPlan, openQuota, select, labels, registry, text, region, general = false, examples, previewData, stylesOpen = false, setStylesOpen }) {
   const { t, numInput, CURRENCY_PRESETS, displayOptions, USAGE_POSITION_SWITCHABLE } = props
   const nested = (key, patch) => set({ [key]: { ...config[key], ...patch } })
-  const check = (label, value, change) => el('label', { className: 'cm-check', key: label },
-    el('input', { type: 'checkbox', checked: value, onChange: e => change(e.target.checked) }), el('span', null, label))
+  const check = (label, value, change, extra = {}) => el('label', { className: 'cm-check cm-display-switch', key: label },
+    el('span', null, label), el('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: value, onChange: e => change(e.target.checked), ...extra }))
   const field = (label, control) => el('label', { className: 'cm-field', key: label }, el('span', null, label), React.cloneElement(control, { 'aria-label': label }))
   const choice = (label, value, options, change) => field(label, el('select', { className: 'cm-input', value, onChange: e => change(e.target.value) },
     ...options.map(([value, label]) => el('option', { key: value, value }, label))))
   const number = (label, value, change, min = 0, max = 1440) => field(label, numInput({ value, emptyMode: 'ignore' }, v => change(Math.max(min, Math.min(max, v)))))
   const direction = (kind, label = t('barDirectionsTitle')) => choice(label, config.barDirections?.[kind] ?? (kind === 'balance' ? 'remaining' : 'used'),
     [['used', t('barDirectionUsed')], ['remaining', t('barDirectionRemaining')]], value => nested('barDirections', { [kind]: value }))
-  const display = key => field(text('显示位置', 'Placement'), el('select', { className: 'cm-input', value: key === 'balance' && config.hideOfficialBalance ? 'off' : config[key]?.display ?? 'both', onChange: e => set({ [key]: { ...config[key], display: e.target.value }, ...(key === 'balance' ? { hideOfficialBalance: e.target.value === 'off' } : {}) }) }, ...displayOptions(t)))
+  const display = key => field(text('显示位置', 'Placement'), el('select', { className: 'cm-input', value: config[key]?.display === 'off' ? 'sidebar' : config[key]?.display ?? 'both', onChange: e => set({ [key]: { ...config[key], display: e.target.value }, ...(key === 'balance' ? { hideOfficialBalance: false } : {}) }) }, ...displayOptions(t).filter(option => option.props.value !== 'off')))
   const todayControls = () => [
     choice(t('sidebarTodayMetric'), config.sidebarTodayMetric ?? 'cost', [['cost', t('sidebarTodayCost')], ['tokens', t('sidebarTodayTokens')]], value => set({ sidebarTodayMetric: value }))]
   const sessionControls = () => [
-    choice(t('positionLabel'), config.position ?? 'dock', [['dock', t('positionDock')], ['header', t('positionHeader')], ['off', t('off')]], value => set({ position: value })),
+    choice(t('positionLabel'), config.position === 'off' ? region === 'conversation' ? 'header' : 'dock' : config.position ?? 'dock', [['dock', t('positionDock')], ['header', t('positionHeader')]], value => set({ position: value })),
     check(t('sessionCostCompact'), config.sessionCostCompact === true, value => set({ sessionCostCompact: value })),
     el('p', { className: 'cm-inspector-note cm-inspector-help' }, text('悬停查看费用分项。', 'Hover to see the cost breakdown.')),
     check(t('showSessionIdLabel'), config.showSessionId === true, value => set({ showSessionId: value })),
@@ -71,29 +71,25 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
   if (selected === 'badge') controls = sessionControls()
   if (selected === 'corner') controls = [['goRolling', 'cornerGoRolling'], ['goWeekly', 'cornerGoWeekly'], ['goMonthly', 'cornerGoMonthly'], ['budget', 'cornerBudget']]
     .map(([key, label]) => check(t(label), config.corner?.[key] !== false, value => nested('corner', { [key]: value })))
-  if (selected?.startsWith('strip-')) controls = [direction(selected === 'strip-plans' ? 'plan' : selected.slice(6)),
-    check(t('quotaStripEnable'), config.quotaStrip?.enabled === true, value => nested('quotaStrip', { enabled: value, promptSeen: true })),
-    ...[['budget', 'quotaStripShowBudget'], ['go', 'quotaStripShowGo'], ['plans', 'quotaStripShowPlans']].map(([key, label]) =>
-      check(t(label), config.quotaStrip?.[key] !== false, value => nested('quotaStrip', { [key]: value, promptSeen: true })))]
+  if (selected?.startsWith('strip-')) controls = [direction(selected === 'strip-plans' ? 'plan' : selected.slice(6))]
   if (selected === 'customBalance') controls = [display('customBalance'), number(t('customBalanceRefreshInterval'), config.customBalance?.refreshMinutes ?? 15, value => nested('customBalance', { refreshMinutes: Math.floor(value) }), 1)]
   if (selected === 'plan') {
     const entry = config.codingPlans?.[selectedPlan] ?? {}
     const setPlanDisplay = value => set({ codingPlans: { ...config.codingPlans, [selectedPlan]: { ...entry, display: value } } })
     controls = [
       choice(text('套餐', 'Plan'), selectedPlan, props.planOptions, selectPlan),
-      field(text('显示位置', 'Placement'), el('select', { className: 'cm-input', value: entry.display ?? (selectedPlan === 'minimax' ? 'both' : 'settings'), onChange: e => setPlanDisplay(e.target.value) }, ...displayOptions(t))),
+      field(text('显示位置', 'Placement'), el('select', { className: 'cm-input', value: entry.display === 'off' ? 'sidebar' : entry.display ?? (selectedPlan === 'minimax' ? 'both' : 'settings'), onChange: e => setPlanDisplay(e.target.value) }, ...displayOptions(t).filter(option => option.props.value !== 'off'))),
       direction('plan', text('所有套餐的进度条方向', 'Bar direction for all plans')),
       el('button', { type: 'button', className: 'cm-btn small', onClick: openQuota }, text('账户与额度设置 →', 'Account and quota settings →')),
     ]
   }
-  if (selected === 'codex' || selected === 'strip-codex') controls = [check(t('codexQuotaEnabled'), config.codexQuotaEnabled === true, value => set({ codexQuotaEnabled: value })),
+  if (selected === 'codex' || selected === 'strip-codex') controls = [
     choice(text('数据源', 'Data source'), config.codexQuotaSource ?? 'auto',
       [['auto', text('自动检测', 'Auto-detect')], ['connect', 'dsh-codex-connect'], ['subscription', 'dsh-codex-subscription']],
       value => set({ codexQuotaSource: value })),
     el('p', { className: 'cm-inspector-note cm-inspector-help' }, text('自动检测优先 dsh-codex-subscription，失败回退 dsh-codex-connect。', 'Auto prefers dsh-codex-subscription, then falls back to dsh-codex-connect.')),
-    check(t('codexQuotaSidebar'), config.codexQuotaSidebar !== false, value => set({ codexQuotaSidebar: value })),
-    check(t('codexQuotaStrip'), config.codexQuotaStrip !== false, value => set({ codexQuotaStrip: value })),
-    ...(selected === 'strip-codex' ? [check(t('quotaStripEnable'), config.quotaStrip?.enabled === true, value => nested('quotaStrip', { enabled: value, promptSeen: true }))] : [])]
+    config.codexQuotaEnabled !== true ? el('p', { className: 'cm-inspector-note' }, text('先在账户与额度设置中启用 Codex 额度。', 'Enable Codex quota in account and quota settings first.')) : null,
+    el('button', { type: 'button', className: 'cm-btn small', onClick: openQuota }, text('账户与额度设置 →', 'Account and quota settings →'))]
   if (selected === 'general') controls = [
     choice(t('languageLabel'), config.locale ?? 'auto', [['auto', t('localeAuto')], ['zh', '简体中文'], ['en', 'English']], value => set({ locale: value })),
     choice(t('currencyLabel'), config.currency ?? 'CNY', [['CNY', t('currencyCny')], ['USD', t('currencyUsd')], ['EUR', t('currencyEur')]], value => set({ currency: value, ...CURRENCY_PRESETS[value], exchangeRate: config.exchangeRateAuto !== false ? config.fxRates?.[value] ?? CURRENCY_PRESETS[value].exchangeRate : CURRENCY_PRESETS[value].exchangeRate })),
@@ -107,11 +103,16 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
     el('p', null, text('统一应用于所有费用组件。', 'Applies to all cost components.')),
     el('div', { className: 'cm-general-grid' }, ...controls))
   const mode = config.sidebarSimple ? 'simple' : config.sidebarStyle === 'compact' ? 'compact' : 'standard'
-  const showStyles = region === 'sidebar' && !selected
+  const showStyles = region === 'sidebar' && stylesOpen
   const selection = registry[selected]
-  return el('aside', { className: 'cm-display-inspector', 'data-component': selected ?? '', 'aria-label': text('外观与组件设置', 'Appearance and component settings') },
+  const scope = region === 'sidebar' ? text('在侧栏显示', 'Show in sidebar') : region === 'composer' ? text('在输入区显示', 'Show in composer') : text('在会话内容显示', 'Show in conversation')
+  return el('aside', { className: 'cm-display-inspector cm-inspector-unified', 'data-component': selected ?? '', 'aria-label': text('外观与组件设置', 'Appearance and component settings') },
+    field(text('调整组件', 'Customize'), el('select', { className: 'cm-input', value: selected ?? '', onChange: event => select(event.target.value) },
+      ...(region === 'sidebar' ? ['budget','balance','today','peak','models','go','plan','customBalance','codex'] : region === 'composer' ? ['strip-budget','strip-go','strip-plans','strip-codex','session-dock','badge','corner','models'] : ['session-header','badge','turn']).map(key => el('option', { key, value: key }, labels[key])))),
+    selection ? el('div', { className: 'cm-inspector-visibility' }, check(text('显示此组件', 'Show this component'), selection.on, () => set(selection.patch), { 'data-display-toggle': selected }), el('span', { className: 'cm-inspector-scope' }, scope)) : null,
+    selected ? el('div', { className: 'cm-inspector-controls', key: selected, 'data-inspector': selected }, ...controls) : null,
+    region === 'sidebar' ? el('button', { type: 'button', className: 'cm-inspector-layout', 'aria-expanded': stylesOpen, onClick: () => setStylesOpen?.(!stylesOpen) }, text('侧栏布局', 'Sidebar layout'), el('span', null, text(mode === 'simple' ? '简洁' : mode === 'compact' ? '紧凑' : '标准', mode === 'simple' ? 'Simple' : mode === 'compact' ? 'Compact' : 'Standard'), stylesOpen ? ' ▴' : ' ▾')) : null,
     showStyles ? el('div', { className: 'cm-inspector-heading' }, text('侧栏样式', 'Sidebar style'), el('span', null, text('进度卡片示例', 'Progress card examples'))) : null,
-    region === 'sidebar' && selected ? el('button', { type: 'button', className: 'cm-inspector-back', onClick: () => select(null) }, text('‹ 返回样式选择', '‹ Back to styles')) : null,
     showStyles ? el('div', { className: 'cm-preview-style-options', role: 'group', 'aria-label': text('侧栏布局', 'Sidebar layout') },
       ...[['simple', text('简洁', 'Simple')], ['standard', text('标准', 'Standard')], ['compact', text('紧凑', 'Compact')]].map(([value, label]) =>
         el('div', { key: value, role: 'button', tabIndex: 0, 'aria-pressed': mode === value,
@@ -119,11 +120,5 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
           onClick: () => set({ sidebarSimple: value === 'simple', sidebarSimplePromptSeen: true, ...(value === 'simple' ? {} : { sidebarStyle: value }) }) },
           el(SidebarStyleSample, { render: props.renderStyleSample, config: previewData.config, data: previewData.state, examples, mode: value }), el('span', { className: 'cm-style-caption' }, label)))) : null,
     showStyles && mode === 'compact' ? el('p', { className: 'cm-inspector-note' }, text('多时段额度并排，预算卡保持完整。', 'Quota windows sit side by side; the budget card stays intact.')) : null,
-    region === 'sidebar' ? el('div', { className: 'cm-inspector-divider' }) : null,
-    field(text('调整组件', 'Customize'), el('select', { className: 'cm-input', value: selected ?? '', onChange: event => select(event.target.value) },
-      !selected ? el('option', { value: '', disabled: true, hidden: true }, text('选择组件', 'Choose a component')) : null,
-      ...(region === 'sidebar' ? ['budget','balance','today','peak','models','go','plan','customBalance','codex'] : region === 'composer' ? ['strip-budget','strip-go','strip-plans','strip-codex','session-dock','badge','corner','models'] : ['session-header','badge','turn']).map(key => el('option', { key, value: key }, labels[key])))),
-    selected ? el('div', { className: 'cm-inspector-controls', key: selected, 'data-inspector': selected },
-      selection && !['models', 'today', 'budget', 'peak', 'balance', 'go', 'plan', 'customBalance', 'codex', 'strip-codex'].includes(selected) ? check(text('显示此组件', 'Show this component'), selection.on, () => set(selection.patch)) : null,
-      ...controls) : null)
+    null)
 }
