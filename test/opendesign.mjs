@@ -38,12 +38,12 @@ const quota = { workspaceId: 'ws-1', workspaceMemberId: 'member-1', eligible: tr
   { policyId: 'week', durationSeconds: 604800, usedCredits: '0', limitCredits: '100', remainingCredits: '100', resetsAt: '2026-10-22T00:00:00Z' },
 ] }
 const wallet = { billingScopeVersion: 2, workspaceId: 'ws-1', workspaceMemberId: 'member-1', balanceUsd: '0.00' }
-assert.equal(parseOpenDesignUsage(quota, 'ws-1').fiveHour.percent, 33.333)
-assert.equal(parseOpenDesignUsage(quota, 'ws-1').weekly.percent, 0)
+assert.equal(parseOpenDesignUsage(quota, 'ws-1').weekly.percent, 33.333)
+assert.equal(parseOpenDesignUsage(quota, 'ws-1').fiveHour.percent, 0)
 assert.equal(parseOpenDesignUsage({ ...quota, windows: [] }, 'ws-1'), null)
 assert.deepEqual(parseOpenDesignUsage({ ...quota, eligible: false, windows: [] }, 'ws-1'), {})
 assert.equal(parseOpenDesignUsage({ ...quota, windows: [{ ...quota.windows[0], remainingCredits: '0' }] }, 'ws-1'), null)
-assert.equal(parseOpenDesignUsage({ ...quota, windows: [{ ...quota.windows[0], usedCredits: '30000000000000000001', remainingCredits: '0' }] }, 'ws-1').fiveHour.percent, 100)
+assert.equal(parseOpenDesignUsage({ ...quota, windows: [{ ...quota.windows[0], usedCredits: '30000000000000000001', remainingCredits: '0' }] }, 'ws-1').weekly.percent, 100)
 assert.equal(parseOpenDesignWallet(wallet, 'ws-1').text, '$0.00')
 assert.equal(parseOpenDesignWallet(wallet, 'ws-other'), null)
 const requests = [], key = 'SYNTHETIC-CONTROL-KEY-1'
@@ -57,7 +57,7 @@ const transport = async (url, init) => {
 }
 const message = (_, code) => 'OpenDesign: ' + code
 const result = await queryOpenDesignQuota(key, 'en', message, { workspaceId: 'ws-1', fetchImpl: transport })
-assert.equal(requests.length, 2); assert.equal(result.windows.balance.text, '$0.00'); assert.equal(result.windows.weekly.percent, 0)
+assert.equal(requests.length, 2); assert.equal(result.windows.balance.text, '$0.00'); assert.equal(result.windows.fiveHour.percent, 0)
 assert.equal(Object.hasOwn(result.windows.balance, 'percent'), false, 'wallet money is not a third quota window')
 for (const bad of [undefined, '', '../ws-1']) await assert.rejects(queryOpenDesignQuota(key, 'en', message, { workspaceId: bad, fetchImpl: transport }), { soft: true })
 await assert.rejects(queryOpenDesignQuota('', 'en', message, { workspaceId: 'ws-1', fetchImpl: transport }), { soft: true })
@@ -124,7 +124,7 @@ for (const provider of OPENDESIGN_PROVIDER_IDS) {
 const nodes = value => Array.isArray(value) ? value.flatMap(nodes) : value && typeof value === 'object' ? [value, ...nodes(value.children)] : []
 for (const locale of ['zh', 'en']) {
   let saved
-  const t = name => ui.MESSAGES[locale][name] ?? name
+  const t = (name, args = {}) => (ui.MESSAGES[locale][name] ?? name).replace(/\{(\w+)\}/g, (_, key) => args[key] ?? '')
   const card = ui.PlanQuotaCard({ state: { config: clientConfig, codingPlans: {} }, draft: clientConfig, setDraft: value => { saved = value }, planId: 'opendesign', labelKey: 'codingPlanOpendesign', t, api: {} })
   const contents = nodes(card.props.configNode)
   const input = contents.find(row => row.type === 'input' && row.props['aria-label'] === t('opendesignWorkspace'))
@@ -132,6 +132,28 @@ for (const locale of ['zh', 'en']) {
   assert.equal(saved.codingPlans.opendesign.workspaceId, 'ws-2')
   assert.ok(contents.some(row => row.props.target === 'codingPlans.opendesign' && row.props.placeholder === 'OPENDESIGN_CONTROL_KEY'))
   assert.ok(contents.some(row => row.children?.includes(t('opendesignNote'))))
+  // Distinct allowances exercise the reported swap through settings, sidebar and strip.
+  const enabledWindows = { ...clientConfig, locale, quotaStrip: { ...clientConfig.quotaStrip, enabled: true, plans: true }, codingPlans: { ...clientConfig.codingPlans, opendesign: { ...clientConfig.codingPlans.opendesign, enabled: true, display: 'both' } } }
+  const swapped = parseOpenDesignUsage(quota, 'ws-1')
+  assert.deepEqual(swapped, parseOpenDesignUsage({ ...quota, windows: [...quota.windows].reverse() }, 'ws-1'), 'mapping is independent of upstream row order')
+  assert.equal(swapped.weekly.percent, 33.333)
+  assert.equal(swapped.fiveHour.percent, 0)
+  assert.equal(swapped.fiveHour.resetsAt, '2026-10-22T00:00:00.000Z')
+  assert.equal(swapped.weekly.resetsAt, '')
+  const swappedState = { config: enabledWindows, codingPlans: { opendesign: { status: 'ok', fetchedAt: 1, windows: swapped } } }
+  const settings = ui.PlanQuotaCard({ state: swappedState, draft: enabledWindows, setDraft() {}, planId: 'opendesign', labelKey: 'codingPlanOpendesign', t, api: {} })
+  const settingRows = nodes(settings.props.statusNode).filter(row => ['weekly', 'fiveHour'].includes(row.props.key))
+  assert.equal(settingRows.length, 2)
+  for (const row of settingRows) {
+    const text = JSON.stringify(row)
+    assert.ok(text.includes(row.props.key === 'weekly' ? '33%' : '0%'), 'settings pairs each window label with its allowance')
+  }
+  const sidebar = ui.CodingPlanBox({ id: 'opendesign', state: swappedState, wide: true })
+  const sidebarRows = nodes(sidebar).filter(row => ['weekly', 'fiveHour'].includes(row.props.key))
+  assert.equal(sidebarRows.length, 2)
+  for (const row of sidebarRows) assert.ok(JSON.stringify(row).includes(row.props.key === 'weekly' ? '33%' : '0%'), 'sidebar uses the same corrected mapping')
+  const strip = JSON.stringify(ui.QuotaStrip({ useCost: () => ({ state: swappedState }) }))
+  assert.ok(strip.includes('5h') && strip.includes('33%') && strip.includes('0%'), 'quota strip retains both corrected windows')
   const message = locale === 'zh' ? '套餐额度：查询失败，钱包仍可用。' : 'Plan quota: unavailable; wallet is still available.'
   const enabled = { ...clientConfig, locale, quotaStrip: { ...clientConfig.quotaStrip, enabled: true }, codingPlans: { ...clientConfig.codingPlans, opendesign: { ...clientConfig.codingPlans.opendesign, enabled: true } } }
   const state = { config: enabled, codingPlans: { opendesign: { status: 'ok', message, fetchedAt: 1, windows: { balance: { text: '$12.50', resetsAt: '' } } } } }

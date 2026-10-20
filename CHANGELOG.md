@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.20] - 2026-10-20
+
+- 修正 OpenDesign 的 5 小时与周额度对应关系，使用量百分比和重置时间跟随同一窗口对调，设置卡片、侧栏和额度横条使用统一结果。
+- Correct the swapped OpenDesign 5-hour and weekly allowances. Keep each usage percentage paired with its reset time across settings, the sidebar and the quota strip.
+
+[更新说明](docs/update-notes-1.9.20.md)
+
 ## [1.9.19] - 2026-10-20
 
 - 统一侧栏峰谷条、余额、今日用量、模型费用、预算、Coding Plan、Codex 与网关额度的内容边线；标题靠左，金额与比例靠右，模型卡片展开箭头移到标题后。
