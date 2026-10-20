@@ -22,12 +22,12 @@
 
 Release notes: [v1.9.16](docs/update-notes-1.9.16.md#english). Fully restart DSH after updating.
 
+![Promo art](docs/promo.en.png)
+
 <details>
-<summary>Full feature summary and preview</summary>
+<summary>Full feature summary</summary>
 
 Per-conversation cost · daily totals · OpenCode Go subscription quota display · budget with usage percentage · official account balance · custom provider balance · balance progress bar · history · peak/off-peak pricing hours display (peak hours UTC 01:00–04:00, 06:00–10:00; weekends and Chinese public holidays are off-peak all day, with separate labels) · pre-switch popup & system-notification alerts for peak/off-peak changes (position / lead time / alert type configurable) · one-click price sync from the official docs · Codex-style token usage heat grid · multi-vendor model pricing (built-in 170+ model-ID catalog with auto-matching) · mainstream Coding Plan quota queries & display (Anthropic / Z.ai / MiniMax / Kimi / OpenRouter / SiliconFlow / CommandCode / Cline Pass / SCNet / Volcano Ark / Qwen / Xiaomi MiMo / Factory Droid) plan/API dual-track billing (subscription quota vs pay-as-you-go money separated, per-1% & full-window token/equivalent-cost estimates with daily/weekly/monthly curves) · subscription plugin compatibility (Codex / ChatGPT subscription plans) · mobile layout (dsh-pocket) · quota strip above the input box (budget / Go / coding-plan usage in one row, toggleable)
-
-![Promo art](docs/promo.en.png)
 
 </details>
 
