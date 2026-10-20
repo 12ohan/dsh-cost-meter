@@ -1727,7 +1727,7 @@
               })))
       return el(QuotaCard, {
         planId, targeted: props.targeted,
-        name: t(labelKey), enabled, saved: config.codingPlans?.[planId], busy, open, errorMsg: msg,
+        name: t(labelKey), enabled, saved: config.codingPlans?.[planId], busy, open, errorMsg: msg?.text === live.message ? null : msg,
         statusNode, configNode,
         onToggle: value => setPlan('enabled', value),
         onRefresh: doRefresh,

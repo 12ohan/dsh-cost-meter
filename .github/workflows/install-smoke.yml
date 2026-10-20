@@ -41,6 +41,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Load the reported Claude skin version
+        uses: actions/checkout@v7
+        with:
+          repository: Nwflower/dsh-claude-style
+          ref: 3f1a5aaf5cb11e64e07020fc08372466652155c8
+          path: .tmp/claude-style
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -99,6 +106,8 @@ jobs:
           node test/sidebar-guide-browser.mjs
           node test/peak-alert-browser.mjs
           node test/peak-progress-browser.mjs
+          node test/update-notice-skin-browser.mjs
+          node test/workbuddy-settings-browser.mjs
           node test/peak-style-picker-browser.mjs
           git fetch --depth=1 origin tag v1.8.29
           node test/idle-performance-browser.mjs
@@ -131,6 +140,8 @@ jobs:
             .tmp-codex-quota-browser/*
             .tmp-session-list-browser/*
             .tmp-peak-progress-preview/
+            .tmp-notice-skin/
+            .tmp-workbuddy-settings/
           if-no-files-found: ignore
           retention-days: 7
           include-hidden-files: true

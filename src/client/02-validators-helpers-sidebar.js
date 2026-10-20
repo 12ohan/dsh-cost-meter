@@ -141,7 +141,7 @@
         hideTodayCost: v.hideTodayCost === true,
         sessionListCostPeriod: v.sessionListCostPeriod === 'today' ? 'today' : 'total',
         modelStatistics: v.modelStatistics ?? {},
-        ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'followSkinTransparency', 'sessionListCosts', 'hideBudget', 'sessionCostCompact', 'contextCostsEnabled', 'contextCostsPromptSeen', 'showTotalWithPlan', 'sidebarSimple', 'sidebarSimplePromptSeen', 'codexQuotaEnabled', 'codexCompatPromptDismissed', 'includeSubagentCost', 'peakEnabled', 'peakAlertWebNotify', 'peakProgressPromptSeen'], value => value === true),
+        ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'followSkinTransparency', 'sidebarTodayBalanceInline', 'sessionListCosts', 'hideBudget', 'sessionCostCompact', 'contextCostsEnabled', 'contextCostsPromptSeen', 'showTotalWithPlan', 'sidebarSimple', 'sidebarSimplePromptSeen', 'codexQuotaEnabled', 'codexCompatPromptDismissed', 'includeSubagentCost', 'peakEnabled', 'peakAlertWebNotify', 'peakProgressPromptSeen'], value => value === true),
         sidebarTodayMetric: ['tokens', 'both'].includes(v.sidebarTodayMetric) ? v.sidebarTodayMetric : 'cost',
         sidebarOrder: Array.isArray(v.sidebarOrder) ? v.sidebarOrder : [],
         statisticsBasis: v.statisticsBasis,
@@ -870,13 +870,15 @@
      * 模型名自动匹配(与 lib/pricing.js 的 matchModelId 同逻辑;bundle 无法导入,修改时两处同步)。
      * 精确 → 归一化等价 → 去日期/版本后缀 → 安全后缀。
      */
-    function stripIdDecor(id) {
+    function stripIdDecor(id, snapshotTags = true) {
       // Strip request decorations one at a time; candidate snapshots keep their identity.
-      return modelNameText(id).replace(/[-_./:@](?:\d{4}-?\d{2}-?\d{2}|v\d+(?:\.\d+)*|\d+k|latest)$/, '')
+      const text = modelNameText(id)
+      if (snapshotTags && /[-_./:@](?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])$/.test(text)) return text.slice(0, -5)
+      return text.replace(/[-_./:@](?:\d{4}-?\d{2}-?\d{2}|v\d+(?:\.\d+)*|\d+k|latest)$/, '')
     }
 
     /** Exact IDs precede unique punctuation aliases and request-only safe decorations. */
-    function matchModelIdLocal(modelId, candidates, exactId = modelId) {
+    function matchModelIdLocal(modelId, candidates, exactId = modelId, snapshotTags = true) {
       if (typeof modelId !== 'string' || modelId.length === 0) return null
       const list = Array.isArray(candidates) ? candidates.filter(c => typeof c === 'string' && c.length > 0) : []
       const exact = list.find(c => c === exactId)
@@ -888,7 +890,7 @@
         if (canon.length === 0) return null
         const hits = list.filter(c => canonModelIdLocal(c) === canon)
         if (hits.length > 0) return hits.length === 1 ? hits[0] : null
-        const stripped = stripIdDecor(target)
+        const stripped = stripIdDecor(target, snapshotTags)
         if (stripped === target.toLowerCase()) return null
         target = stripped
       }
@@ -919,11 +921,11 @@
         if (Object.hasOwn(MODEL_VENDOR_PREFIXES, vendor)
           && (vendor === provider || (provider === 'opencode-zen' || provider === 'opencode-go')
             && (MODEL_VENDOR_PREFIXES[vendor].test(bare)
-              || matchModelIdLocal(bare, Object.keys(vendor === 'deepseek' ? prices?.models ?? {} : prices?.providers?.[vendor]?.models ?? {})) !== null))) target = bare
+              || matchModelIdLocal(bare, Object.keys(vendor === 'deepseek' ? prices?.models ?? {} : prices?.providers?.[vendor]?.models ?? {}), bare, prices?.snapshotTags !== false) !== null))) target = bare
         else if (Object.hasOwn(MODEL_VENDOR_PREFIXES, vendor)) return null
       }
       // Formatting a request must not create a literal hit that bypasses alias collisions.
-      return matchModelIdLocal(target, Object.keys(models), modelId)
+      return matchModelIdLocal(target, Object.keys(models), modelId, prices?.snapshotTags !== false)
     }
     /**
      * 客户端价格解析(与 pricing.js providerPriceEntryFor 同口径):手动覆盖 → 精确 → 自动匹配。
@@ -954,7 +956,7 @@
         && typeof override === 'string' && override.length > 0 && override !== '__local__' && !override.includes(':')) {
         const dsModels = prices.models ?? {}
         const retryHit = Object.hasOwn(dsModels, override) ? override
-          : (mode === 'auto' ? matchModelIdLocal(override, Object.keys(dsModels)) : null)
+          : (mode === 'auto' ? matchModelIdLocal(override, Object.keys(dsModels), override, prices?.snapshotTags !== false) : null)
         if (retryHit !== null && dsModels[retryHit]?.unpriced !== true) return { entry: dsModels[retryHit], priced: true, billingMode: 'deepseek-peak', matched: true }
       }
       return null
@@ -1266,9 +1268,8 @@
           // Ollama Cloud 的 DeepSeek 模型使用自有峰谷日历;provider/model 归一化与 lib/pricing.js
           // providerPriceEntryFor 的 peakSchedule 标记同口径(trim、小写、剥离 llm- 前缀)。
           if (entry && resolved.billingMode === 'deepseek-peak' && config.prices?.ollamaPeak !== false
-            && (config.prices?.ollamaTaggedPeak === false
-              ? /^\s*(llm-)?ollama-cloud\s*:\s*deepseek-v4(\.1-flash|-pro)\s*$/i.test(providerKey)
-              : /^\s*(llm-)?ollama-cloud\s*:\s*deepseek-v(?:4\.1-flash|4-pro)(?:[-_./:@](?:(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])|\d{4}-?\d{2}-?\d{2}|v\d+(?:\.\d+)*|\d+k|latest))*\s*$/i.test(providerKey))) entry.peakSchedule = 'ollama'
+            && provider.trim().toLowerCase().replace(/^llm-/, '') === 'ollama-cloud'
+            && (config.prices?.ollamaTaggedPeak === false ? ['deepseek-v4.1-flash', 'deepseek-v4-pro'].includes(modelId.trim().toLowerCase()) : matchModelIdLocal(modelId, ['deepseek-v4.1-flash', 'deepseek-v4-pro']) !== null)) entry.peakSchedule = 'ollama'
           const c = costOfBuckets(byModel[providerKey], tierFor(entry, now, { ...peak, enabled: ['deepseek-peak', 'utc-peak'].includes(resolved.billingMode) && peak.enabled }))
           const billed = usdFromCostLocal(c, resolved.currency, cnyRate)
           total += billed
@@ -3394,7 +3395,7 @@
       const simple = config.sidebarSimple === true
       const compactWide = !simple && wide && config.sidebarStyle === 'compact'
       const nodes = []
-      if (simple && wide && showToday) nodes.push(el('div', { key: 'today', 'data-cm-display': 'today', className: 'cm-simple-summary' },
+      if (simple && wide && showToday && !config.sidebarTodayBalanceInline) nodes.push(el('div', { key: 'today', 'data-cm-display': 'today', className: 'cm-simple-summary' },
         el('span', null, t('today')), el('span', { className: 'cm-num' }, sidebarTodayValue(state.today, config, t))))
       if (showBalanceBar) nodes.push(el(BalanceBox, { key: 'balance', state, wide, api: api }))
       else if (showBalance) nodes.push(el(BalanceRowContent, { key: 'balance', state, wide, api: api }))
@@ -3408,7 +3409,7 @@
       if (codexOn) nodes.push(el(CodexPlanBox, { key: 'codex', state, wide, api, preview }))
       if (goOk) nodes.push(el(GoQuotaBox, { key: 'go', state, wide }))
       if (budgetOn) nodes.push(el(BudgetBoxContent, { key: 'budget', state, wide, summary: simple && wide }))
-      if (showToday && !(simple && wide)) nodes.push(el(BudgetBoxContent, { key: 'today', state, wide, todayOnly: true }))
+      if (showToday && (!(simple && wide) || config.sidebarTodayBalanceInline)) nodes.push(el(BudgetBoxContent, { key: 'today', state, wide, todayOnly: true }))
       // Each display target owns its visibility; hiding another card cannot hide it.
       if (peakOn) nodes.push(el(Fragment, { key: 'peak' }, wide ? peakNoticeEl(state, config.sidebarStyle === 'summary' && !config.sidebarSimple ? { ...config, peakProgressVariant: 'summary' } : config, t) : peakNoticeRailEl(state, config, t)))
       if (modelsOn) nodes.splice(config.sidebarModels.position === 'first' ? 0 : config.sidebarModels.position === 'afterBalance' ? afterBalance : nodes.length, 0,
@@ -3418,5 +3419,5 @@
         const rank = node => { const index = order.indexOf(node.key); return index < 0 ? 999 : index }
         nodes.sort((a, b) => rank(a) - rank(b))
       }
-      return el('div', { ...(simple ? { tabIndex: 0, role: 'region', 'aria-label': t('sidebarSimple') } : {}), className: 'cm-footer-stack' + (wide ? '' : ' rail') + (compactWide ? ' compact' : '') + (simple ? ' simple' : config.sidebarStyle === 'summary' && wide ? ' summary' : '') }, ...nodes)
+      return el('div', { ...(simple ? { tabIndex: 0, role: 'region', 'aria-label': t('sidebarSimple') } : {}), className: 'cm-footer-stack' + (config.sidebarTodayBalanceInline ? ' same-line' : '') + (wide ? '' : ' rail') + (compactWide ? ' compact' : '') + (simple ? ' simple' : config.sidebarStyle === 'summary' && wide ? ' summary' : '') }, ...nodes)
     }

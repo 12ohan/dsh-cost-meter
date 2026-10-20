@@ -1,5 +1,16 @@
 # dsh-cost-meter 版本更新历史
 
+## v1.9.18(2026-10-20)—— WorkBuddy 加密登录、公告交互与快照计价
+
+- WorkBuddy 积分优先读取连接插件的本地状态接口，兼容加密登录文件；移除“重新登录生成明文副本”的错误提示，同一条刷新错误只显示一次。已用真实加密登录文件验证查询值与上游一致。
+- 更新公告改为非模态窗口，补齐皮肤兼容标记；被隐藏时不再让宿主进入 inert 状态。感谢 [@SherUnlocked-4869](https://github.com/SherUnlocked-4869) 在 [issue #355](https://github.com/Han-1413141/dsh-cost-meter/issues/355) 提供环境、A/B 复现和原因定位。
+- Ollama Cloud 的 `deepseek-v4.1-flash:1017`、`deepseek-v4-pro:0813` 等快照与连续安全后缀可自动匹配，显式映射同样使用 Ollama 峰谷日历。冻结历史匹配策略，旧账本加载、回放和重启不自动改价；手动模型重算保留原汇率。感谢 [@LetterXbox](https://github.com/LetterXbox) 在 [issue #356](https://github.com/Han-1413141/dsh-cost-meter/issues/356) 提供复现、定位及历史保护要求。
+
+- UI 设置增加“今日消费与余额同行”独立开关，保留现有布局、悬停详情和余额进度条。感谢 [@zhuwnq](https://github.com/zhuwnq) 在 [issue #359](https://github.com/Han-1413141/dsh-cost-meter/issues/359) 提出需求。
+- 整合 [@LetterXbox](https://github.com/LetterXbox) 在 [PR #358](https://github.com/Han-1413141/dsh-cost-meter/pull/358) 提交的历史时间线恢复与升级测试，扩展自动匹配时继续保留原账单和策略切换时间。
+
+[更新说明](update-notes-1.9.18.md)
+
 ## v1.9.17(2026-10-20)—— 侧栏显示、排序保存与皮肤公告修复
 
 - 主页侧栏恢复普通展示，移除六点拖动手柄、额外左侧留白和保存提示；拖动与方向键排序仅保留在“费用 → 显示”的预览中。

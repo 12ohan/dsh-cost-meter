@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
+import { fetchWorkBuddyConnectCredits } from '../lib/workbuddy.js'
+import { queryCodingPlan } from '../lib/coding-plans.js'
+
+const encrypted = JSON.stringify({ auth: { accessToken: { $wbEncrypted: 1, ciphertext: 'synthetic' } } })
+const requestLog = []
+let status = { status: 'signed-in', credits: { total: 1011, accounts: [] }, probeKey: 'DO_NOT_COPY', nickname: 'DO_NOT_COPY' }
+let httpStatus = 200, html = false, aiStatus = null
+const server = createServer((req, res) => {
+  requestLog.push({ path: req.url, method: req.method, authorization: req.headers.authorization })
+  if (req.url.endsWith('/ai/status') && aiStatus) { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(aiStatus)); return }
+  res.writeHead(httpStatus, { 'content-type': html ? 'text/html' : 'application/json', ...(httpStatus === 302 ? { location: '/must-not-follow' } : {}) })
+  res.end(html ? '<!doctype html>' : JSON.stringify(status))
+})
+await new Promise(done => server.listen(0, '127.0.0.1', done))
+const hostOrigin = `http://127.0.0.1:${server.address().port}`
+const key = { hostOrigin, readFile: () => { throw Error('Must not read plaintext when the connector exists') } }
+const t = (_, code) => code
+try {
+  const result = await queryCodingPlan('workbuddy', key, 'en', t)
+  assert.equal(result.windows.balance.text, '1,011')
+  assert.equal(JSON.stringify(result).includes('DO_NOT_COPY'), false)
+  assert.equal(requestLog.length, 1)
+  assert.deepEqual(requestLog[0], { path: '/plugins/dsh-workbuddy-connect/status', method: 'GET', authorization: undefined })
+  status = { status: 'signed-in', credits: { total: 0, accounts: [] } }
+  assert.equal((await queryCodingPlan('workbuddy', key, 'en', t)).windows.balance.text, '0')
+  status.credits = { total: 0, unlimited: true, accounts: [] }
+  assert.equal((await queryCodingPlan('workbuddy', key, 'en', t)).windows.balance.text, 'workbuddyUnlimited')
+  status.credits = { total: 400, cycleResetTime: '2030-01-01T00:00:00Z', accounts: [] }
+  assert.ok((await queryCodingPlan('workbuddy', key, 'en', t)).windows.cycleReset.resetsAt)
+  for (const credits of [undefined, { total: null }, { total: -1 }, { total: '1011' }, { total: 1, unlimited: 'yes' }]) {
+    status = { status: 'signed-in', credits, creditsError: 'SECRET_UPSTREAM_MESSAGE' }
+    await assert.rejects(queryCodingPlan('workbuddy', key, 'en', t), e => e.soft && e.message === 'workbuddyConnectCreditsFailed')
+  }
+  status = { status: 'signed-out', reasonCode: 'encrypted-credential-unreadable', reason: 'DO_NOT_COPY' }
+  await assert.rejects(queryCodingPlan('workbuddy', key, 'en', t), e => e.soft && e.message === 'workbuddyConnectLoginFailed')
+  status = { status: 'signed-out', reasonCode: 'no-credential' }
+  await assert.rejects(queryCodingPlan('workbuddy', key, 'en', t), e => e.soft && e.message === 'workbuddyNotInstalled')
+  aiStatus = { status: 'signed-in', credits: { total: 700, accounts: [] } }
+  assert.equal((await queryCodingPlan('workbuddy', key, 'en', t)).windows.balance.text, '700')
+  aiStatus = null
+  for (const mode of ['404', 'SPA']) {
+    httpStatus = mode === '404' ? 404 : 200; html = mode === 'SPA'
+    await assert.rejects(queryCodingPlan('workbuddy', { hostOrigin, readFile: () => encrypted }, 'en', t), e => e.soft && e.message === 'workbuddyAuthEncrypted')
+  }
+  html = false; httpStatus = 302
+  await assert.rejects(queryCodingPlan('workbuddy', key, 'en', t), /fetch failed/)
+  assert.equal(requestLog.some(r => r.path === '/must-not-follow'), false)
+  for (const url of ['https://example.com', 'http://example.com', 'http://user@127.0.0.1:1234', hostOrigin + '/unexpected']) {
+    await assert.rejects(fetchWorkBuddyConnectCredits(url), e => e.code === 'workbuddyConnectUnavailable')
+  }
+  const controller = new AbortController(); controller.abort()
+  await assert.rejects(fetchWorkBuddyConnectCredits(hostOrigin, { signal: controller.signal }), e => e.name === 'AbortError')
+  console.log('[ok] WorkBuddy connector: real loopback HTTP, encrypted-file fallback, CN/global, finite/zero/unlimited credits, sign-out authority, no credential/control-key forwarding, redirects and cancellation')
+} finally { server.closeAllConnections(); await new Promise(done => server.close(done)) }

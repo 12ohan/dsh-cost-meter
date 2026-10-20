@@ -42,25 +42,17 @@ window.__ModuleLoader__.load({
         useEffect(() => {
           if (!show) return
           const token = {}, previous = document.activeElement, node = dialog.current
-          // Wait for existing update guides/dialogs; never stack several modals.
-          const visible = new ResizeObserver(() => {
-            if (node?.open && (!node.getBoundingClientRect().width || !node.getBoundingClientRect().height || getComputedStyle(node).visibility === 'hidden')) {
-              node.close(); setClosed(true)
-            }
-          })
+          // Update notices are non-modal: a skin hiding one must never make the host inert.
           const observer = new MutationObserver(() => attempt())
           const attempt = () => {
             if (guideOwner || wasSeen(seenKey) || document.querySelector('dialog[open], .cm-qguide')) return
-            guideOwner = token; observer.disconnect()
-            // A skin may hide generic dialogs with !important. Never leave an invisible modal blocking DSH.
-            node.style.setProperty('display', 'flex', 'important')
-            node.style.setProperty('visibility', 'visible', 'important')
-            try { node.showModal(); visible.observe(node) } catch { setClosed(true) }
+            guideOwner = token; observer.disconnect(); node?.show()
+            if (node && (!node.getClientRects().length || getComputedStyle(node).visibility === 'hidden')) setClosed(true)
           }
           observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['open'] })
           attempt()
           return () => {
-            observer.disconnect(); visible.disconnect()
+            observer.disconnect()
             if (guideOwner === token) { guideOwner = null; node?.close(); if (previous?.isConnected) previous.focus?.() }
           }
         }, [show])
@@ -80,7 +72,7 @@ window.__ModuleLoader__.load({
           finally { pending.current = false; setBusy(false) }
         }
         const preview = { ...config, peakEnabled: true, peakNotice: true, peakEffectiveAt: '', peakTimeDisplay: mode }
-        return el('dialog', { ref: dialog, role: 'dialog', 'aria-modal': true, className: 'cm-stat-dialog cm-peak-intro', 'aria-label': title, onCancel: event => { event.preventDefault(); dismiss() } },
+        return el('dialog', { ref: dialog, role: 'dialog', className: 'cm-stat-dialog cm-peak-intro', 'aria-label': title, onKeyDown: event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismiss() } }, onCancel: event => { event.preventDefault(); dismiss() } },
           el('header', { className: 'cm-stat-dialog-head' }, el('strong', null, title),
             el('button', { type: 'button', className: 'cm-btn', 'aria-label': text('关闭', 'Close'), onClick: dismiss }, '×')),
           el('div', { className: 'cm-stat-dialog-body' },

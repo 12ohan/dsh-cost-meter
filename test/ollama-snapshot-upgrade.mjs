@@ -53,7 +53,7 @@ async function scenario(alias, timeline) {
     const decoded = normalizePricingHistory(saved.pricingHistory, saved.config, undefined, true)
     assert.equal(decoded.changes.initial?.version, initial, 'valid legacy fixture must decode without recovery')
     assert.equal(decoded.versions[initial].prices.ollamaPeak, true)
-    assert.equal(decoded.versions[initial].prices.ollamaTaggedPeak, false)
+    assert.equal(decoded.versions[initial].prices.snapshotTags, false)
     if (timeline === 'missing') delete saved.pricingHistory
     if (timeline === 'invalid') saved.pricingHistory.changes = {}
     if (timeline === 'mixed') {
@@ -66,7 +66,7 @@ async function scenario(alias, timeline) {
       const recoveredConfig = bindPricingHistory({ ...saved.config }, recovered)
       near(turnCostFromRecords(records, recoveredConfig, 0, 7).calls.find(c => c.model === model).cost, oldCost)
       const later = records.map(row => ({ ...row, ...(row.time ? { time: row.time + 86400000 } : {}) }))
-      near(turnCostFromRecords(later, recoveredConfig, 0, 7).calls.find(c => c.model === model).cost, alias ? .15 : 0)
+      near(turnCostFromRecords(later, recoveredConfig, 0, 7).calls.find(c => c.model === model).cost, .15)
     }
     writeFileSync(path, JSON.stringify(saved))
     mkdirSync(sessionDir, { recursive: true })
@@ -79,7 +79,7 @@ async function scenario(alias, timeline) {
 
     const newAt = Date.parse('2026-10-20T13:00:00Z')
     ledger.account({ input: 1e6 }, model, 'new-call', newAt, 'ollama-cloud')
-    near(ledger.days['2026-10-20'].byProviderModel[key].cost, alias ? .30 : 0)
+    near(ledger.days['2026-10-20'].byProviderModel[key].cost, .30)
     ledger.close(); ledger = Ledger.load(path)
     check(oldCost)
     const beforeSibling = structuredClone(ledger.days['2026-10-19'].byProviderModel[sibling])
@@ -89,13 +89,13 @@ async function scenario(alias, timeline) {
     ledger.flush()
     const result = await recomputeLedgerPricingBasis(ledger, sessionsRoot, null, null, true, key)
     assert.equal(result.recostedSessions, 1, 'explicitly recost the matching session')
-    check(alias ? .15 : 0)
-    near(ledger.days['2026-10-19'].byProviderModel[key].costCny, (alias ? .15 : 0) * 7)
+    check(.15)
+    near(ledger.days['2026-10-19'].byProviderModel[key].costCny, (.15) * 7)
     assert.deepEqual(ledger.days['2026-10-19'].byProviderModel[sibling], beforeSibling, 'other provider untouched')
     ledger.scheduleWrite()
     ledger.close(); ledger = Ledger.load(path)
-    check(alias ? .15 : 0)
-    near(ledger.days['2026-10-20'].byProviderModel[key].cost, alias ? .30 : 0)
+    check(.15)
+    near(ledger.days['2026-10-20'].byProviderModel[key].cost, .30)
   } finally {
     ledger?.close()
     Date.now = oldNow

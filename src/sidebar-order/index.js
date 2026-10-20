@@ -10,7 +10,7 @@ window.__ModuleLoader__.load({
       next.splice(index + Number(after), 0, source)
       return next.slice(0, 64)
     }
-    function mount(ctx) {
+    function mount(ctx, store) {
       let drag = null
       const style = document.createElement('style')
       style.textContent = `
@@ -29,7 +29,44 @@ window.__ModuleLoader__.load({
         [data-cm-order-drop=before]{box-shadow:0 -2px var(--dsw-alias-state-business-primary,#4d6bfe)!important}
         [data-cm-order-drop=after]{box-shadow:0 2px var(--dsw-alias-state-business-primary,#4d6bfe)!important}
       `
+      style.textContent += `        body .cm-footer-stack.cm-inline-ready:not(.rail){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:10px;align-items:start}.cm-inline-ready>[data-cm-display]{grid-column:1/-1;min-width:0}.cm-inline-ready>.cm-inline-today{grid-column:1;grid-row:var(--cm-inline-row)}.cm-inline-ready>.cm-inline-balance{grid-column:2;grid-row:var(--cm-inline-row)}
+        body .cm-footer-stack.cm-inline-ready>:is(.cm-inline-today,.cm-inline-balance){padding:4px 0;min-height:22px;font-size:12px;border:0;background:transparent;box-shadow:none;gap:4px;align-self:start}.cm-inline-ready :is(.cm-inline-today,.cm-inline-balance) :is(.cm-num,.cm-bbox-pct,.cm-bbox-label){font-size:12px}.cm-inline-ready :is(.cm-inline-today,.cm-inline-balance) .cm-bbox-head{gap:4px;margin:0 0 4px;min-height:19px}.cm-inline-ready .cm-inline-balance .cm-balance-name a{display:none}.cm-inline-ready :is(.cm-inline-today,.cm-inline-balance) :is(.cm-bal-label,.cm-balance-name){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cm-inline-ready :is(.cm-inline-today,.cm-inline-balance) .cm-num{min-width:0;overflow:hidden;text-overflow:ellipsis}.cm-inline-ready .cm-today-values{gap:4px;flex-wrap:wrap}.cm-inline-ready .cm-inline-today>.cm-num{flex:1;text-align:right}
+`
       document.head.appendChild(style)
+      const alignTodayBalance = root => {
+        const cards = [...root.children].filter(node => node.dataset.cmDisplay)
+        const today = cards.find(node => node.dataset.cmDisplay === 'today')
+        const balance = cards.find(node => node.dataset.cmDisplay === 'balance') ?? cards.find(node => node.dataset.cmDisplay === 'customBalance')
+        const enabled = root.classList.contains('same-line') && !root.classList.contains('rail') && today && balance
+        const toggle = (node, name, on) => { if (node.classList.contains(name) !== on) node.classList.toggle(name, on) }
+        toggle(root, 'cm-inline-ready', !!enabled)
+        for (const node of cards) {
+          toggle(node, 'cm-inline-today', !!enabled && node === today)
+          toggle(node, 'cm-inline-balance', !!enabled && node === balance)
+        }
+        if (enabled) root.style.setProperty('--cm-inline-row', Math.min(cards.indexOf(today), cards.indexOf(balance)) + 1)
+        else root.style.removeProperty('--cm-inline-row')
+      }
+      let frame = 0, stopped = false, watching = false
+      const arrange = () => {
+        frame = 0
+        if (stopped) return
+        for (const root of document.querySelectorAll('.cm-footer-stack.same-line,.cm-footer-stack.cm-inline-ready')) alignTodayBalance(root)
+      }
+      const schedule = () => { if (!frame && !stopped) frame = requestAnimationFrame(arrange) }
+      const observer = new MutationObserver(records => {
+        if (records.some(record => record.target.closest?.('.cm-footer-stack') || [...record.addedNodes].some(node => node.nodeType === 1 && (node.matches('.cm-footer-stack') || node.querySelector('.cm-footer-stack'))))) schedule()
+      })
+      const refresh = () => {
+        const enabled = store?.getSnapshot().state?.config?.sidebarTodayBalanceInline === true
+        if (!enabled && !watching) return
+        watching = enabled; observer.disconnect()
+        if (enabled) observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+        schedule()
+      }
+      const unsubscribe = store?.subscribe(refresh)
+      refresh()
+
       const scopeOf = node => node?.closest?.('.cm-sidebar-selection')
       const entries = root => [...root.querySelectorAll('[data-cm-order-key]')]
         .map(node => ({ node, key: node.dataset.cmOrderKey }))
@@ -83,6 +120,7 @@ window.__ModuleLoader__.load({
       const events = { dragstart: start, dragover: over, drop, dragend: clear, keydown }
       for (const [name, handler] of Object.entries(events)) document.addEventListener(name, handler, true)
       ctx.effect(() => () => {
+        stopped = true; unsubscribe?.(); observer.disconnect(); cancelAnimationFrame(frame)
         clear()
         for (const [name, handler] of Object.entries(events)) document.removeEventListener(name, handler, true)
         style.remove()
