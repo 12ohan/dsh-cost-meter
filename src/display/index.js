@@ -11,12 +11,13 @@ window.__ModuleLoader__.load({
     try { hostNative = require('@deepseek-ai/dsh-client-ui-primitives') } catch {}
     const Native = Object.fromEntries(Object.entries(fallbackNative).map(([name, component]) => [name, hostNative[name] ?? component]))
     const css = 'DISPLAY_STYLE_SOURCE'
-    // Only owned surfaces change. Nested statistics share the surrounding material;
-    // floating surfaces retain a 90% opacity floor, including fully transparent skins.
+    // Embedded pages and sidebar cards share the surrounding material. Only floating
+    // surfaces retain a 90% opacity floor, including fully transparent skins.
     const skinCss = `
       body :is(.cm-section,.cm-stat){background:transparent}
-      body :is(.cm-stat-dialog,.cm-qguide,.cm-peak-alert,.cm-footer-stack.simple,.cm-combo-panel,.cm-context-intro),body dialog.cm-fee-dialog{background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base,#fff)) r g b / max(alpha,.9))}
+      body :is(.cm-stat-dialog,.cm-qguide,.cm-peak-alert,.cm-combo-panel,.cm-context-intro),body dialog.cm-fee-dialog{background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base,#fff)) r g b / max(alpha,.9))}
       body :is(.cm-simple-summary,.cm-billion-notice){background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-1,var(--dsw-alias-bg-base,#fff)) r g b / max(alpha,.9))}
+      html body .cm-footer-stack,html body .cm-footer-stack:is(.simple,.summary):not(.rail),html body .cm-footer-stack :is(.cm-bbox,.cm-foot,.cm-simple-summary,.cm-peak-classic-chip){background:transparent}
     `
     /* DISPLAY_APPEARANCE_SOURCE */
     /* DISPLAY_PARTS_SOURCE */
@@ -205,7 +206,7 @@ window.__ModuleLoader__.load({
           el('input', { type: 'checkbox', checked: config.followSkinTransparency === true,
             onChange: event => set({ followSkinTransparency: event.target.checked }) }),
           text('跟随皮肤透明度', 'Follow skin transparency')),
-        el('span', { className: 'cm-hint' }, text('费用页跟随设置窗口背景，弹窗保留至少 90% 不透明度。', 'Use the settings window background; dialogs remain at least 90% opaque.')))
+        el('span', { className: 'cm-hint' }, text('费用页与侧栏卡片跟随背景，弹窗保留至少 90% 不透明度。', 'Cost pages and sidebar cards share their background; dialogs remain at least 90% opaque.')))
     }
     function CompatibilityNotice({ config, set, text, state }) {
       return el('section', { className: 'cm-display-notifications', 'aria-label': text('兼容提醒', 'Compatibility reminders') },
