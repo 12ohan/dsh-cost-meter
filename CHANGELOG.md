@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- 修复已配置价格映射的 Ollama Cloud 快照模型（如 `deepseek-v4.1-flash:1017`、`deepseek-v4-pro:0813`）仍套用 DeepSeek 官方峰谷日历的问题，宿主与浏览器同步支持日期标签及叠加安全后缀。价格匹配规则不变，标签模型仍需现有价格条目或手动映射；保留自定义价格与其他渠道规则。历史版本保存日历策略，升级不自动修改已有金额；显式按模型重算保留原汇率。历史初始记录缺失时保留仍有效的策略切换时间。
+- Fix the Ollama Cloud calendar for snapshot models with configured price mappings, such as `deepseek-v4.1-flash:1017` and `deepseek-v4-pro:0813`, including stacked safe suffixes in host billing and browser projection. Price matching is unchanged: tagged models still require an existing price entry or explicit mapping. Custom quotes and other providers retain their rules. Frozen calendar policies preserve recorded amounts across upgrades; explicit per-model recalculation retains original exchange rates. Recovery preserves surviving policy activation times when the initial history row is missing.
+
 ## [1.9.16] - 2026-10-20
 
 - 读取 DSH `web.searchProvider`／`web.fetchProvider`，在调用开始时保存所选提供方，并结合实际接口区分旧版 Messages 搜索与新版 Search／Fetch API。新版独立接口按成功请求每千次 ¥5 计费；旧版保留模型 Token 费用，已观察到的服务端成功搜索在北京时间 2026 年 11 月 1 日 00:00 前免请求费，此后按次收费。历史记录保持调用时的版本、单价与汇率。
