@@ -111,3 +111,6 @@ body[data-dsh-pocket-layout=mobile] .cm-display-inspector.cm-inspector-unified{b
 
 .cm-preview-part{display:inline-flex;align-items:center;gap:4px;max-width:100%;min-width:0;flex-wrap:wrap}.cm-preview-part[data-preview-hidden=true]{opacity:.42;filter:grayscale(1);background:color-mix(in srgb,var(--dsw-alias-label-tertiary) 7%,transparent);border-radius:3px}.cm-display-item[data-visible=false] .cm-preview-part[data-preview-hidden=true]{opacity:1}.cm-preview-corner{display:flex;flex-wrap:wrap;gap:6px}.cm-preview .cm-corner{position:static;max-width:100%;padding:0}.cm-preview .cm-corner-chip{max-width:100%;height:auto;min-height:20px;white-space:normal}
 .cm-preview [data-placeholder]:empty:before{content:attr(data-placeholder);color:var(--dsw-alias-label-tertiary);background:color-mix(in srgb,var(--dsw-alias-label-tertiary) 7%,transparent);border-radius:4px;padding:1px 5px}
+
+/* Four layout choices use balanced rows when the inspector is narrow. */
+.cm-inspector-unified .cm-preview-style-options{grid-template-columns:repeat(2,minmax(0,1fr))}@container cm-inspector (min-width:300px){.cm-inspector-unified .cm-preview-style-options{grid-template-columns:repeat(4,minmax(0,1fr))}}

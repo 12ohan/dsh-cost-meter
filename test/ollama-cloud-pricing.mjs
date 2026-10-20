@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { pricingSnapshot } from '../lib/billing-history.js'
 import { readFileSync, readdirSync } from 'node:fs'
 import vm from 'node:vm'
 import { AUGUST_PRICE_TABLE, DEFAULT_PRICE_TABLE, DEFAULT_PRICE_TABLE_CNY, OLLAMA_CLOUD_PEAK_EFFECTIVE_AT, providerPriceEntryFor, tierFor, costOf, usdFromCost } from '../lib/pricing.js'
@@ -184,8 +185,8 @@ const scenarios = [
   }, prices: { ...structuredClone(DEFAULT_PRICE_TABLE), custom: { 'ollama-cloud:deepseek-v4-pro': { currency: 'USD', cacheMiss: 0.5, cacheHit: 0.05, output: 1 } } } })],
   ['local override', sanitizeConfig({ currency: 'USD', priceOverrides: { 'ollama-cloud:deepseek-v4.1-flash': '__local__', 'ollama-cloud:deepseek-v4-pro': 'deepseek-v4-pro' } })],
   ['snapshot alias', sanitizeConfig({ currency: 'USD', priceOverrides: { 'ollama-cloud:deepseek-v4.1-flash:1017': 'deepseek:deepseek-v4.1-flash' } })],
-  ['frozen v1.9.16 matching', { ...usd, prices: { ...usd.prices, snapshotTags: false, ollamaPeak: true } }],
-  ['frozen v1.9.16 alias', { ...usd, prices: { ...usd.prices, snapshotTags: false, ollamaPeak: true }, priceOverrides: { 'ollama-cloud:deepseek-v4.1-flash:1017': 'deepseek:deepseek-v4.1-flash' } }],
+  ['frozen v1.9.16 matching', { ...usd, prices: { ...usd.prices, snapshotTags: false, ollamaTaggedPeak: false, ollamaPeak: true } }],
+  ['frozen v1.9.16 alias', { ...usd, prices: { ...usd.prices, snapshotTags: false, ollamaTaggedPeak: false, ollamaPeak: true }, priceOverrides: { 'ollama-cloud:deepseek-v4.1-flash:1017': 'deepseek:deepseek-v4.1-flash' } }],
 ]
 const KEYS = ['ollama-cloud:deepseek-v4.1-flash', 'ollama-cloud:deepseek-v4-pro', 'llm-ollama-cloud:deepseek-v4-pro', 'deepseek-official:deepseek-v4.1-flash',
   'opencode-go:deepseek-v4-pro', 'ollama:deepseek-v4.1-flash', 'ollama-cloud:deepseek-v4-flash', 'ollama-cloud:glm-5',
@@ -264,6 +265,18 @@ for (const [model, off, high] of snapshots) {
   }
 }
 const taggedKey = 'ollama-cloud:deepseek-v4.1-flash:1017'
+// v1.9.17 already fixed aliased snapshot calendars, but had no automatic MMDD matching.
+// Preserve the two independent policies when decoding its saved price versions.
+for (const alias of [false, true]) {
+  const old = pricingSnapshot({ ...usd, prices: { ...usd.prices, ollamaPeak: true, ollamaTaggedPeak: true },
+    priceOverrides: alias ? { [taggedKey]: 'deepseek:deepseek-v4.1-flash' } : {} }, true)
+  assert.equal(old.prices.snapshotTags, false)
+  assert.equal(old.prices.ollamaTaggedPeak, true)
+  clock = at('2026-10-20T07:00:00Z')
+  near(hostCost(old, taggedKey, { input: 1e6 }, clock), alias ? .15 : 0, 'v1.9.17 frozen calendar and matching')
+  for (const [label, split] of clients) near(split({ byProviderModel: { [taggedKey]: { input: 1e6 } } }, old).total, alias ? .15 : 0, label + ' v1.9.17')
+}
+
 for (const [name, patch, morning, afternoon] of [
   ['auto without override', {}, .15, .30],
   ['exact without override', { priceMatch: 'exact' }, 0, 0],
@@ -271,8 +284,8 @@ for (const [name, patch, morning, afternoon] of [
   ['local override', { priceOverrides: { [taggedKey]: '__local__' } }, 0, 0],
   ['custom flat price', { priceOverrides: { [taggedKey]: '__custom__' },
     prices: { ...usd.prices, custom: { [taggedKey]: { currency: 'USD', cacheMiss: 2, cacheHit: .2, output: 3 } } } }, 2, 2],
-  ['frozen unmatched snapshot', { prices: { ...usd.prices, snapshotTags: false } }, 0, 0],
-  ['frozen alias calendar', { prices: { ...usd.prices, snapshotTags: false },
+  ['frozen unmatched snapshot', { prices: { ...usd.prices, snapshotTags: false, ollamaTaggedPeak: false } }, 0, 0],
+  ['frozen alias calendar', { prices: { ...usd.prices, snapshotTags: false, ollamaTaggedPeak: false },
     priceOverrides: { [taggedKey]: 'deepseek:deepseek-v4.1-flash' } }, .30, .15],
 ]) {
   const config = { ...usd, ...patch }

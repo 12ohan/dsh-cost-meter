@@ -16,7 +16,7 @@ window.__ModuleLoader__.load({
     const skinCss = `
       body :is(.cm-section,.cm-stat){background:transparent}
       body :is(.cm-stat-dialog,.cm-qguide,.cm-peak-alert,.cm-footer-stack.simple,.cm-combo-panel,.cm-context-intro),body dialog.cm-fee-dialog{background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base,#fff)) r g b / max(alpha,.9))}
-      body :is(.cm-simple-summary,.cm-billion-notice){background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-1,var(--dsw-alias-bg-base,#fff)) r g b / max(alpha,.9))}
+      body .cm-billion-notice{background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-1,var(--dsw-alias-bg-base,#fff)) r g b / max(alpha,.9))}
     `
     /* DISPLAY_APPEARANCE_SOURCE */
     /* DISPLAY_PARTS_SOURCE */
@@ -29,9 +29,9 @@ window.__ModuleLoader__.load({
       const config = draft ?? props.state.config
       const en = locale === 'en', text = (zh, english) => en ? english : zh
       const [region, setRegion] = useState('sidebar'), [expanded, setExpanded] = useState(false)
-      const [selected, setSelected] = useState('budget'), [selectedPlan, selectPlan] = useState('minimax'), [stylesOpen, setStylesOpen] = useState(false)
-      const select = (key, planId) => { setSelected(key); setStylesOpen(false); if (planId) selectPlan(planId) }
-      const chooseRegion = key => { setRegion(key); setStylesOpen(false); setSelected(key === 'sidebar' ? 'budget' : key === 'composer' ? 'strip-budget' : 'session-header') }
+      const [selected, setSelected] = useState('budget'), [selectedPlan, selectPlan] = useState('minimax'), [stylesOpen, setStylesOpen] = useState(true)
+      const select = (key, planId) => { setSelected(key); if (planId) selectPlan(planId) }
+      const chooseRegion = key => { setRegion(key); setSelected(key === 'sidebar' ? 'budget' : key === 'composer' ? 'strip-budget' : 'session-header') }
       const [examples, setExamples] = useState(() => {
         try { return localStorage.getItem('dsh-cost-meter:display-examples') !== 'false' } catch { return true }
       })
@@ -178,7 +178,7 @@ window.__ModuleLoader__.load({
       return el('section', { className: 'cm-display', 'aria-label': text('交互式显示设置', 'Interactive display settings') },
         el('div', { className: 'cm-display-heading' }, el('div', null,
           el('h3', null, text('设置你看到的界面', 'Make the screen yours')),
-          el('p', null, text('点击虚线框调整显示，拖动左侧手柄排序。淡化表示已隐藏。', 'Select an outlined item to customize it. Drag its left handle to reorder. Faded components are hidden.'))),
+          el('p', null, text('点击虚线框调整显示，拖动虚线框排序。淡化表示已隐藏。', 'Select an outlined item to customize it, or drag it to reorder. Faded components are hidden.'))),
           el('button', { ref: expandButton, type: 'button', className: 'cm-btn small cm-display-expand', onClick: () => setExpanded(true) }, icon('IconFullscreenOutlineRegular', 14), text('放大预览', 'Expand preview'))),
         el(SkinTransparency, { config, set, text }),
         el('section', { className: 'cm-display-notifications', 'aria-label': text('兼容提醒', 'Compatibility reminders') },

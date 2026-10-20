@@ -30,7 +30,7 @@ const day = { ...zeroDay('2026-10-12'), byProviderModel: {
   'fixture:unknown': { input: 1, output: 1, calls: 1, cost: 0 },
   'deepseek:deepseek-v4-flash': { input: 1, output: 1, calls: 1, cost: .001 },
 } }
-const initialState = { config: sanitizeConfig({ locale: 'zh' }), today: day, month: day, total: day, history: [], balance: {} }
+const initialState = { ourFreeModel: { enabled: true }, config: sanitizeConfig({ locale: 'zh' }), today: day, month: day, total: day, history: [], balance: {} }
 const code = `
 import React from ${literal(req.resolve('react'))};
 import {createRoot} from ${literal(req.resolve('react-dom/client'))};
@@ -254,6 +254,21 @@ try {
   assert.ok((await page.locator('.cm-model-identity').textContent()).includes('model-499'))
   assert.ok(await page.evaluate(before => window.priceResolutions - before < 24, beforeFilter), 'typing a filter reuses matching results instead of resolving all 500 models again')
   assert.equal(await page.evaluate(() => window.patches.length), 0)
+  await page.getByRole('searchbox', { name: '查找已用模型' }).fill('')
+  for (const width of [1100, 390]) {
+    await page.setViewportSize({ width, height: 950 })
+    const option = page.locator('.cm-free-model')
+    const layout = await option.evaluate(node => {
+      const input = node.querySelector('input').getBoundingClientRect(), label = node.querySelector('label>span').getBoundingClientRect()
+      return { height: node.getBoundingClientRect().height, center: Math.abs(input.y + input.height/2 - label.y - label.height/2), overflow: node.scrollWidth > node.clientWidth }
+    })
+    assert.ok(layout.height < 115, 'free-model option uses a compact layout')
+    assert.ok(layout.center < 2, 'checkbox and its label share a center line')
+    assert.equal(layout.overflow, false)
+    await option.screenshot({ path: join(output, 'free-model-' + width + '.png') })
+  }
+  await page.locator('.cm-free-model input').check()
+  await page.waitForFunction(() => window.patches.some(patch => patch.priceOverrides?.['our-free-model:*'] === '__free__' && patch.priceOverrides?.['our-free-model-region:*'] === '__free__'))
   assert.deepEqual(external, [], 'theme test sends no external requests')
   assert.deepEqual(errors, [], 'settings render without browser errors')
   writeFileSync(join(output, 'report.json'), JSON.stringify({ checks, baseline, errors, external }, null, 2) + '\n')

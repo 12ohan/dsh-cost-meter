@@ -122,7 +122,7 @@ try {
   assert.equal(await page.locator('.cm-preview-sidebar').evaluate(n=>getComputedStyle(n).borderRadius),'19px','current skin surface is reused')
   assert.equal(await page.locator('.cm-sidebar-live').evaluate(n=>Math.round(n.getBoundingClientRect().width)),324,'preview follows the actual footer width')
   assert.equal(await page.locator('.cm-display-toggles').count(),0,'visibility controls are only in the right inspector')
-  await page.locator('.cm-inspector-layout').click()
+  assert.equal(await page.locator('.cm-inspector-layout').getAttribute('aria-expanded'), 'true', 'sidebar layouts start expanded and remain open when selecting components')
   const previews=page.locator('.cm-style-thumbnail')
   assert.equal(await previews.count(),4)
   for(const preview of await previews.all()) assert.equal(await preview.locator('.cm-mm-row .cm-bbox-bar').count(),2,'each style preview uses real quota progress rows')

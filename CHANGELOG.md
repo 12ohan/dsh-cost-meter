@@ -1,12 +1,32 @@
 # Changelog
 
-## [1.9.17] - 2026-10-20
+## [1.9.18] - 2026-10-20
 
 - WorkBuddy 积分优先读取连接插件的本地状态接口，兼容加密登录文件；移除“重新登录生成明文副本”的错误提示，同一条刷新错误只显示一次。已用真实加密登录文件验证查询值与上游一致。
 - 更新公告改为非模态窗口，补齐皮肤兼容标记；被隐藏时不再让宿主进入 inert 状态。感谢 [@SherUnlocked-4869](https://github.com/SherUnlocked-4869) 在 [issue #355](https://github.com/Han-1413141/dsh-cost-meter/issues/355) 提供环境、A/B 复现和原因定位。
 - Ollama Cloud 的 `deepseek-v4.1-flash:1017`、`deepseek-v4-pro:0813` 等快照与连续安全后缀可自动匹配，显式映射同样使用 Ollama 峰谷日历。冻结历史匹配策略，旧账本加载、回放和重启不自动改价；手动模型重算保留原汇率。感谢 [@LetterXbox](https://github.com/LetterXbox) 在 [issue #356](https://github.com/Han-1413141/dsh-cost-meter/issues/356) 提供复现、定位及历史保护要求。
 
-[更新说明](docs/update-notes-1.9.17.md)
+- UI 设置增加“今日消费与余额同行”独立开关，保留现有布局、悬停详情和余额进度条。感谢 [@zhuwnq](https://github.com/zhuwnq) 在 [issue #359](https://github.com/Han-1413141/dsh-cost-meter/issues/359) 提出需求。
+- 整合 [@LetterXbox](https://github.com/LetterXbox) 在 [PR #358](https://github.com/Han-1413141/dsh-cost-meter/pull/358) 提交的历史时间线恢复与升级测试，扩展自动匹配时继续保留原账单和策略切换时间。
+
+[更新说明](docs/update-notes-1.9.18.md)
+
+## [1.9.17] - 2026-10-20
+
+- 主页侧栏恢复普通展示，移除六点拖动手柄、额外左侧留白和保存提示；拖动与方向键排序仅保留在“费用 → 显示”的预览中。
+- 修复网关卡片拖动遗漏来源 ID 导致排序保存失败的问题；无效排序标识在提交前过滤，保存失败后仍可继续修改组件显示。
+- “侧栏布局”默认展开，切换组件时保持用户的展开选择；四种布局缩略图在窄面板中排为两列。
+- 合并卡片使用对称内边距和紧凑行高，统一简洁卡片的今日行背景；移除拖动造成的多余空间，三行卡片不再出现内部滚动条。
+- `dsh-our-free-model` 免费计费选项改为同一行的开关与文字，说明缩短；仅该插件后续调用记为免费，Token、历史费用与其他渠道规则不变。
+- 修复皮肤隐藏更新公告却留下模态锁定的问题：为公告补齐 dialog 语义与显示样式，无法显示时关闭模态，避免锁住整页。感谢 [@SherUnlocked-4869](https://github.com/SherUnlocked-4869) 在 [#355](https://github.com/Han-1413141/dsh-cost-meter/issues/355) 提供复现和定位。
+- 纳入 [@LetterXbox](https://github.com/LetterXbox) 在 [PR #358](https://github.com/Han-1413141/dsh-cost-meter/pull/358) 提供的 Ollama Cloud 快照模型日历修复，问题来源 [#356](https://github.com/Han-1413141/dsh-cost-meter/issues/356)。带标签模型仍需已有价格或手动映射，历史金额保留原规则。
+
+- Keep drag and keyboard reordering inside Display settings. The home sidebar no longer adds handles, padding or save-status nodes.
+- Preserve gateway source IDs when ordering cards; a failed save no longer blocks subsequent display changes. Sidebar layout choices start expanded.
+- Balance combined-card spacing, share the Simple card background with its Today row, and avoid an inner scrollbar for the three-row card.
+- Align the free-model checkbox with its label and shorten the explanation without changing billing behavior.
+- Keep update guides visible under skin dialog rules and close an invisible modal instead of blocking DSH (#355, reported and diagnosed by @SherUnlocked-4869).
+- Include @LetterXbox’s reviewed PR #358: configured Ollama Cloud snapshot models use its own calendar; historical prices are preserved and automatic price matching is unchanged.
 
 ## [1.9.16] - 2026-10-20
 

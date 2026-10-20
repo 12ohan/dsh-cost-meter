@@ -1269,7 +1269,7 @@
           // providerPriceEntryFor 的 peakSchedule 标记同口径(trim、小写、剥离 llm- 前缀)。
           if (entry && resolved.billingMode === 'deepseek-peak' && config.prices?.ollamaPeak !== false
             && provider.trim().toLowerCase().replace(/^llm-/, '') === 'ollama-cloud'
-            && (config.prices?.snapshotTags === false ? ['deepseek-v4.1-flash', 'deepseek-v4-pro'].includes(modelId.trim().toLowerCase()) : matchModelIdLocal(modelId, ['deepseek-v4.1-flash', 'deepseek-v4-pro']) !== null)) entry.peakSchedule = 'ollama'
+            && (config.prices?.ollamaTaggedPeak === false ? ['deepseek-v4.1-flash', 'deepseek-v4-pro'].includes(modelId.trim().toLowerCase()) : matchModelIdLocal(modelId, ['deepseek-v4.1-flash', 'deepseek-v4-pro']) !== null)) entry.peakSchedule = 'ollama'
           const c = costOfBuckets(byModel[providerKey], tierFor(entry, now, { ...peak, enabled: ['deepseek-peak', 'utc-peak'].includes(resolved.billingMode) && peak.enabled }))
           const billed = usdFromCostLocal(c, resolved.currency, cnyRate)
           total += billed
