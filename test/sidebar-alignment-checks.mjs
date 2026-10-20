@@ -102,6 +102,14 @@ export async function checkSidebarAlignment(page, output) {
     }
     await all.evaluate(node => { node.style.width = '280px' })
     await all.screenshot({ path: join(output, `sidebar-all-${layout}.png`) })
+    if (layout === 'simple') {
+      const card = all.locator('.cm-footer-stack')
+      assert.equal(await card.evaluate(node => getComputedStyle(node).scrollbarWidth), 'none', 'simple card hides its scrollbar and arrow buttons')
+      assert.ok(await card.evaluate(node => node.scrollHeight > node.clientHeight), 'many visible components still have scrollable content')
+      await card.focus()
+      await card.press('End')
+      await page.waitForFunction(() => document.querySelector('#alignment-all .cm-footer-stack').scrollTop > 0)
+    }
   }
   return { layouts: 4, peakStyles: 3, components: 10, widths: [352, 280, 220], headingAndAmountAlignment: true }
 }

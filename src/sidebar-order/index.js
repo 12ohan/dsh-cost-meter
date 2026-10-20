@@ -23,7 +23,8 @@ window.__ModuleLoader__.load({
         .cm-footer-stack:not(.rail) :is(.cm-bbox-pct,.cm-gw-switcher){flex-shrink:0}
         body .cm-footer-stack.summary:not(.rail){display:flex;flex-direction:column;gap:4px;box-sizing:border-box;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1,#ddd);border-radius:12px;background:var(--dsw-alias-bg-layer-1,#fff);height:auto;max-height:none;overflow:visible}
         body .cm-footer-stack:is(.simple,.summary)>[data-cm-display]{background:transparent;box-shadow:none}
-        body .cm-footer-stack.simple{max-height:max(180px,min(38dvh,320px))}
+        body .cm-footer-stack.simple{max-height:max(180px,min(38dvh,320px));scrollbar-width:none}
+        .cm-footer-stack.simple::-webkit-scrollbar{display:none;width:0;height:0}
         body .cm-footer-stack.simple>.cm-simple-summary{background:inherit}
         body .cm-footer-stack.summary>[data-cm-display]{border:0;margin:0;min-width:0;flex-shrink:0}
         body .cm-footer-stack.summary>.cm-foot{padding:0;height:auto;min-height:24px;font-size:12px;line-height:20px;border-radius:0}
