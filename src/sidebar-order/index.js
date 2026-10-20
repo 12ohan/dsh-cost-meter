@@ -38,10 +38,11 @@ window.__ModuleLoader__.load({
         const today = cards.find(node => node.dataset.cmDisplay === 'today')
         const balance = cards.find(node => node.dataset.cmDisplay === 'balance') ?? cards.find(node => node.dataset.cmDisplay === 'customBalance')
         const enabled = root.classList.contains('same-line') && !root.classList.contains('rail') && today && balance
-        root.classList.toggle('cm-inline-ready', !!enabled)
+        const toggle = (node, name, on) => { if (node.classList.contains(name) !== on) node.classList.toggle(name, on) }
+        toggle(root, 'cm-inline-ready', !!enabled)
         for (const node of cards) {
-          node.classList.toggle('cm-inline-today', !!enabled && node === today)
-          node.classList.toggle('cm-inline-balance', !!enabled && node === balance)
+          toggle(node, 'cm-inline-today', !!enabled && node === today)
+          toggle(node, 'cm-inline-balance', !!enabled && node === balance)
         }
         if (enabled) root.style.setProperty('--cm-inline-row', Math.min(cards.indexOf(today), cards.indexOf(balance)) + 1)
         else root.style.removeProperty('--cm-inline-row')
@@ -60,7 +61,7 @@ window.__ModuleLoader__.load({
         const enabled = store?.getSnapshot().state?.config?.sidebarTodayBalanceInline === true
         if (!enabled && !watching) return
         watching = enabled; observer.disconnect()
-        if (enabled) observer.observe(document.body, { childList: true, subtree: true })
+        if (enabled) observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
         schedule()
       }
       const unsubscribe = store?.subscribe(refresh)

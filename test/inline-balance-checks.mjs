@@ -20,6 +20,9 @@ export async function checkInlineBalance(page, output) {
     assert.ok(Math.abs(a.y - b.y) <= 1 && a.x + a.width <= b.x, 'today and balance occupy one row without overlap')
   }
   await sameRow()
+  await row('balance').click()
+  await page.waitForFunction(() => window.balanceRefreshes === 1 && !document.querySelector('#actual-sidebar .busy') && document.querySelector('#actual-sidebar .cm-inline-balance'))
+  await sameRow()
   assert.ok(await host.evaluate(n => n.getBoundingClientRect().height) < oldHeight, 'inline setting reduces sidebar height')
   assert.match(await row('today').getAttribute('data-test-tooltip'), /调用|请求/)
   assert.match(await row('balance').getAttribute('data-test-tooltip'), /赠送.*充值/)
