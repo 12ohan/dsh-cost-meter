@@ -9,6 +9,7 @@ import { sanitizeConfig, applyConfigPatch, zeroDay } from '../lib/store.js'
 import { stateSchema } from '../lib/typert.host.js'
 import { javascriptLiteral as literal } from '../scripts/javascript-literal.mjs'
 import { checkSidebarUpdates } from './sidebar-updates-checks.mjs'
+import { checkInlineBalance } from './inline-balance-checks.mjs'
 import { checkTodayAndOrder } from './today-sidebar-order-checks.mjs'
 import { checkDisplayPreview } from './display-preview-checks.mjs'
 
@@ -26,7 +27,7 @@ const state = { config: saved, today: day, month: day, total: day, history: [], 
 const code = `
 import React from ${literal(req.resolve('react'))};import{createRoot}from ${literal(req.resolve('react-dom/client'))};
 const h=React.createElement;
-const mainRequire=name=>name==='react'?React:{Tooltip:({children})=>children};mainRequire.async=async()=>window.peakUI;
+const mainRequire=name=>name==='react'?React:{Tooltip:({children,label})=>React.cloneElement(children,{'data-test-tooltip':typeof label==='string'?label:''})};mainRequire.async=async()=>window.peakUI;
 window.__ModuleLoader__={load:mod=>window.mainUI=mod.factory(mainRequire)};
 ${client}
 window.__ModuleLoader__={load:mod=>window.peakUI=mod.factory(()=>React)};
@@ -106,6 +107,7 @@ try {
   await page.screenshot({ path: join(output, 'skin-transparency-zh.png'), fullPage: true })
   await skinSwitch.uncheck()
   await page.waitForFunction(() => window.current().followSkinTransparency === false && getComputedStyle(document.querySelector('.cm-section')).backgroundColor !== 'rgba(0, 0, 0, 0)')
+  await checkInlineBalance(page, output)
   await checkTodayAndOrder(page, output)
   const region=async name=>page.getByRole('tab',{name,exact:true}).click()
   const item=key=>page.locator('.cm-preview [data-display="'+key+'"]')

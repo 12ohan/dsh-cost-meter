@@ -20,6 +20,8 @@ window.__ModuleLoader__.load({
       const style = document.createElement('style')
       style.textContent = `
         .cm-footer-stack.summary:not(.rail){display:flex;flex-direction:column;gap:2px;box-sizing:border-box;padding:8px 10px 8px 24px;border:1px solid var(--dsw-alias-border-l1,#ddd);border-radius:12px;background:var(--dsw-alias-bg-layer-1,#fff)}.cm-footer-stack.summary>[data-cm-display]{background:transparent;border:0;box-shadow:none;margin:0;min-width:0}.cm-footer-stack.summary>.cm-foot{padding:0;min-height:22px;font-size:12px}.cm-footer-stack.summary>[data-cm-display=today]>.cm-num{flex:1;display:flex;min-width:0}.cm-footer-stack.summary .cm-today-values{display:flex;flex:1;min-width:0;justify-content:space-between;max-width:none}.cm-footer-stack.summary [data-cm-today=cost]{order:2;margin-left:auto;color:var(--dsw-alias-state-business-primary,#4d6bfe);font-weight:600}.cm-footer-stack.summary [data-cm-today=tokens]{order:1;font-size:10px;color:var(--dsw-alias-label-tertiary,#888)}.cm-footer-stack.summary .cm-today-values:not(:has([data-cm-today=cost])){justify-content:flex-end}.cm-footer-stack.summary>.cm-bbox{padding:8px 0 2px;border-top:1px solid var(--dsw-alias-border-l1,#ddd)}.cm-footer-stack.summary>.cm-order-handle{height:20px;line-height:20px}
+        .cm-footer-stack.cm-inline-ready:not(.rail){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:10px;align-items:start}.cm-inline-ready>[data-cm-display]{grid-column:1/-1;min-width:0}.cm-inline-ready>.cm-inline-today{grid-column:1;grid-row:var(--cm-inline-row)}.cm-inline-ready>.cm-inline-balance{grid-column:2;grid-row:var(--cm-inline-row)}
+        .cm-footer-stack.cm-inline-ready>:is(.cm-inline-today,.cm-inline-balance){padding:4px 0;min-height:22px;font-size:12px;border:0;background:transparent;box-shadow:none;gap:4px;align-self:start}.cm-inline-ready :is(.cm-inline-today,.cm-inline-balance) :is(.cm-num,.cm-bbox-pct,.cm-bbox-label){font-size:12px}.cm-inline-ready :is(.cm-inline-today,.cm-inline-balance) .cm-bbox-head{gap:4px;margin:0 0 4px;min-height:19px}.cm-inline-ready .cm-inline-balance .cm-balance-name a{display:none}.cm-inline-ready :is(.cm-inline-today,.cm-inline-balance) :is(.cm-bal-label,.cm-balance-name){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cm-inline-ready :is(.cm-inline-today,.cm-inline-balance) .cm-num{min-width:0;overflow:hidden;text-overflow:ellipsis}.cm-inline-ready .cm-today-values{gap:4px;flex-wrap:wrap}.cm-inline-ready .cm-inline-today>.cm-num{flex:1;text-align:right}
         .cm-footer-stack:not(.rail){padding-left:16px;box-sizing:border-box;position:relative}
         .cm-footer-stack>[data-cm-display]{position:relative}
         .cm-order-handle{position:absolute;left:0;top:3px;width:16px;height:24px;border:0;padding:0;border-radius:4px;background:transparent;color:var(--dsw-alias-label-tertiary,#888);font:14px/24px system-ui;cursor:grab;opacity:0;z-index:2;touch-action:none}
@@ -56,8 +58,23 @@ window.__ModuleLoader__.load({
         catch { if (active) announce(root, text('保存失败，请重试', 'Save failed. Try again.')) }
         finally { saving = false }
       }
+      const alignTodayBalance = root => {
+        const cards = [...root.children].filter(node => keyOf(node))
+        const today = cards.find(node => keyOf(node) === 'today')
+        const balance = cards.find(node => keyOf(node) === 'balance') ?? cards.find(node => keyOf(node) === 'customBalance')
+        const enabled = root.classList.contains('same-line') && !root.classList.contains('rail') && today && balance
+        root.classList.toggle('cm-inline-ready', !!enabled)
+        for (const node of cards) {
+          node.classList.toggle('cm-inline-today', !!enabled && node === today)
+          node.classList.toggle('cm-inline-balance', !!enabled && node === balance)
+        }
+        if (enabled) root.style.setProperty('--cm-inline-row', Math.min(cards.indexOf(today), cards.indexOf(balance)) + 1)
+        else root.style.removeProperty('--cm-inline-row')
+      }
       const prepare = root => {
-        if (!active || !root || root.closest('[inert]') || root.classList.contains('rail')) return
+        if (!active || !root) return
+        alignTodayBalance(root)
+        if (root.closest('[inert]') || root.classList.contains('rail')) return
         if (!roots.has(root)) {
           const observer = new MutationObserver(schedule)
           observer.observe(root, { childList: true, subtree: true })

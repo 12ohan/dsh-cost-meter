@@ -141,7 +141,7 @@
         hideTodayCost: v.hideTodayCost === true,
         sessionListCostPeriod: v.sessionListCostPeriod === 'today' ? 'today' : 'total',
         modelStatistics: v.modelStatistics ?? {},
-        ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'followSkinTransparency', 'sessionListCosts', 'hideBudget', 'sessionCostCompact', 'contextCostsEnabled', 'contextCostsPromptSeen', 'showTotalWithPlan', 'sidebarSimple', 'sidebarSimplePromptSeen', 'codexQuotaEnabled', 'codexCompatPromptDismissed', 'includeSubagentCost', 'peakEnabled', 'peakAlertWebNotify', 'peakProgressPromptSeen'], value => value === true),
+        ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'followSkinTransparency', 'sidebarTodayBalanceInline', 'sessionListCosts', 'hideBudget', 'sessionCostCompact', 'contextCostsEnabled', 'contextCostsPromptSeen', 'showTotalWithPlan', 'sidebarSimple', 'sidebarSimplePromptSeen', 'codexQuotaEnabled', 'codexCompatPromptDismissed', 'includeSubagentCost', 'peakEnabled', 'peakAlertWebNotify', 'peakProgressPromptSeen'], value => value === true),
         sidebarTodayMetric: ['tokens', 'both'].includes(v.sidebarTodayMetric) ? v.sidebarTodayMetric : 'cost',
         sidebarOrder: Array.isArray(v.sidebarOrder) ? v.sidebarOrder : [],
         statisticsBasis: v.statisticsBasis,
@@ -3395,7 +3395,7 @@
       const simple = config.sidebarSimple === true
       const compactWide = !simple && wide && config.sidebarStyle === 'compact'
       const nodes = []
-      if (simple && wide && showToday) nodes.push(el('div', { key: 'today', 'data-cm-display': 'today', className: 'cm-simple-summary' },
+      if (simple && wide && showToday && !config.sidebarTodayBalanceInline) nodes.push(el('div', { key: 'today', 'data-cm-display': 'today', className: 'cm-simple-summary' },
         el('span', null, t('today')), el('span', { className: 'cm-num' }, sidebarTodayValue(state.today, config, t))))
       if (showBalanceBar) nodes.push(el(BalanceBox, { key: 'balance', state, wide, api: api }))
       else if (showBalance) nodes.push(el(BalanceRowContent, { key: 'balance', state, wide, api: api }))
@@ -3409,7 +3409,7 @@
       if (codexOn) nodes.push(el(CodexPlanBox, { key: 'codex', state, wide, api, preview }))
       if (goOk) nodes.push(el(GoQuotaBox, { key: 'go', state, wide }))
       if (budgetOn) nodes.push(el(BudgetBoxContent, { key: 'budget', state, wide, summary: simple && wide }))
-      if (showToday && !(simple && wide)) nodes.push(el(BudgetBoxContent, { key: 'today', state, wide, todayOnly: true }))
+      if (showToday && (!(simple && wide) || config.sidebarTodayBalanceInline)) nodes.push(el(BudgetBoxContent, { key: 'today', state, wide, todayOnly: true }))
       // Each display target owns its visibility; hiding another card cannot hide it.
       if (peakOn) nodes.push(el(Fragment, { key: 'peak' }, wide ? peakNoticeEl(state, config.sidebarStyle === 'summary' && !config.sidebarSimple ? { ...config, peakProgressVariant: 'summary' } : config, t) : peakNoticeRailEl(state, config, t)))
       if (modelsOn) nodes.splice(config.sidebarModels.position === 'first' ? 0 : config.sidebarModels.position === 'afterBalance' ? afterBalance : nodes.length, 0,
@@ -3419,5 +3419,5 @@
         const rank = node => { const index = order.indexOf(node.key); return index < 0 ? 999 : index }
         nodes.sort((a, b) => rank(a) - rank(b))
       }
-      return el('div', { ...(simple ? { tabIndex: 0, role: 'region', 'aria-label': t('sidebarSimple') } : {}), className: 'cm-footer-stack' + (wide ? '' : ' rail') + (compactWide ? ' compact' : '') + (simple ? ' simple' : config.sidebarStyle === 'summary' && wide ? ' summary' : '') }, ...nodes)
+      return el('div', { ...(simple ? { tabIndex: 0, role: 'region', 'aria-label': t('sidebarSimple') } : {}), className: 'cm-footer-stack' + (config.sidebarTodayBalanceInline ? ' same-line' : '') + (wide ? '' : ' rail') + (compactWide ? ' compact' : '') + (simple ? ' simple' : config.sidebarStyle === 'summary' && wide ? ' summary' : '') }, ...nodes)
     }
