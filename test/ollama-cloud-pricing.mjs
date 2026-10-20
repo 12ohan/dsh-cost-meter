@@ -183,9 +183,34 @@ const scenarios = [
     'ollama-cloud:deepseek-v4-pro': '__custom__',
   }, prices: { ...structuredClone(DEFAULT_PRICE_TABLE), custom: { 'ollama-cloud:deepseek-v4-pro': { currency: 'USD', cacheMiss: 0.5, cacheHit: 0.05, output: 1 } } } })],
   ['local override', sanitizeConfig({ currency: 'USD', priceOverrides: { 'ollama-cloud:deepseek-v4.1-flash': '__local__', 'ollama-cloud:deepseek-v4-pro': 'deepseek-v4-pro' } })],
+  ['snapshot alias', sanitizeConfig({ currency: 'USD', priceOverrides: { 'ollama-cloud:deepseek-v4.1-flash:1017': 'deepseek:deepseek-v4.1-flash' } })],
+  ['frozen v1.9.16 matching', { ...usd, prices: { ...usd.prices, snapshotTags: false, ollamaPeak: true } }],
+  ['frozen v1.9.16 alias', { ...usd, prices: { ...usd.prices, snapshotTags: false, ollamaPeak: true }, priceOverrides: { 'ollama-cloud:deepseek-v4.1-flash:1017': 'deepseek:deepseek-v4.1-flash' } }],
 ]
 const KEYS = ['ollama-cloud:deepseek-v4.1-flash', 'ollama-cloud:deepseek-v4-pro', 'llm-ollama-cloud:deepseek-v4-pro', 'deepseek-official:deepseek-v4.1-flash',
-  'opencode-go:deepseek-v4-pro', 'ollama:deepseek-v4.1-flash', 'ollama-cloud:deepseek-v4-flash', 'ollama-cloud:glm-5']
+  'opencode-go:deepseek-v4-pro', 'ollama:deepseek-v4.1-flash', 'ollama-cloud:deepseek-v4-flash', 'ollama-cloud:glm-5',
+  'ollama-cloud:deepseek-v4.1-flash:1017', 'ollama-cloud:deepseek-v4-pro:0813', 'llm-ollama-cloud:DEEPSEEK-V4.1-FLASH:1017:latest',
+  'ollama-cloud:deepseek-v4-pro:2026-08-13:latest', 'ollama-cloud:deepseek-v4.1-flash:1017:free', 'ollama-cloud:deepseek-v4.1-flash:online:1017']
+for (const [model, morning, afternoon] of [['deepseek-v4.1-flash:1017', .15, .30], ['deepseek-v4-pro:0813', .66, 1.32]]) {
+  for (const overrides of [{}, { ['ollama-cloud:' + model]: 'deepseek:' + model.split(':')[0] }]) {
+    const result = providerPriceEntryFor('ollama-cloud', model, usd.prices, { overrides })
+    assert.equal(result.priced, true)
+    near(tierFor(result.entry, at('2026-10-20T07:00:00Z'), DEEPSEEK_PEAK).cacheMiss, morning, 'issue #356 morning')
+    near(tierFor(result.entry, at('2026-10-20T13:00:00Z'), DEEPSEEK_PEAK).cacheMiss, afternoon, 'issue #356 afternoon')
+  }
+  assert.equal(providerPriceEntryFor('ollama-cloud', model, usd.prices, { mode: 'exact' }).priced, false)
+  assert.equal(providerPriceEntryFor('ollama-cloud', model, usd.prices, { overrides: { ['ollama-cloud:' + model]: '__local__' } }).priced, false)
+}
+for (const suffix of [':0000', ':1399', ':free:1017', ':online:1017', ':1017:unknown']) {
+  assert.equal(providerPriceEntryFor('ollama-cloud', 'deepseek-v4.1-flash' + suffix, usd.prices).priced, false, suffix)
+}
+{
+  const id = 'deepseek-v4.1-flash:1017'
+  const prices = { ...usd.prices, providers: { ...usd.prices.providers, 'ollama-cloud': { models: { [id]: { cacheMiss: 9, cacheHit: 1, output: 12 } } } } }
+  const exact = providerPriceEntryFor('ollama-cloud', id, prices)
+  assert.equal(exact.entry.cacheMiss, 9, 'an explicit snapshot quote wins')
+  assert.equal(exact.entry.peakSchedule, undefined, 'a flat snapshot quote keeps its own billing mode')
+}
 for (const [label, usageSplit] of clients) {
   for (const [scenario, config] of scenarios) {
     const pricesBefore = JSON.stringify(config.prices)

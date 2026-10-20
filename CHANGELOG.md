@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.17] - 2026-10-20
+
+- WorkBuddy 积分优先读取连接插件的本地状态接口，兼容加密登录文件；移除“重新登录生成明文副本”的错误提示，同一条刷新错误只显示一次。已用真实加密登录文件验证查询值与上游一致。
+- 更新公告改为非模态窗口，补齐皮肤兼容标记；被隐藏时不再让宿主进入 inert 状态。感谢 [@SherUnlocked-4869](https://github.com/SherUnlocked-4869) 在 [issue #355](https://github.com/Han-1413141/dsh-cost-meter/issues/355) 提供环境、A/B 复现和原因定位。
+- Ollama Cloud 的 `deepseek-v4.1-flash:1017`、`deepseek-v4-pro:0813` 等快照与连续安全后缀可自动匹配，显式映射同样使用 Ollama 峰谷日历。冻结历史匹配策略，旧账本加载、回放和重启不自动改价；手动模型重算保留原汇率。感谢 [@LetterXbox](https://github.com/LetterXbox) 在 [issue #356](https://github.com/Han-1413141/dsh-cost-meter/issues/356) 提供复现、定位及历史保护要求。
+
+[更新说明](docs/update-notes-1.9.17.md)
+
 ## [1.9.16] - 2026-10-20
 
 - 读取 DSH `web.searchProvider`／`web.fetchProvider`，在调用开始时保存所选提供方，并结合实际接口区分旧版 Messages 搜索与新版 Search／Fetch API。新版独立接口按成功请求每千次 ¥5 计费；旧版保留模型 Token 费用，已观察到的服务端成功搜索在北京时间 2026 年 11 月 1 日 00:00 前免请求费，此后按次收费。历史记录保持调用时的版本、单价与汇率。
