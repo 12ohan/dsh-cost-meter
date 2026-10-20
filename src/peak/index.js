@@ -43,15 +43,24 @@ window.__ModuleLoader__.load({
           if (!show) return
           const token = {}, previous = document.activeElement, node = dialog.current
           // Wait for existing update guides/dialogs; never stack several modals.
+          const visible = new ResizeObserver(() => {
+            if (node?.open && (!node.getBoundingClientRect().width || !node.getBoundingClientRect().height || getComputedStyle(node).visibility === 'hidden')) {
+              node.close(); setClosed(true)
+            }
+          })
           const observer = new MutationObserver(() => attempt())
           const attempt = () => {
             if (guideOwner || wasSeen(seenKey) || document.querySelector('dialog[open], .cm-qguide')) return
-            guideOwner = token; observer.disconnect(); node?.showModal()
+            guideOwner = token; observer.disconnect()
+            // A skin may hide generic dialogs with !important. Never leave an invisible modal blocking DSH.
+            node.style.setProperty('display', 'flex', 'important')
+            node.style.setProperty('visibility', 'visible', 'important')
+            try { node.showModal(); visible.observe(node) } catch { setClosed(true) }
           }
           observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['open'] })
           attempt()
           return () => {
-            observer.disconnect()
+            observer.disconnect(); visible.disconnect()
             if (guideOwner === token) { guideOwner = null; node?.close(); if (previous?.isConnected) previous.focus?.() }
           }
         }, [show])
@@ -71,11 +80,11 @@ window.__ModuleLoader__.load({
           finally { pending.current = false; setBusy(false) }
         }
         const preview = { ...config, peakEnabled: true, peakNotice: true, peakEffectiveAt: '', peakTimeDisplay: mode }
-        return el('dialog', { ref: dialog, className: 'cm-stat-dialog cm-peak-intro', 'aria-label': title, onCancel: event => { event.preventDefault(); dismiss() } },
+        return el('dialog', { ref: dialog, role: 'dialog', 'aria-modal': true, className: 'cm-stat-dialog cm-peak-intro', 'aria-label': title, onCancel: event => { event.preventDefault(); dismiss() } },
           el('header', { className: 'cm-stat-dialog-head' }, el('strong', null, title),
             el('button', { type: 'button', className: 'cm-btn', 'aria-label': text('关闭', 'Close'), onClick: dismiss }, '×')),
           el('div', { className: 'cm-stat-dialog-body' },
-            el('p', { className: 'cm-peak-intro-description' }, summary ? text('将今日 Token、费用、余额和峰谷进度放进一张卡片。各组件仍可单独隐藏和拖动排序。', 'Combine today’s tokens, cost, balance and pricing-period progress in one card. Each component keeps its own visibility and drag ordering.') : text('显示时段进度、剩余时长和切换时间。简洁两行，紧凑单行；周末和节假日也能看清下一次切换。', 'See time progress, time remaining and the next switch. Simple uses two lines; compact uses one, including weekends and holidays.')),
+            el('p', { className: 'cm-peak-intro-description' }, summary ? text('将今日 Token、费用、余额和峰谷进度放进一张卡片。在“显示”设置中可隐藏组件和拖动排序。', 'Combine today’s tokens, cost, balance and pricing-period progress in one card. Hide and reorder components in Display settings.') : text('显示时段进度、剩余时长和切换时间。简洁两行，紧凑单行；周末和节假日也能看清下一次切换。', 'See time progress, time remaining and the next switch. Simple uses two lines; compact uses one, including weekends and holidays.')),
             el('label', { className: 'cm-peak-intro-field' }, text('显示时间', 'Time display'),
               el('select', { className: 'cm-input', value: mode, onChange: event => setMode(event.target.value) },
                 ...[['both', text('倒计时 + 切换时间', 'Countdown + switch time')], ['countdown', text('只看倒计时', 'Countdown')], ['switch', text('只看切换时间', 'Switch time')]].map(([id, label]) => el('option', { key: id, value: id }, label)))),

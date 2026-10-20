@@ -25,7 +25,7 @@ function SidebarPreview({ renderSidebar, config, displayConfig = config, selecte
       const next = [...root.querySelectorAll('[data-cm-display]')].slice(0, 32).map(node => {
         node.dataset.previewHidden = String(visibility?.[node.dataset.cmDisplay] === false)
         const rect = node.getBoundingClientRect()
-        return { key: node.dataset.cmDisplay, planId: node.dataset.cmPlan, x: rect.left - box.left, y: rect.top - box.top, width: rect.width, height: rect.height }
+        return { key: node.dataset.cmDisplay, planId: node.dataset.cmPlan, sourceId: node.dataset.cmSource, x: rect.left - box.left, y: rect.top - box.top, width: rect.width, height: rect.height }
       }).filter(rect => rect.width > 0 && rect.height > 0)
       for (const part of parts) for (const scope of root.querySelectorAll('[data-cm-display="' + part.key + '"]')) for (const node of scope.querySelectorAll(part.selector)) {
         node.dataset.previewHidden = String(!part.on)
@@ -56,7 +56,7 @@ function SidebarPreview({ renderSidebar, config, displayConfig = config, selecte
           el('p', null, text('内嵌内容 · 当前简洁布局未显示', 'Nested content · hidden in Simple layout')), renderSidebar(sidebarChildSample(preview, selected))) : null),
       el('div', { ref: selection, className: 'cm-sidebar-selection', 'data-cm-order': JSON.stringify(displayConfig.sidebarOrder ?? []) }, ...targets.map((target, index) =>
         el('button', { key: target.key + index, type: 'button', className: 'cm-sidebar-target', 'data-display': target.key, 'data-display-part': target.part,
-          ...(!target.part ? { draggable: true, 'data-cm-order-key': target.key === 'plan' ? 'plan:' + target.planId : target.key } : {}),
+          ...(!target.part ? { draggable: true, 'data-cm-order-key': target.key === 'plan' ? 'plan:' + target.planId : target.key === 'gateway' ? 'gateway:' + target.sourceId : target.key } : {}),
           'aria-label': target.label ?? labels[target.key] ?? target.key, 'aria-pressed': !target.part && selected === target.key && (target.key !== 'plan' || target.planId === selectedPlan),
           title: (target.label ?? labels[target.key] ?? target.key) + text(' · 点击调整', ' · Click to customize'),
           onPointerEnter: refreshPeakHint, onFocus: refreshPeakHint,
