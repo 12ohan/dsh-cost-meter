@@ -1,9 +1,17 @@
 # Changelog
 
-## [Unreleased]
+## [1.9.22] - 2026-10-20
 
-- 修复 WorkBuddy 国际版 `workbuddy-ai` 未沿用 WorkBuddy 套餐分类的问题，服务端账本与界面统计同步；升级时按现有分类配置修正历史 API 金额，保留原金额、Token、调用数和历史价格。显式配置的自定义渠道分类现在可保存并生效，模型级覆盖仍优先。感谢 [@pcs801](https://github.com/pcs801) 在 [issue #364](https://github.com/Han-1413141/dsh-cost-meter/issues/364) 提供复现数据、原因定位和修复建议。
-- Recognize `workbuddy-ai` as a WorkBuddy route in server and client billing. Correct historical API attribution on upgrade using existing classification settings while preserving recorded amounts, tokens, calls and prices. Honor explicit custom-provider classifications with model overrides taking priority.
+- 修复 WorkBuddy 国际版 `workbuddy-ai` 未沿用套餐分类的问题。启用 WorkBuddy 积分查询或显式选择 Plan 后，国际版调用的等值金额不再计入 API 支出，服务端账本与界面统计保持一致。
+- 升级启动时一次性修正历史日账本、单会话和模型明细中的 API 金额，保留原金额、各币种记录、历史价格、Token 和调用数。
+- 自定义渠道的显式 plan/api 配置可正常保存并生效，模型级覆盖仍优先；DeepSeek 官方搜索和抓取请求费继续归 API。
+- 感谢 [@pcs801](https://github.com/pcs801) 在 [issue #364](https://github.com/Han-1413141/dsh-cost-meter/issues/364) 提供复现数据、原因定位和修复建议。
+
+- Recognize `workbuddy-ai` as a WorkBuddy route in server and client billing. When WorkBuddy credits querying is enabled or its classification is explicitly Plan, international calls no longer count toward API spend.
+- Correct historical daily, session and model API attribution once after upgrading, preserving recorded amounts in each currency, prices, tokens and calls.
+- Honor explicit custom-provider plan/api settings, with model overrides taking priority. Official DeepSeek search and fetch request fees remain API charges.
+
+[更新说明 / Release notes](docs/update-notes-1.9.22.md)
 
 ## [1.9.21] - 2026-10-20
 
