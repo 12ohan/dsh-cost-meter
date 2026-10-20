@@ -14,6 +14,13 @@ window.__ModuleLoader__.load({
       let drag = null
       const style = document.createElement('style')
       style.textContent = `
+        .cm-footer-stack{--cm-sidebar-inset:11px}.cm-footer-stack.simple{--cm-sidebar-inset:8px}.cm-footer-stack.summary{--cm-sidebar-inset:0px}
+        body .cm-footer-stack:not(.rail)>.cm-foot,body .cm-footer-stack:not(.rail)>.cm-peak-progress{padding-left:var(--cm-sidebar-inset);padding-right:var(--cm-sidebar-inset)}
+        body .cm-footer-stack:not(.rail)>:is(.cm-peak-strip,.cm-peak-classic){margin-left:var(--cm-sidebar-inset);margin-right:var(--cm-sidebar-inset);padding-left:0;padding-right:0}
+        .cm-model-costs .cm-collapse-h>.cm-bal-label{order:-1}.cm-model-costs .cm-collapse-h{gap:6px}
+        .cm-footer-stack:not(.rail) :is(.cm-bbox-head,.cm-mm-title){min-width:0}.cm-footer-stack:not(.rail) .cm-mm-title{overflow-wrap:anywhere}
+        .cm-footer-stack:not(.rail) .cm-bbox-head>:is(.cm-bbox-label,.cm-mm-title){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .cm-footer-stack:not(.rail) :is(.cm-bbox-pct,.cm-gw-switcher){flex-shrink:0}
         body .cm-footer-stack.summary:not(.rail){display:flex;flex-direction:column;gap:4px;box-sizing:border-box;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1,#ddd);border-radius:12px;background:var(--dsw-alias-bg-layer-1,#fff);height:auto;max-height:none;overflow:visible}
         body .cm-footer-stack:is(.simple,.summary)>[data-cm-display]{background:transparent;box-shadow:none}
         body .cm-footer-stack.simple{max-height:max(180px,min(38dvh,320px))}
@@ -31,6 +38,7 @@ window.__ModuleLoader__.load({
       `
       style.textContent += `        body .cm-footer-stack.cm-inline-ready:not(.rail){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:10px;align-items:start}.cm-inline-ready>[data-cm-display]{grid-column:1/-1;min-width:0}.cm-inline-ready>.cm-inline-today{grid-column:1;grid-row:var(--cm-inline-row)}.cm-inline-ready>.cm-inline-balance{grid-column:2;grid-row:var(--cm-inline-row)}
         body .cm-footer-stack.cm-inline-ready>:is(.cm-inline-today,.cm-inline-balance){padding:4px 0;min-height:22px;font-size:12px;border:0;background:transparent;box-shadow:none;gap:4px;align-self:start}.cm-inline-ready :is(.cm-inline-today,.cm-inline-balance) :is(.cm-num,.cm-bbox-pct,.cm-bbox-label){font-size:12px}.cm-inline-ready :is(.cm-inline-today,.cm-inline-balance) .cm-bbox-head{gap:4px;margin:0 0 4px;min-height:19px}.cm-inline-ready .cm-inline-balance .cm-balance-name a{display:none}.cm-inline-ready :is(.cm-inline-today,.cm-inline-balance) :is(.cm-bal-label,.cm-balance-name){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cm-inline-ready :is(.cm-inline-today,.cm-inline-balance) .cm-num{min-width:0;overflow:hidden;text-overflow:ellipsis}.cm-inline-ready .cm-today-values{gap:4px;flex-wrap:wrap}.cm-inline-ready .cm-inline-today>.cm-num{flex:1;text-align:right}
+        body .cm-footer-stack.cm-inline-ready>.cm-inline-today{padding-left:var(--cm-sidebar-inset)}body .cm-footer-stack.cm-inline-ready>.cm-inline-balance{padding-right:var(--cm-sidebar-inset)}
 `
       document.head.appendChild(style)
       const alignTodayBalance = root => {

@@ -125,8 +125,8 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
     number(t('decimalsLabel'), config.decimals ?? 2, value => set({ decimals: Math.floor(value) }), 0, 10),
     USAGE_POSITION_SWITCHABLE ? choice(t('usagePositionLabel'), config.usage?.position ?? 'cost', [['cost', t('usagePositionCost')], ['general', t('usagePositionGeneral')], ['section', t('usagePositionSection')]], value => nested('usage', { position: value })) : null]
   if (general) return el('details', { className: 'cm-display-general cm-display-inspector' },
-    el('summary', null, text('金额与语言', 'Currency and language')),
-    el('p', null, text('统一应用于所有费用组件。', 'Applies to all cost components.')),
+    el('summary', null, text('通用设置 · 外观、提醒、金额与语言', 'General · appearance, notices, currency and language')),
+    el('div', { className: 'cm-display-preferences' }, el(SkinTransparency, { config, set, text }), el(CompatibilityNotice, { config, set, text, state: props.state })),
     el('div', { className: 'cm-general-grid' }, ...controls))
   const mode = config.sidebarSimple ? 'simple' : config.sidebarStyle === 'summary' ? 'summary' : config.sidebarStyle === 'compact' ? 'compact' : 'standard'
   const showStyles = region === 'sidebar' && stylesOpen

@@ -156,13 +156,14 @@ window.__ModuleLoader__.load({
             item('turn', text('每轮费用', 'Per-turn cost'), config.hideTurnCost !== true, { hideTurnCost: config.hideTurnCost !== true },
               el('span', { className: 'cm-native-turn' }, text('▸ 本轮费用 ≈ ', '▸ Turn cost ≈ ') + (examples ? money(.08) : '—'))),
             el('div', { className: 'cm-native-response-actions', 'aria-hidden': true }, icon('IconCopyOutlineRegular'), icon('IconLikeOutlineRegular'), icon('IconDislikeOutlineRegular'), icon('IconShareOutlineRegular'), el('span', null, examples ? '14:32' : '—'))))
-      const preview = el(Fragment, null,
-        el('div', { className: 'cm-display-preview-options' },
-          el('label', { className: 'cm-check' }, el('input', { type: 'checkbox', checked: examples, onChange: event => {
+      const exampleHint = examples ? text('展示完整效果，示例不计入账本', 'Full preview · example data is not recorded') : text('展示当前数据，缺失内容显示 —', 'Current data · unavailable values show —')
+      const previewOptions = el('div', { className: 'cm-display-preview-options' },
+          el('label', { className: 'cm-check', title: exampleHint }, el('input', { type: 'checkbox', checked: examples, 'aria-description': exampleHint, onChange: event => {
             setExamples(event.target.checked)
             try { localStorage.setItem('dsh-cost-meter:display-examples', String(event.target.checked)) } catch {}
-          } }), text('使用示例数据', 'Use example data')),
-          el('span', null, examples ? text('展示完整效果，示例不计入账本', 'Full preview · example data is not recorded') : text('展示当前数据，缺失内容显示 —', 'Current data · unavailable values show —'))),
+          } }), text('使用示例数据', 'Use example data')))
+      const preview = el(Fragment, null,
+        el('div', { className: 'cm-display-preview-toolbar' },
         el('div', { className: 'cm-display-region-tabs', role: 'tablist', 'aria-label': text('预览区域', 'Preview area') }, ...regions.map(([key, label], index) =>
           el('button', { key, type: 'button', role: 'tab', id: id + key, 'aria-selected': region === key, 'aria-controls': id + '-panel', tabIndex: region === key ? 0 : -1,
             onClick: () => chooseRegion(key), onKeyDown: event => {
@@ -170,7 +171,7 @@ window.__ModuleLoader__.load({
               event.preventDefault()
               const next = event.key === 'Home' ? 0 : event.key === 'End' ? regions.length - 1 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + regions.length) % regions.length
               chooseRegion(regions[next][0]); event.currentTarget.parentElement.children[next].focus()
-            } }, label))),
+            } }, label))), previewOptions),
         el('div', { className: 'cm-preview cm-region-preview', role: 'tabpanel', id: id + '-panel', 'aria-labelledby': id + region, 'data-region': region },
           el('div', { className: 'cm-preview-workspace' }, el('div', { className: 'cm-preview-scene' }, scene),
             el(DisplayInspector, { props, config, set, selected, selectedPlan, selectPlan, select, labels, registry, text, region, examples, previewData,
@@ -180,10 +181,6 @@ window.__ModuleLoader__.load({
           el('h3', null, text('设置你看到的界面', 'Make the screen yours')),
           el('p', null, text('点击虚线框调整显示，拖动虚线框排序。淡化表示已隐藏。', 'Select an outlined item to customize it, or drag it to reorder. Faded components are hidden.'))),
           el('button', { ref: expandButton, type: 'button', className: 'cm-btn small cm-display-expand', onClick: () => setExpanded(true) }, icon('IconFullscreenOutlineRegular', 14), text('放大预览', 'Expand preview'))),
-        el(SkinTransparency, { config, set, text }),
-        el('section', { className: 'cm-display-notifications', 'aria-label': text('兼容提醒', 'Compatibility reminders') },
-          el('label', { className: 'cm-check' }, el('input', { type: 'checkbox', role: 'switch', checked: config.billionContextNoticeEnabled !== false, onChange: event => set({ billionContextNoticeEnabled: event.target.checked }) }), text('弹出 billion-context 计费兼容提醒', 'Show billion-context billing compatibility popups')),
-          el('p', { className: 'cm-note' }, text('关闭只停止自动弹窗，计费检测继续运行。当前状态：', 'Disabling popups keeps billing detection active. Current status: ') + ({ ready: text('已接入', 'Connected'), needs_update: text('需要更新', 'Update required'), changed: text('接口变化', 'Interface changed'), bridge_missing: text('尚未接入', 'Not connected') }[props.state.billionContext?.compatibility] ?? text('未检测到兼容问题', 'No compatibility issue detected')))),
         expanded ? el('dialog', { ref: dialogRef, className: 'cm-display-dialog', 'aria-label': text('桌面显示预览', 'Desktop display preview'),
           onCancel: event => { event.preventDefault(); event.stopPropagation(); setExpanded(false) }, onKeyDown: event => { if(event.key==='Escape')event.stopPropagation() } },
           el('div', { className: 'cm-display-dialog-head' }, text('显示设置', 'Display settings'),
@@ -209,6 +206,11 @@ window.__ModuleLoader__.load({
             onChange: event => set({ followSkinTransparency: event.target.checked }) }),
           text('跟随皮肤透明度', 'Follow skin transparency')),
         el('span', { className: 'cm-hint' }, text('费用页跟随设置窗口背景，弹窗保留至少 90% 不透明度。', 'Use the settings window background; dialogs remain at least 90% opaque.')))
+    }
+    function CompatibilityNotice({ config, set, text, state }) {
+      return el('section', { className: 'cm-display-notifications', 'aria-label': text('兼容提醒', 'Compatibility reminders') },
+        el('label', { className: 'cm-check' }, el('input', { type: 'checkbox', role: 'switch', checked: config.billionContextNoticeEnabled !== false, onChange: event => set({ billionContextNoticeEnabled: event.target.checked }) }), text('弹出 billion-context 计费兼容提醒', 'Show billion-context billing compatibility popups')),
+        el('p', { className: 'cm-note' }, text('关闭只停止自动弹窗，计费检测继续运行。当前状态：', 'Disabling popups keeps billing detection active. Current status: ') + ({ ready: text('已接入', 'Connected'), needs_update: text('需要更新', 'Update required'), changed: text('接口变化', 'Interface changed'), bridge_missing: text('尚未接入', 'Not connected') }[state.billionContext?.compatibility] ?? text('未检测到兼容问题', 'No compatibility issue detected'))))
     }
     function DetailedSettings({ state, draft, setDraft, t, locale, numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, open = false }) {
       const config=state.config
