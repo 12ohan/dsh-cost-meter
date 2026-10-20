@@ -16,7 +16,7 @@ window.__ModuleLoader__.load({
     const skinCss = `
       body :is(.cm-section,.cm-stat){background:transparent}
       body :is(.cm-stat-dialog,.cm-qguide,.cm-peak-alert,.cm-footer-stack.simple,.cm-combo-panel,.cm-context-intro),body dialog.cm-fee-dialog{background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base,#fff)) r g b / max(alpha,.9))}
-      body .cm-billion-notice{background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-1,var(--dsw-alias-bg-base,#fff)) r g b / max(alpha,.9))}
+      body :is(.cm-simple-summary,.cm-billion-notice){background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-1,var(--dsw-alias-bg-base,#fff)) r g b / max(alpha,.9))}
     `
     /* DISPLAY_APPEARANCE_SOURCE */
     /* DISPLAY_PARTS_SOURCE */
