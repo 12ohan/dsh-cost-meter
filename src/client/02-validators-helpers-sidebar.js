@@ -1141,7 +1141,7 @@
       kimi: ['kimi', 'kimi-code'],
       commandcode: ['commandcode', 'command-code'],
       clinepass: ['clinepass', 'cline-pass'],
-      workbuddy: ['workbuddy', 'workbuddy-subscription'],
+      workbuddy: ['workbuddy', 'workbuddy-subscription', 'workbuddy-ai'],
       antigravity: ['antigravity'],
       stepfun: ['stepfun', 'step-code'],
       'volcengine-agent': ['volcengine-agent', 'ark-agent-plan', 'volcengine-agent-plan'],
@@ -1225,6 +1225,7 @@
       return false
     }
     function billingClassOfLocal(provider, modelId, config) {
+      if (provider === 'deepseek-official' && /^deepseek-(web-(search|fetch)|(search|fetch)-api|search-server)$/.test(modelId)) return 'api'
       let planId = planProviderIdOfLocal(provider, config, modelId)
       if (planId === null && isRoutedThirdPartyCallLocal(provider, modelId, config)) planId = 'go'
       const models = config?.planBilling?.models
@@ -1236,9 +1237,12 @@
           if (canonical === 'plan' || canonical === 'api') return canonical
         }
       }
+      for (const id of [provider, planId]) {
+        if (id == null) continue
+        const configured = config?.planBilling?.providers?.[id]
+        if (configured === 'plan' || configured === 'api') return configured
+      }
       if (planId === null) return 'api'
-      const configured = config?.planBilling?.providers?.[planId]
-      if (configured === 'plan' || configured === 'api') return configured
       return enabledPlanSetOfLocal(config).has(planId) ? 'plan' : 'api'
     }
     /**

@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- 修复 WorkBuddy 国际版 `workbuddy-ai` 未沿用 WorkBuddy 套餐分类的问题，服务端账本与界面统计同步；升级时按现有分类配置修正历史 API 金额，保留原金额、Token、调用数和历史价格。显式配置的自定义渠道分类现在可保存并生效，模型级覆盖仍优先。感谢 [@pcs801](https://github.com/pcs801) 在 [issue #364](https://github.com/Han-1413141/dsh-cost-meter/issues/364) 提供复现数据、原因定位和修复建议。
+- Recognize `workbuddy-ai` as a WorkBuddy route in server and client billing. Correct historical API attribution on upgrade using existing classification settings while preserving recorded amounts, tokens, calls and prices. Honor explicit custom-provider classifications with model overrides taking priority.
+
 ## [1.9.20] - 2026-10-20
 
 - 修正 OpenDesign 的 5 小时与周额度对应关系，使用量百分比和重置时间跟随同一窗口对调，设置卡片、侧栏和额度横条使用统一结果。
