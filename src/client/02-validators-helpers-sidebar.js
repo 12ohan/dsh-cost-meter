@@ -1265,8 +1265,10 @@
           const entry = normalizeClientPrice(resolved.entry)
           // Ollama Cloud 的 DeepSeek 模型使用自有峰谷日历;provider/model 归一化与 lib/pricing.js
           // providerPriceEntryFor 的 peakSchedule 标记同口径(trim、小写、剥离 llm- 前缀)。
-          if (entry && resolved.billingMode === 'deepseek-peak'
-            && /^\s*(llm-)?ollama-cloud\s*:\s*deepseek-v4(\.1-flash|-pro)\s*$/.test(providerKey.toLowerCase())) entry.peakSchedule = 'ollama'
+          if (entry && resolved.billingMode === 'deepseek-peak' && config.prices?.ollamaPeak !== false
+            && (config.prices?.ollamaTaggedPeak === false
+              ? /^\s*(llm-)?ollama-cloud\s*:\s*deepseek-v4(\.1-flash|-pro)\s*$/i.test(providerKey)
+              : /^\s*(llm-)?ollama-cloud\s*:\s*deepseek-v(?:4\.1-flash|4-pro)(?:[-_./:@](?:(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])|\d{4}-?\d{2}-?\d{2}|v\d+(?:\.\d+)*|\d+k|latest))*\s*$/i.test(providerKey))) entry.peakSchedule = 'ollama'
           const c = costOfBuckets(byModel[providerKey], tierFor(entry, now, { ...peak, enabled: ['deepseek-peak', 'utc-peak'].includes(resolved.billingMode) && peak.enabled }))
           const billed = usdFromCostLocal(c, resolved.currency, cnyRate)
           total += billed

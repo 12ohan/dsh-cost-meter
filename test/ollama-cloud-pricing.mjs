@@ -216,4 +216,56 @@ for (const [label, usageSplit] of clients) {
     near(usageSplit({ byProviderModel: { 'deepseek-official:deepseek-v4.1-flash': { input: 1e6 } } }, usd).total, input, `${label} deepseek-official @ ${iso}`)
   }
 }
-console.log('[ok] Ollama Cloud: own weekday 12:00-18:00 UTC peak calendar on host and in src/bundle usageSplit, shared DeepSeek rates, other channels unchanged')
+// Configured snapshot aliases must use the Ollama calendar, including stacked tags.
+// Literal costs catch a host/client pair that agrees on the wrong calendar.
+const snapshots = [
+  ['deepseek-v4.1-flash:1017', .15, .30],
+  ['deepseek-v4.1-flash:1017:latest', .15, .30],
+  ['deepseek-v4.1-flash-latest-1017', .15, .30],
+  ['deepseek-v4-pro:0813', .66, 1.32],
+  ['deepseek-v4-pro:0813:latest', .66, 1.32],
+]
+for (const [model, off, high] of snapshots) {
+  for (const provider of ['ollama-cloud', 'llm-ollama-cloud', ' Ollama-Cloud ']) {
+    for (const [iso, phase] of CALENDAR) {
+      clock = at(iso)
+      const want = phase === PEAK ? high : off
+      const config = { ...usd, priceOverrides: { ['ollama-cloud:' + model]: 'deepseek:' + (model.includes('flash') ? 'deepseek-v4.1-flash' : 'deepseek-v4-pro') } }
+      near(hostCost(config, `${provider}:${model}`, { input: 1e6 }, clock), want, `snapshot host ${model} ${iso}`)
+      for (const [label, split] of clients) {
+        near(split({ byProviderModel: { [`${provider}:${model}`]: { input: 1e6 } } }, config).total, want, `snapshot ${label} ${model} ${iso}`)
+      }
+    }
+  }
+}
+const taggedKey = 'ollama-cloud:deepseek-v4.1-flash:1017'
+for (const [name, patch, morning, afternoon] of [
+  ['auto without override', {}, 0, 0],
+  ['exact without override', { priceMatch: 'exact' }, 0, 0],
+  ['exact alias', { priceMatch: 'exact', priceOverrides: { [taggedKey]: 'deepseek:deepseek-v4.1-flash' } }, .15, .30],
+  ['local override', { priceOverrides: { [taggedKey]: '__local__' } }, 0, 0],
+  ['custom flat price', { priceOverrides: { [taggedKey]: '__custom__' },
+    prices: { ...usd.prices, custom: { [taggedKey]: { currency: 'USD', cacheMiss: 2, cacheHit: .2, output: 3 } } } }, 2, 2],
+  ['frozen unmatched snapshot', { prices: { ...usd.prices, ollamaTaggedPeak: false } }, 0, 0],
+  ['frozen alias calendar', { prices: { ...usd.prices, ollamaTaggedPeak: false },
+    priceOverrides: { [taggedKey]: 'deepseek:deepseek-v4.1-flash' } }, .30, .15],
+]) {
+  const config = { ...usd, ...patch }
+  for (const [iso, want] of [['2026-10-20T07:00:00Z', morning], ['2026-10-20T13:00:00Z', afternoon]]) {
+    clock = at(iso)
+    near(hostCost(config, taggedKey, { input: 1e6 }, clock), want, name + ' host')
+    for (const [label, split] of clients) near(split({ byProviderModel: { [taggedKey]: { input: 1e6 } } }, config).total, want, name + ' ' + label)
+  }
+}
+for (const suffix of [':0000', ':1317', ':1032', ':1017:free', ':1017:online', ':1017-custom']) {
+  const key = 'ollama-cloud:deepseek-v4.1-flash' + suffix
+  near(hostCost(usd, key, { input: 1e6 }, clock), 0, `unrecognized variant ${suffix}`)
+  for (const [label, split] of clients) near(split({ byProviderModel: { [key]: { input: 1e6 } } }, usd).total, 0, `${label} unrecognized ${suffix}`)
+  const mapped = { ...usd, priceOverrides: { [key]: 'deepseek:deepseek-v4.1-flash' } }
+  for (const [iso, want] of [['2026-10-20T07:00:00Z', .30], ['2026-10-20T13:00:00Z', .15]]) {
+    clock = at(iso)
+    near(hostCost(mapped, key, { input: 1e6 }, clock), want, `unrecognized alias keeps target calendar ${suffix}`)
+    for (const [label, split] of clients) near(split({ byProviderModel: { [key]: { input: 1e6 } } }, mapped).total, want, `${label} unrecognized alias ${suffix}`)
+  }
+}
+console.log('[ok] Ollama Cloud: own weekday 12:00-18:00 UTC peak calendar on host and in src/bundle usageSplit, including snapshots, stacked tags, overrides and frozen calendar policy')
