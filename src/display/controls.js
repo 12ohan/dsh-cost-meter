@@ -14,7 +14,7 @@
 // Real footer markup, clipped and scaled only in the small style selector.
 // The editable scene itself always stays at its normal size.
 function SidebarStyleSample({ render, config, mode, data, examples }) {
-  const sample = React.useMemo(() => render({ ...config, sidebarSimple: mode === 'simple', sidebarStyle: mode === 'compact' ? 'compact' : 'standard' }, data, examples), [render, config, mode, data, examples])
+  const sample = React.useMemo(() => render({ ...config, sidebarSimple: mode === 'simple', sidebarStyle: mode === 'simple' ? 'standard' : mode }, data, examples), [render, config, mode, data, examples])
   return el('div', { className: 'cm-style-thumbnail', 'aria-hidden': true, inert: '' },
     el('div', { className: 'cm-style-thumbnail-content' }, sample))
 }
@@ -109,11 +109,12 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
     ]
   }
   if (selected === 'codex' || selected === 'strip-codex') controls = [
+    check(t('codexQuotaEnabled'), config.codexQuotaEnabled === true, value => set({ codexQuotaEnabled: value }), { 'data-display-option': 'codex-enabled' }),
     choice(text('数据源', 'Data source'), config.codexQuotaSource ?? 'auto',
       [['auto', text('自动检测', 'Auto-detect')], ['connect', 'dsh-codex-connect'], ['subscription', 'dsh-codex-subscription'], ['chatgpt', 'dsh-chatgpt-subscription']],
       value => set({ codexQuotaSource: value })),
     el('p', { className: 'cm-inspector-note cm-inspector-help' }, text('自动检测依次尝试 dsh-codex-subscription、dsh-chatgpt-subscription、dsh-codex-connect。', 'Auto tries dsh-codex-subscription, dsh-chatgpt-subscription, then dsh-codex-connect.')),
-    config.codexQuotaEnabled !== true ? el('p', { className: 'cm-inspector-note' }, text('先在账户与额度设置中启用 Codex 额度。', 'Enable Codex quota in account and quota settings first.')) : null,
+    config.codexQuotaEnabled !== true ? el('p', { className: 'cm-inspector-note' }, text('额度查询未开启。打开上方开关后，可在侧栏和输入区显示。', 'Quota queries are disabled. Enable the switch above to show quota in the sidebar and composer.')) : null,
     el('button', { type: 'button', className: 'cm-btn small', onClick: openQuota }, text('账户与额度设置 →', 'Account and quota settings →'))]
   if (selected === 'general') controls = [
     choice(t('languageLabel'), config.locale ?? 'auto', [['auto', t('localeAuto')], ['zh', '简体中文'], ['en', 'English']], value => set({ locale: value })),
@@ -127,7 +128,7 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
     el('summary', null, text('金额与语言', 'Currency and language')),
     el('p', null, text('统一应用于所有费用组件。', 'Applies to all cost components.')),
     el('div', { className: 'cm-general-grid' }, ...controls))
-  const mode = config.sidebarSimple ? 'simple' : config.sidebarStyle === 'compact' ? 'compact' : 'standard'
+  const mode = config.sidebarSimple ? 'simple' : config.sidebarStyle === 'summary' ? 'summary' : config.sidebarStyle === 'compact' ? 'compact' : 'standard'
   const showStyles = region === 'sidebar' && stylesOpen
   const selection = registry[selected]
   const scope = region === 'sidebar' ? text('在侧栏显示', 'Show in sidebar') : region === 'composer' ? text('在输入区显示', 'Show in composer') : text('在会话内容显示', 'Show in conversation')
@@ -136,12 +137,12 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
       ...(region === 'sidebar' ? ['sessionList','budget','balance','today','peak','models','go','plan','customBalance','codex'] : region === 'composer' ? ['strip-budget','strip-go','strip-plans','strip-codex','session-dock','badge','corner','models'] : ['session-header','badge','turn']).map(key => el('option', { key, value: key }, labels[key])))),
     selection ? el('div', { className: 'cm-inspector-visibility', title: scope }, check(text('显示此组件', 'Show this component'), selection.on, () => set(selection.patch), { 'data-display-toggle': selected })) : null,
     selected ? el('div', { className: 'cm-inspector-controls', key: selected, 'data-inspector': selected }, ...controls) : null,
-    region === 'sidebar' ? el('button', { type: 'button', className: 'cm-inspector-layout', 'aria-expanded': stylesOpen, onClick: () => setStylesOpen?.(!stylesOpen) }, text('侧栏布局', 'Sidebar layout'), el('span', null, text(mode === 'simple' ? '简洁' : mode === 'compact' ? '紧凑' : '标准', mode === 'simple' ? 'Simple' : mode === 'compact' ? 'Compact' : 'Standard'), stylesOpen ? ' ▴' : ' ▾')) : null,
+    region === 'sidebar' ? el('button', { type: 'button', className: 'cm-inspector-layout', 'aria-expanded': stylesOpen, onClick: () => setStylesOpen?.(!stylesOpen) }, text('侧栏布局', 'Sidebar layout'), el('span', null, text(mode === 'summary' ? '合并卡片' : mode === 'simple' ? '简洁' : mode === 'compact' ? '紧凑' : '标准', mode === 'summary' ? 'Combined card' : mode === 'simple' ? 'Simple' : mode === 'compact' ? 'Compact' : 'Standard'), stylesOpen ? ' ▴' : ' ▾')) : null,
     showStyles ? el('div', { className: 'cm-preview-style-options', role: 'group', 'aria-label': text('侧栏布局', 'Sidebar layout') },
-      ...[['simple', text('简洁', 'Simple')], ['standard', text('标准', 'Standard')], ['compact', text('紧凑', 'Compact')]].map(([value, label]) =>
+      ...[['summary', text('合并卡片', 'Combined card')], ['simple', text('简洁', 'Simple')], ['standard', text('标准', 'Standard')], ['compact', text('紧凑', 'Compact')]].map(([value, label]) =>
         el('div', { key: value, role: 'button', tabIndex: 0, 'aria-pressed': mode === value,
           onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.currentTarget.click() } },
-          onClick: () => set({ sidebarSimple: value === 'simple', sidebarSimplePromptSeen: true, ...(value === 'simple' ? {} : { sidebarStyle: value }) }) },
+          onClick: () => set({ sidebarSimple: value === 'simple', sidebarSimplePromptSeen: true, ...(value === 'simple' ? {} : { sidebarStyle: value }), ...(value === 'summary' ? { sidebarSummaryPromptSeen: true, sidebarTodayMetric: 'both', peakStyle: 'progress', sidebarOrder: ['today', 'balance', 'peak', ...(config.sidebarOrder ?? []).filter(key => !['today', 'balance', 'peak'].includes(key))] } : {}) }) },
           el(SidebarStyleSample, { render: props.renderStyleSample, config: previewData.config, data: previewData.state, examples, mode: value }), el('span', { className: 'cm-style-caption' }, label)))) : null,
     el(DisplayInspector, { props, config, set, selected: 'general', text, general: true }))
 }

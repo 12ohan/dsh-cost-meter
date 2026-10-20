@@ -547,21 +547,31 @@ window.__ModuleLoader__.load({
             el('div', { className: 'cm-context-preview-extra' }, el('p', null, text('最近一次调用', 'Latest call')), el('div', { className: 'cm-context-preview-row' }, el('span', null, text('输入 $0.012 · 输出 $0.004', 'Input $0.012 · output $0.004'))),
               el('p', { className: 'cm-context-muted' }, text('用量计费合计 $0.016', 'Usage-based total $0.016')))) : null))
     }
-    function BillionCompatibilityNotice({ meter, locale }) {
+    function BillionCompatibilityNotice({ meter, locale, config, api }) {
       const ref = useRef(null), [dismissed, setDismissed] = useState('')
       const id = meter?.noticeId ?? '', storageKey = 'dsh-cost-meter:billion-compatibility:' + id
       const text = (zh, en) => locale === 'en' ? en : zh
       let seen = dismissed === id
       try { seen ||= window.localStorage.getItem(storageKey) === 'seen' } catch {}
-      const visible = id && !seen && ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility)
-      const dismiss = () => { try { window.localStorage.setItem(storageKey, 'seen') } catch {}; setDismissed(id) }
+      const visible = config?.billionContextNoticeEnabled !== false && !config?.billionContextNoticesSeen?.includes(id) && id && !seen && ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility)
+      const [saving, setSaving] = useState(false), [saveError, setSaveError] = useState('')
+      const dismiss = async (mute = false) => {
+        if (saving) return
+        setSaving(true); setSaveError('')
+        try {
+          if (api?.updateConfig) await api.updateConfig({ billionContextNoticesSeen: [...new Set([...(config?.billionContextNoticesSeen ?? []), id])].slice(-32), ...(mute ? { billionContextNoticeEnabled: false } : {}) })
+          try { window.localStorage.setItem(storageKey, 'seen') } catch {}
+          setDismissed(id)
+        } catch { setSaveError(text('保存失败，请重试。', 'Could not save. Please retry.')) }
+        finally { setSaving(false) }
+      }
       useEffect(() => {
         const node = ref.current
         if (!visible || !node) return
         let opened = false, previous
         const show = () => {
           if (opened || document.hidden || [...document.querySelectorAll('dialog[open],[aria-modal="true"]')].some(other => other !== node && other.getClientRects().length)) return
-          try { previous = document.activeElement; node.showModal(); node.querySelector('button')?.focus(); opened = true } catch {}
+          try { previous = document.activeElement; node.showModal(); node.querySelector('button[data-cm-notice-ack]')?.focus(); opened = true } catch {}
         }
         let timer
         const attempt = () => { show(); if (!opened && !document.hidden) timer = setTimeout(attempt, 1000) }
@@ -580,10 +590,12 @@ window.__ModuleLoader__.load({
             ? text('检测到 billion-context 计费接口变化，内部费用尚未完整采集。请到交流群反馈，或提交 issue，以便更新接入。', 'The billion-context metering interface has changed. Internal cost coverage is incomplete. Report this in the community group or open an issue so the integration can be updated.')
             : text('原版 billion-context 的自动计费接入尚未完成。更新费用插件后请完全重启 DSH，让新启动的本地代理接入计费；仍有问题时，到交流群反馈或提交 issue。', 'Automatic billing for the original billion-context package is not connected. Fully restart DSH after updating cost-meter so its local proxy starts with metering. If the problem persists, contact the community group or open an issue.')),
         el('p', null, text('反馈时请附 billion-context、费用插件及 DSH 的版本。', 'Include the billion-context, cost-meter and DSH versions in your report.')),
+        saveError ? el('p', { role: 'alert' }, saveError) : null,
         el('footer', null,
-          el('a', { href: 'https://github.com/Han-1413141/dsh-cost-meter/blob/master/README.zh-CN.md#交流与反馈', target: '_blank', rel: 'noopener noreferrer', onClick: dismiss }, text('加入交流群', 'Community group')),
-          el('a', { href: 'https://github.com/Han-1413141/dsh-cost-meter/issues/new?template=bug_report.yml', target: '_blank', rel: 'noopener noreferrer', onClick: dismiss }, text('提交 issue', 'Open an issue')),
-          el('button', { type: 'button', autoFocus: true, onClick: dismiss }, text('知道了', 'Dismiss'))))
+          el('button', { type: 'button', disabled: saving, onClick: () => dismiss(true) }, text('不再弹出此提醒', 'Do not show this reminder again')),
+          el('a', { href: 'https://github.com/Han-1413141/dsh-cost-meter/blob/master/README.zh-CN.md#交流与反馈', target: '_blank', rel: 'noopener noreferrer', onClick: () => dismiss(false) }, text('加入交流群', 'Community group')),
+          el('a', { href: 'https://github.com/Han-1413141/dsh-cost-meter/issues/new?template=bug_report.yml', target: '_blank', rel: 'noopener noreferrer', onClick: () => dismiss(false) }, text('提交 issue', 'Open an issue')),
+          el('button', { type: 'button', autoFocus: true, disabled: saving, 'data-cm-notice-ack': true, onClick: () => dismiss(false) }, text('知道了', 'Dismiss'))))
     }
     function ContextPrompt({ manager, getLocale }) {
       const state = React.useSyncExternalStore(manager.subscribe, manager.getSnapshot), ref = useRef(null)

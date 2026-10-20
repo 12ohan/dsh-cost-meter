@@ -152,7 +152,10 @@
         // Codex 订阅兼容(契约 B-5):用户已关闭一次性提示 / 已应用历史归类的时点。
         // 直通白名单缺失会导致关闭后重开页面又弹提示,或应用后状态行回落「未应用」。
         codexCompatHistoryAppliedAt: num0(v.codexCompatHistoryAppliedAt),
-        sidebarStyle: v.sidebarStyle === 'compact' ? 'compact' : 'standard',
+        sidebarStyle: oneOf(v.sidebarStyle, ['standard', 'compact', 'summary'], 'standard'),
+        sidebarSummaryPromptSeen: v.sidebarSummaryPromptSeen === true,
+        billionContextNoticeEnabled: v.billionContextNoticeEnabled !== false,
+        billionContextNoticesSeen: Array.isArray(v.billionContextNoticesSeen) ? v.billionContextNoticesSeen.filter(value => typeof value === 'string').slice(-32) : [],
         priceMatchDismissed: Array.isArray(v.priceMatchDismissed) ? v.priceMatchDismissed.filter(key => typeof key === 'string') : [],
         // 官方价格币种(issue #47):读侧白名单缺失会导致下拉选择保存后读不回。
         pricingCurrency: v.pricingCurrency === 'CNY' ? 'CNY' : 'USD',
@@ -459,6 +462,7 @@
         planStats: parsePlanStats(v.planStats),
         // Codex 订阅兼容(契约 C):宿主未检出插件/旧宿主时无此键,回落 undefined。
         codexCompat: parseCodexCompat(v.codexCompat),
+        ourFreeModel: v.ourFreeModel?.enabled === true ? { enabled: true, version: typeof v.ourFreeModel.version === 'string' ? v.ourFreeModel.version : '' } : undefined,
         history: Array.isArray(v.history) ? v.history.map((d, i) => parseDay(d, path + '.history[' + i + ']')) : [],
         billionContext: v.billionContext?.protocol === 1 ? { protocol: 1, connected: v.billionContext.connected === true, failed: v.billionContext.failed === true,
           requests: Number(v.billionContext.requests) || 0, unreported: Number(v.billionContext.unreported) || 0, partial: Number(v.billionContext.partial) || 0, uncovered: Number(v.billionContext.uncovered) || 0,
@@ -962,6 +966,7 @@
       let provider = String(providerRaw ?? '').trim().toLowerCase()
       if (provider.startsWith('llm-')) provider = provider.slice(4)
       if (provider === '') provider = 'deepseek'
+      if (['our-free-model', 'our-free-model-region'].includes(provider) && overrides[provider + ':*'] === '__free__') return { entry: { cacheHit: 0, cacheMiss: 0, cacheWrite: 0, output: 0, reasoning: 0 }, priced: true, currency: 'USD', billingMode: 'flat', matched: true }
       let targetProvider = provider
       let targetModel = modelId
       const override = overrides[provider + ':' + modelId]
@@ -2253,7 +2258,9 @@
         }
       }, [])
       const { actions, children, ...attributes } = props
-      return el('div', { ...attributes, ref: cardRef, popover: 'manual' }, children)
+      const card = el('div', { ...attributes, ref: cardRef, popover: 'manual' }, children)
+      let portal; try { portal = require('react-dom')?.createPortal } catch {}
+      return typeof portal === 'function' ? portal(card, document.body) : card
     }
 
     // 预览通道事件名:设置页按钮/控制台经 window.cmPeakAlertPreview(kind) 触发真实组件。
@@ -2262,7 +2269,6 @@
     // 峰谷 Web 通知去重:记录最近一次已通知的切换点时刻(nextAtMs)。
     // 必须放模块级——配置变化会重挂 PeakAlert(内部 ref 归零),若用组件内状态,
     // 重挂后同一切换点会再发一条;切换点时刻单调递增,存单值即可。
-    let lastPeakNotifyAtMs = 0
 
     /**
      * 峰/谷切换前弹窗提醒:距下次相位切换不足配置提前量(默认 2 分钟)时弹浮层,
@@ -2273,98 +2279,8 @@
      * 渲染一次弹窗(峰谷计价启用时常驻监听,提醒开关关闭也可预览)。
      */
     function PeakAlert(props) {
-      const costStore = props.useCost ? props.useCost(s => s) : undefined
-      const config = costStore?.state?.config
-      const [now, setNow] = useState(Date.now())
-      const [dismissedAt, setDismissedAt] = useState(null)
-      const [preview, setPreview] = useState(null)
-      useEffect(() => {
-        const timer = window.setInterval(() => setNow(Date.now()), 10000)
-        return () => window.clearInterval(timer)
-      }, [])
-      // 预览通道:监听自定义事件(事件由 activate 顶层的 window.cmPeakAlertPreview 派发),
-      // 组件挂载期间置在线标志,供 API 判断弹窗宿主是否可用。
-      useEffect(() => {
-        const onPreview = event => {
-          const kind = event.detail?.kind === 'offpeak' ? 'offpeak' : 'peak'
-          setPreview(kind)
-          // 预览系统通知:遵循 Web 通知开关与授权,标题加预览标记。
-          const cfg = costStore?.state?.config
-          if (cfg?.peakAlertWebNotify === true && window.Notification && Notification.permission === 'granted') {
-            const pt = makeT(resolveLocale(cfg))
-            try {
-              new Notification(pt(kind === 'peak' ? 'peakAlertTitlePeak' : 'peakAlertTitleOffPeak') + pt('peakAlertPreviewTag'),
-                { body: pt('peakAlertBody', { time: pt('countdownMinute', { m: 2 }), phase: pt(kind === 'peak' ? 'peakAlertPhasePeak' : 'peakAlertPhaseOffPeak') }) })
-            } catch (_) { /* 通知被系统拒绝时静默 */ }
-          }
-        }
-        window.addEventListener(PEAK_ALERT_PREVIEW_EVENT, onPreview)
-        window.__cmPeakAlertLive = true
-        return () => {
-          window.removeEventListener(PEAK_ALERT_PREVIEW_EVENT, onPreview)
-          window.__cmPeakAlertLive = false
-        }
-      }, []) // eslint-disable-line react-hooks/exhaustive-deps
-      useEffect(() => {
-        // Web 通知:每次 tick 自包含重算切换点,按切换点(nextAtMs)在模块级去重,
-        // 同一切换点只发一次(旧实现比较 tick 时间戳,每 10 秒都"未通知过",会连发)。
-        if (!config || config.peakAlertEnabled !== true || config.peakEnabled !== true) return
-        if (config.peakAlertWebNotify !== true || !window.Notification || Notification.permission !== 'granted') return
-        const wv = peakPhaseAt(now, Array.isArray(config.peakWindows) ? config.peakWindows : [], config.peakHolidays)
-        if (wv === null) return
-        const tgt = config.peakAlertTarget === 'peak' || config.peakAlertTarget === 'offpeak' ? config.peakAlertTarget : 'both'
-        const intoPeak = wv.nextIntoPeak === true
-        if (tgt !== 'both' && tgt !== (intoPeak ? 'peak' : 'offpeak')) return
-        const mins = Number(config.peakAlertAhead)
-        const aheadMs = (Number.isFinite(mins) && mins >= 1 ? mins : 2) * 60000
-        if (now < wv.nextAtMs - aheadMs || now >= wv.nextAtMs) return
-        if (lastPeakNotifyAtMs === wv.nextAtMs) return
-        const t = makeT(resolveLocale(config))
-        lastPeakNotifyAtMs = wv.nextAtMs
-        try {
-          new Notification(
-            t(intoPeak ? 'peakAlertTitlePeak' : 'peakAlertTitleOffPeak'),
-            { body: t('peakAlertBody', { time: countdownText(wv, now, t), phase: t(intoPeak ? 'peakAlertPhasePeak' : 'peakAlertPhaseOffPeak') }) })
-        } catch (_) { /* 通知被系统拒绝时静默 */ }
-      }, [now]) // eslint-disable-line react-hooks/exhaustive-deps
-      if (!config || config.peakEnabled !== true) return null
-      // 真实弹窗判定:提醒开关开启 + 已生效 + 相位/类型/提前量窗口内 + 未手动关闭。
-      let real = null
-      if (config.peakAlertEnabled === true) {
-        const effectiveAtMs = Date.parse(config.peakEffectiveAt || '')
-        if (!(Number.isFinite(effectiveAtMs) && now < effectiveAtMs)) {
-          const view = peakPhaseAt(now, Array.isArray(config.peakWindows) ? config.peakWindows : [], config.peakHolidays)
-          if (view !== null) {
-            const target = config.peakAlertTarget === 'peak' || config.peakAlertTarget === 'offpeak' ? config.peakAlertTarget : 'both'
-            const aheadMinutes = Number(config.peakAlertAhead)
-            const aheadMs = (Number.isFinite(aheadMinutes) && aheadMinutes >= 1 ? aheadMinutes : 2) * 60000
-            if ((target === 'both' || target === (view.nextIntoPeak ? 'peak' : 'offpeak'))
-              && now >= view.nextAtMs - aheadMs && now < view.nextAtMs && dismissedAt !== view.nextAtMs) real = view
-          }
-        }
-      }
-      // 渲染:真实窗口激活用真实切换点;否则若有预览请求,用虚拟切换点(2 分钟后)。
-      let view = null, intoPeak = false, dismiss = null
-      if (real !== null) {
-        view = real
-        intoPeak = real.nextIntoPeak === true
-        dismiss = () => setDismissedAt(real.nextAtMs)
-      } else if (preview !== null) {
-        view = { nextAtMs: now + 2 * 60000, nextIntoPeak: preview === 'peak' }
-        intoPeak = preview === 'peak'
-        dismiss = () => setPreview(null)
-      } else return null
-      const t = makeT(resolveLocale(config))
-      const position = config.peakAlertPosition === 'center' ? 'cm-peak-alert-center' : 'cm-peak-alert-corner'
-      return el(FloatingCard, { actions: { dismiss }, className: 'cm-peak-alert ' + position + ' ' + (intoPeak ? 'cm-peak-alert-peak' : 'cm-peak-alert-offpeak'), role: 'alert' },
-        el('div', { className: 'cm-peak-alert-badge' }, t(intoPeak ? 'peakAlertBadgePeak' : 'peakAlertBadgeOffPeak')),
-        el('div', { className: 'cm-peak-alert-title' }, t(intoPeak ? 'peakAlertTitlePeak' : 'peakAlertTitleOffPeak')),
-        el('div', { className: 'cm-peak-alert-body' }, t('peakAlertBody', {
-          time: countdownText(view, now, t),
-          phase: t(intoPeak ? 'peakAlertPhasePeak' : 'peakAlertPhaseOffPeak'),
-        })),
-        el('div', { className: 'cm-peak-alert-actions' },
-          el('button', { type: 'button', className: 'cm-btn', 'data-cm-action': 'dismiss', onClick: dismiss }, t('peakAlertBtn'))))
+      const state = props.useCost?.(s => s)?.state
+      return state?.config?.peakEnabled === true ? el(PeakProgress, { ...props, view: 'alert' }) : null
     }
 
     /** 展开态简洁样式:单行紧凑时段条——细轨道(左橙右蓝,非当前段淡化)+ 标记线 + 右侧倒计时文本。 */
@@ -2415,11 +2331,15 @@
     // 进度条与首次介绍共用按需模块，不增加旧样式的定时器和主包体积。
     let peakPage
     function loadPeakPage() {
-      return peakPage ??= require.async('./client.peak.js').then(module => module.mount({ peakView, peakPhaseAt, phaseLabelKeys, countdownText, resolveLocale, makeT, Tooltip }))
+      return peakPage ??= require.async('./client.peak.js').then(module => module.mount({ peakView, peakPhaseAt, phaseLabelKeys, countdownText, resolveLocale, makeT, Tooltip, FloatingCard, renderSidebarFooter }))
         .catch(error => { peakPage = null; throw error })
     }
     function PeakProgress(props) {
       return el(BillingStatistics, { ...props, load: loadPeakPage, quiet: true })
+    }
+    function SidebarSummaryGuide(props) {
+      const state = props.useCost?.(s => s)?.state
+      return state && state.config.sidebar !== false && !state.config.sidebarSummaryPromptSeen ? el(PeakProgress, { ...props, state, config: state.config, view: 'summary-guide' }) : null
     }
     function PeakProgressGuide(props) {
       const state = props.useCost?.(s => s)?.state, config = state?.config
@@ -2545,6 +2465,15 @@
       }
     }
 
+    function goQuotaDetail(go, config, t) {
+      const direction = barDirectionOf(config, 'go')
+      return ['rolling', 'weekly', 'monthly'].map((key, i) => {
+        const win = go?.[key], pct = typeof win?.percent === 'number' && Number.isFinite(win.percent) ? Math.max(0, Math.min(100, win.percent)) : null
+        const reset = win?.resetsAt && Number.isFinite(Date.parse(win.resetsAt)) ? ' · ' + t('goResetAt', { time: new Date(win.resetsAt).toLocaleString() }) : ''
+        return t(['goWindowRolling', 'goWindowWeekly', 'goWindowMonthly'][i]) + ': ' + (pct === null ? '—' : quotaValueText(simpleBarByDirection(pct, direction).label, direction, t)) + reset
+      }).concat(go?.fetchedAt > 0 ? t('goQuotaFetchedAt', { time: new Date(go.fetchedAt).toLocaleTimeString() }) : []).join('\n')
+    }
+
     function GoQuotaBox(props) {
       const { state, wide } = props
       const goQuota = state.goQuota
@@ -2553,17 +2482,8 @@
       const mainKey = state.config?.goQuota?.main === 'weekly' || state.config?.goQuota?.main === 'monthly' ? state.config.goQuota.main : 'rolling'
       if (goQuota[mainKey] === null || typeof goQuota[mainKey]?.percent !== 'number') return null
       const view = goBoxBody(state, state.config, t)
-      const detail = [
-        t('goQuotaTitle'),
-        t('goWindowRolling') + ': ' + (goQuota.rolling === null ? '—' : Math.round(goQuota.rolling.percent) + '%'),
-        t('goWindowWeekly') + ': ' + (goQuota.weekly === null ? '—' : Math.round(goQuota.weekly.percent) + '%'),
-        t('goWindowMonthly') + ': ' + (goQuota.monthly === null ? '—' : Math.round(goQuota.monthly.percent) + '%'
-          + (goQuota.monthly !== null && typeof goQuota.monthly.resetsAt === 'string' && goQuota.monthly.resetsAt.length > 0
-            ? ' · ' + t('goResetAt', { time: new Date(goQuota.monthly.resetsAt).toLocaleString() })
-            : '')),
-        t('goQuotaFetchedAt', { time: goQuota.fetchedAt > 0 ? new Date(goQuota.fetchedAt).toLocaleTimeString() : '—' }),
-      ].join('; ')
-      return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
+      const detail = goQuotaDetail(goQuota, state.config, t)
+      return el(Tooltip, { portal: true, label: el('span', { style: { whiteSpace: 'pre-line' } }, detail), side: 'right', delayMs: 300 },
         el('div', { 'data-cm-display': 'go', className: 'cm-bbox' + (view.level === 'ok' ? '' : ' ' + view.level) + (wide ? '' : ' rail') },
           wide ? view.body : el('div', { className: 'cm-bbox-rail cm-num' }, view.rail)))
     }
@@ -2805,8 +2725,9 @@
       const source = state.config?.codexQuotaSource ?? 'auto'
       const cached = useCodexQuota(enabled && !props.preview, source)
       const snap = props.preview ? state.displayPreviewCodex ?? (codexQuotaCache.source === source ? codexQuotaCache : { status: 'idle' }) : cached
-      const refresh = useClickRefresh(props.preview ? null : () => fetchCodexQuota(true, enabled, source))
-      if (!enabled) return null
+      const refresh = useClickRefresh(props.preview ? null : enabled ? () => fetchCodexQuota(true, enabled, source) : () => props.api.updateConfig({ codexQuotaEnabled: true, codexQuotaSidebar: true }))
+      if (!enabled && (state.config?.codexQuotaSidebar === false || state.codexCompat?.enabled !== true)) return null
+      if (!enabled) return el('div', { 'data-cm-display': 'codex', className: 'cm-bbox cm-mm clickable' + (wide === false ? ' rail' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) }, refresh.err || (wide === false ? 'Codex' : t('codexQuotaEnable')))
       if (snap.status !== 'ok') return el('div', {
         'data-cm-display': 'codex', className: 'cm-bbox cm-mm clickable' + (wide === false ? ' rail' : ''),
         title: t('codexQuotaUnavailable'), ...clickableRefreshProps(refresh.busy, refresh.run),
@@ -3101,7 +3022,7 @@
               key: 'go',
               label: 'Go ' + t(mainKey === 'rolling' ? 'goShortRolling' : mainKey === 'weekly' ? 'goShortWeekly' : 'goShortMonthly'),
               level,
-              tip: 'Go: ' + pct + '%' + resets,
+              tip: goQuotaDetail(goQuota, config, t),
               segs: [{ name: 'main', pct: Math.round(simpleBarByDirection(pct, barDirectionOf(config, 'go')).width) }],
             })
           }
@@ -3460,7 +3381,7 @@
       // 网关额度侧边栏卡片(issue #96):按来源 display 门控,卡片本体见 GatewayQuotaBox。
       const gatewayNodes = gatewaySidebarCards(state, config, wide, api)
       // 启用后始终保留卡片,避免未登录/接口失败时没有提示和手动重试入口。
-      const codexOn = config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false
+      const codexOn = config.codexQuotaSidebar !== false && (config.codexQuotaEnabled === true || state.codexCompat?.enabled === true)
       const budgetOn = (config.budget ?? {}).enabled === true && config.hideBudget !== true
       const showToday = config.sidebar !== false && config.hideTodayCost !== true
       const peakOn = peakView(config, Date.now()) !== null
@@ -3487,12 +3408,13 @@
       if (budgetOn) nodes.push(el(BudgetBoxContent, { key: 'budget', state, wide, summary: simple && wide }))
       if (showToday && !(simple && wide)) nodes.push(el(BudgetBoxContent, { key: 'today', state, wide, todayOnly: true }))
       // Each display target owns its visibility; hiding another card cannot hide it.
-      if (peakOn) nodes.push(el(Fragment, { key: 'peak' }, wide ? peakNoticeEl(state, config, t) : peakNoticeRailEl(state, config, t)))
+      if (peakOn) nodes.push(el(Fragment, { key: 'peak' }, wide ? peakNoticeEl(state, config.sidebarStyle === 'summary' && !config.sidebarSimple ? { ...config, peakProgressVariant: 'summary' } : config, t) : peakNoticeRailEl(state, config, t)))
       if (modelsOn) nodes.splice(config.sidebarModels.position === 'first' ? 0 : config.sidebarModels.position === 'afterBalance' ? afterBalance : nodes.length, 0,
         el(SidebarModelCosts, { key: 'models', state, wide, preview }))
-      if (config.sidebarOrder?.length) {
-        const rank = node => { const index = config.sidebarOrder.indexOf(node.key); return index < 0 ? 999 : index }
+      const order = config.sidebarOrder?.length ? config.sidebarOrder : config.sidebarStyle === 'summary' && !simple ? ['today', 'balance', 'peak'] : []
+      if (order.length) {
+        const rank = node => { const index = order.indexOf(node.key); return index < 0 ? 999 : index }
         nodes.sort((a, b) => rank(a) - rank(b))
       }
-      return el('div', { ...(simple ? { tabIndex: 0, role: 'region', 'aria-label': t('sidebarSimple') } : {}), className: 'cm-footer-stack' + (wide ? '' : ' rail') + (compactWide ? ' compact' : '') + (simple ? ' simple' : '') }, ...nodes)
+      return el('div', { ...(simple ? { tabIndex: 0, role: 'region', 'aria-label': t('sidebarSimple') } : {}), className: 'cm-footer-stack' + (wide ? '' : ' rail') + (compactWide ? ' compact' : '') + (simple ? ' simple' : config.sidebarStyle === 'summary' && wide ? ' summary' : '') }, ...nodes)
     }

@@ -13,14 +13,14 @@
     function BillionCompatibilityGuide(props) {
       const state = props.useCost?.(s => s)?.state, meter = state?.billionContext
       const [Page, setPage] = useState(null)
-      const show = meter?.noticeId && ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility)
+      const show = state?.config?.billionContextNoticeEnabled !== false && meter?.noticeId && !state?.config?.billionContextNoticesSeen?.includes(meter.noticeId) && ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility)
       useEffect(() => {
         if (!show) return
         let active = true
         props.api.loadStatistics().then(page => { if (active) setPage(() => page.BillionCompatibilityNotice) }).catch(() => {})
         return () => { active = false }
       }, [!!show, props.api])
-      return show && Page ? el(Page, { meter, locale: resolveLocale(state?.config ?? {}) }) : null
+      return show && Page ? el(Page, { meter, config: state.config, api: props.api, locale: resolveLocale(state?.config ?? {}) }) : null
     }
     function BillingStatistics(props) {
       const load = props.load ?? props.api.loadStatistics
@@ -2550,6 +2550,8 @@
         { name: 'sidebar.footer.action', id: 'cost-meter-billion-compatibility', order: 2, inject: injected }, BillionCompatibilityGuide))
       slots.inject('sidebar.footer.action', () => slots.register(
         { name: 'sidebar.footer.action', id: 'cost-meter-peak-progress-guide', order: 1, inject: injected }, PeakProgressGuide))
+      slots.inject('sidebar.footer.action', () => slots.register(
+        { name: 'sidebar.footer.action', id: 'cost-meter-summary-guide', order: 1, inject: injected }, SidebarSummaryGuide))
       // 首次更新引导:常驻 sidebar.footer.action 挂载,组件内部按 promptSeen 门控。
       slots.inject('sidebar.footer.action', () => {
         const dispose = slots.register(

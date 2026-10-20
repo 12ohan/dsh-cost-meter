@@ -267,6 +267,22 @@ window.__ModuleLoader__.load({
       }))
     }
 
+    function OurFreeModelSettings({ state, draft, setDraft, locale }) {
+      if (state.ourFreeModel?.enabled !== true) return null
+      const en = locale === 'en', overrides = draft?.priceOverrides ?? state.config.priceOverrides ?? {}
+      const keys = ['our-free-model:*', 'our-free-model-region:*']
+      const free = keys.every(key => overrides[key] === '__free__')
+      return el('fieldset', { className: 'cm-custom-price cm-free-model', 'aria-label': 'dsh-our-free-model' },
+        el('legend', null, en ? 'Detected dsh-our-free-model' : '已检测到 dsh-our-free-model'),
+        el('label', { className: 'cm-check' }, el('input', { type: 'checkbox', role: 'switch', checked: free, onChange: event => {
+          if (!draft) return
+          const next = { ...overrides }
+          for (const key of keys) { if (event.target.checked) next[key] = '__free__'; else if (next[key] === '__free__') delete next[key] }
+          setDraft({ ...draft, priceOverrides: next })
+        } }), en ? 'Treat every model called through this plugin as free' : '从此插件调用的所有模型按免费计算'),
+        el('p', { className: 'cm-hint' }, en ? 'Applies to future calls through its two provider routes, including account channels. Tokens remain recorded. Other providers and saved historical prices keep their current billing.' : '开启后，该插件两个渠道之后的调用（含账号渠道）费用均为 0，Token 照常统计。其他来源与已保存的历史价格保持原计费口径。'))
+    }
+
     function Matching({ state, draft, setDraft, t, locale, resolveClientPrice, prettyProviderKey, setField, priceEditor }) {
       const [query, setQuery] = useState(''), [limit, setLimit] = useState(24)
       const [expanded, setExpanded] = useState(null), [sourceModes, setSourceModes] = useState({})
@@ -282,7 +298,7 @@ window.__ModuleLoader__.load({
             ...Object.fromEntries(Object.keys(statistics).map(key => [key, null])) }), [state.total?.byProviderModel, state.month?.byProviderModel, state.today?.byProviderModel, statistics])
           // Price-source changes never move a model between parent sections or remount its editor.
           const rows = useMemo(() => [...new Set([...Object.keys(byProvider), ...Object.keys(overrides)])]
-            .filter(key => !dismissed.includes(key) && !isRequestKey(key)).sort(), [byProvider, overrides, dismissed])
+            .filter(key => !dismissed.includes(key) && !isRequestKey(key) && !['our-free-model:*', 'our-free-model-region:*'].includes(key)).sort(), [byProvider, overrides, dismissed])
           useLayoutEffect(() => {
             const editor = rowNodes.current.get(customTarget.current)?.querySelector('.cm-custom-price')
             if (!editor) return
@@ -366,6 +382,7 @@ window.__ModuleLoader__.load({
                 automatic ? null : el('button', { type: 'button', className: 'cm-model-dismiss', title: t('removePriceMatchHint'), onClick: () => dismissMatch(key) }, t('overrideRemove'))) : null)
           }
           return el('div', { className: 'cm-model-matching' },
+            el(OurFreeModelSettings, { state, draft, setDraft, locale }),
             el('div', { className: 'cm-model-toolbar' },
               el('input', { type: 'search', className: 'cm-input', value: query, placeholder: en ? 'Find a model or channel…' : '查找模型或渠道…', 'aria-label': en ? 'Find configured models' : '查找已用模型', onChange: event => { setQuery(event.target.value); setLimit(24) }, onKeyDown: event => { if (event.key === 'Escape') { setQuery(''); setLimit(24); event.stopPropagation() } } }),
               el('span', { className: 'cm-note', role: 'status' }, en ? `${total} models` : `${total} 个模型`)),

@@ -58,12 +58,15 @@ assert.equal(config.sidebarTodayMetric, 'tokens')
 assert.equal(control(inspect('today'), 'sidebarTodayTokens').props.disabled, true, 'at least one value remains visible')
 for (const selected of ['codex', 'strip-codex']) {
   const tree = inspect(selected)
-  assert.equal(nodes(tree).filter(node => node.props.role === 'switch').length, 0, 'account and placement toggles are not duplicated within Codex controls')
+  assert.equal(nodes(tree).filter(node => node.props.role === 'switch').length, 1, 'Codex has one explicit query-enable switch')
   for (const source of ['subscription', 'chatgpt']) {
     assert.ok(control(tree, 'Data source').children.some(node => node.props?.value === source))
     control(tree, 'Data source').props.onChange({ target: { value: source } })
     assert.equal(config.codexQuotaSource, source)
   }
-  assert.equal(config.codexQuotaEnabled, false, 'display changes do not enable account queries')
+  control(tree, 'codexQuotaEnabled').props.onChange({ target: { checked: true } })
+  assert.equal(config.codexQuotaEnabled, true, 'explicit master switch enables quota queries')
+  control(inspect(selected), 'codexQuotaEnabled').props.onChange({ target: { checked: false } })
+  assert.equal(config.codexQuotaEnabled, false)
 }
 console.log('[ok] display controls: per-account visibility/placement, no query enablement, independent selection, targeted navigation and separate today control')

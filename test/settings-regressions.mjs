@@ -474,3 +474,12 @@ console.log('[ok] #282 channel-price filtering and serialized autosave races')
  timers.clear()
 }
 console.log('[ok] Codex settings: hidden without plugin, uninstall fallback and stable selection after reinstall')
+
+{
+  const update=applyConfigPatch(sanitizeConfig({}),{sidebarStyle:"summary",sidebarSummaryPromptSeen:true,billionContextNoticeEnabled:false,billionContextNoticesSeen:["bridge_missing:0.1.201"]})
+  assert.deepEqual(update.errors,[])
+  assert.equal(roundTrip(update.config).sidebarStyle,"summary")
+  assert.equal(roundTrip(update.config).billionContextNoticeEnabled,false)
+  assert.deepEqual(roundTrip(update.config).billionContextNoticesSeen,["bridge_missing:0.1.201"])
+  assert.ok(applyConfigPatch(update.config,{billionContextNoticesSeen:[1]}).errors.length>0)
+}

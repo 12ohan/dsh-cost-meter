@@ -195,6 +195,7 @@ for (const chunk of ['statistics', 'openrouter', 'community', 'pricing', 'displa
   }
   if (chunk === 'peak') {
     source = source.replace('/* PEAK_COMPONENT_SOURCE */', readFileSync(resolve(projectRoot, 'src/peak/component.js'), 'utf8'))
+    source = source.replace('/* PEAK_ALERT_SOURCE */', readFileSync(resolve(projectRoot, 'src/peak/alert.js'), 'utf8'))
     const styles = await transform(readFileSync(resolve(projectRoot, 'src/peak/style.css'), 'utf8'), { loader: 'css', minify: true })
     source = source.replace("'PEAK_STYLE_SOURCE'", () => javascriptLiteral(styles.code))
   }

@@ -1248,7 +1248,7 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   // 双端声明与客户端接线:typert config schema、PeakAlert 组件、浮层注册、类型过滤逻辑、设置 UI。
   const hostTypert = readFileSync(new URL('../lib/typert.host.js', import.meta.url), 'utf8')
   assert.ok(hostTypert.includes('peakAlertEnabled') && hostTypert.includes("z.enum(['peak', 'offpeak', 'both'])"), 'typert config 声明提醒字段')
-  const clientSource = readClientSource()
+  const clientSource = readClientSource() + '\n' + readFileSync(new URL('../src/peak/alert.js', import.meta.url), 'utf8')
   assert.ok(clientSource.includes('function PeakAlert('), '客户端 PeakAlert 组件存在')
   assert.ok(clientSource.includes("'cost-meter-peak-alert'"), '浮层注册 id 存在')
   assert.ok(clientSource.includes("target === 'both' || target === (view.nextIntoPeak ? 'peak' : 'offpeak')"), '提醒类型过滤逻辑存在')
@@ -1466,7 +1466,7 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
 // 新实现按切换点(nextAtMs)在模块级去重:同一切换点只发一次,且配置变化重挂组件后
 // (组件内 ref 会归零)也不会重发。
 {
-  const clientSource = readClientSource()
+  const clientSource = readClientSource() + '\n' + readFileSync(new URL('../src/peak/index.js', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../src/peak/alert.js', import.meta.url), 'utf8')
   assert.ok(!clientSource.includes('notifiedAtRef'), '已移除按 tick 时间戳防重的旧实现(每 10 秒连发)')
   assert.ok(clientSource.includes('let lastPeakNotifyAtMs = 0'), '模块级切换点去重标记存在(跨组件重挂持久)')
   assert.ok(clientSource.includes('if (lastPeakNotifyAtMs === wv.nextAtMs) return'), '同一切换点只发一次(nextAtMs 比较)')
@@ -1482,7 +1482,7 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
 // 不计入组件上下文;字符串与注释跳过。QuotaStripGuide 曾把 useRef 放在
 // promptSeen 提前返回之后,点击引导按钮即触发 #300。
 {
-  const hookSrc = readClientSource()
+  const hookSrc = readClientSource() + '\n' + readFileSync(new URL('../src/peak/alert.js', import.meta.url), 'utf8')
   const scanHookOrder = source => {
     const fnRe = /^[ \t]*function\s+([A-Za-z0-9_$]+)\s*\(/gm
     const out = []
@@ -6950,6 +6950,7 @@ await import('./client-style-injection.mjs')
 await import('./native-search-history.mjs')
 await import('./web-request-billing.mjs')
 await import('./search-versions.mjs')
+await import('./our-free-model.mjs')
 await import('./versioned-session-logs.mjs')
 await import('./session-log-repair.mjs')
 await import('./client-issues-127-129.mjs')
