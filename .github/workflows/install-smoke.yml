@@ -70,6 +70,10 @@ jobs:
           DSH_TEST_CODEX_PACKAGE="$PWD/.tmp-billion-matrix/dsh-codex-subscription-3.1.1.tgz" node test/codex-subscription-published.mjs
           npm pack @eddyskywalker/dsh-chatgpt-subscription@0.29.0 --ignore-scripts --pack-destination .tmp-billion-matrix
           DSH_TEST_CHATGPT_PACKAGE="$PWD/.tmp-billion-matrix/eddyskywalker-dsh-chatgpt-subscription-0.29.0.tgz" node test/chatgpt-subscription-quota.mjs
+          mkdir -p .tmp-our-free-model
+          npm pack dsh-our-free-model@2.1.0 --ignore-scripts --pack-destination .tmp-our-free-model
+          tar -xzf .tmp-our-free-model/dsh-our-free-model-2.1.0.tgz -C .tmp-our-free-model
+          DSH_TEST_FREE_MODEL_DIR="$PWD/.tmp-our-free-model/package" node test/our-free-model.mjs
           node test/context-costs.mjs --host
           node test/context-costs-client.mjs
           node test/context-costs-lifecycle.mjs
@@ -207,6 +211,8 @@ jobs:
           export DSH_TEST_NODE_MODULES="$PWD/.tmp-native-search-host/node_modules"
           node test/native-search-host.mjs
           node test/web-request-host.mjs
+          node scripts/fetch-search-api-fixture.mjs
+          node test/search-api-host.mjs
           node test/native-search-proxy.mjs
           mkdir -p .tmp-native-package
           npm pack --pack-destination .tmp-native-package
@@ -276,6 +282,8 @@ jobs:
           node test/context-costs-regression-browser.mjs
           node test/native-search-host.mjs
           node test/web-request-host.mjs
+          node scripts/fetch-search-api-fixture.mjs
+          node test/search-api-host.mjs
           node test/codex-quota-browser.mjs
       - name: Install the packed plugin and start the real Web host
         run: |

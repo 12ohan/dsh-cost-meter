@@ -37,6 +37,7 @@ window.__ModuleLoader__.load({
     // ── 样式 ────────────────────────────────────────────────────────────────
 
     const css = [
+      '.cm-section .cm-tabs>.cm-tab{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:32px;padding:6px 10px;margin:0;font:inherit;font-size:13px;line-height:20px;vertical-align:middle}.cm-peak-alert{z-index:2147483647;max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain}.cm-peak-alert,.cm-peak-alert *{-webkit-app-region:no-drag}.cm-peak-alert .cm-peak-alert-actions{position:relative;flex:none}.cm-peak-alert .cm-peak-alert-actions button{pointer-events:auto}',
       '/* dsh-cost-meter: 会话费用徽章与设置页 */',
       // 费用明细弹窗定位(见 03 片段 STAT_DIALOG_CLASS 注释)。写成样式表规则而非内联样式:
       // 皮肤能用 [role=dialog] 覆盖(issue #219),且 @property 注册后非法宿主变量整体退回
@@ -381,6 +382,7 @@ window.__ModuleLoader__.load({
       // Theme backgrounds may carry alpha. Flatten owned surfaces without changing host tokens.
       'body{--cm-opaque-base:#fff}body[data-ds-dark-theme],body[data-theme=dark],html[data-theme=dark] body{--cm-opaque-base:#151517}',
       '.cm-section,.cm-stat-dialog,.cm-qguide,.cm-peak-alert,.cm-footer-stack.simple{background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-base,#fff)) r g b / 1)}',
+      '.cm-today-values{display:inline-flex;flex-wrap:wrap;justify-content:flex-end;gap:2px 8px;min-width:0;max-width:100%}.cm-today-values>span{white-space:nowrap}.cm-today-values[data-both=true]>[data-cm-today=tokens]{font-size:11px;color:var(--dsw-alias-label-secondary)}',
       '.cm-simple-summary{background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-1,var(--dsw-alias-bg-base,#fff)) r g b / 1)}',
     ].join('\n')
     // 样式表注入。**按内容比对,不按 id 去重**:客户端插件热更新(DSH 的 client HMR,不刷新
@@ -576,6 +578,7 @@ window.__ModuleLoader__.load({
         codingPlanRemain7d: '7d',
         balanceRechargeLink: '打开 DeepSeek 充值页(platform.deepseek.com/usage)',
         codexQuotaTitle: 'ChatGPT (Codex) 额度',
+        codexQuotaEnable: 'Codex 额度未开启 · 点此开启',
         codexQuotaFive: '5h 额度',
         codexQuotaWeek: '周额度',
         codexQuotaReset: '{time} 重置',
@@ -1121,6 +1124,7 @@ window.__ModuleLoader__.load({
         codingPlanRemain7d: '7d',
         balanceRechargeLink: 'Open DeepSeek top-up page (platform.deepseek.com/usage)',
         codexQuotaTitle: 'ChatGPT (Codex) quota',
+        codexQuotaEnable: 'Codex quota is disabled · click to enable',
         codexQuotaFive: '5h quota',
         codexQuotaWeek: 'Weekly quota',
         codexQuotaReset: 'resets {time}',

@@ -91,7 +91,7 @@ const roundTrip = config => ui.parseConfig(sanitizeConfig(config), 'config')
 }
 assert.equal(roundTrip({}).codexQuotaSidebar, true, 'old configs retain the sidebar card')
 assert.equal(roundTrip({}).codexQuotaStrip, true, 'old configs retain the composer quota strip')
-for (const key of ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'sessionCostCompact', 'followSkinTransparency']) {
+for (const key of ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'sessionCostCompact', 'followSkinTransparency', 'hideTodayCost', 'hideBudget', 'hideOfficialBalance', 'showTotalWithPlan']) {
   assert.equal(roundTrip({})[key], false)
   for (const enabled of [true, false]) {
     const patch = applyConfigPatch(sanitizeConfig({}), { [key]: enabled })
@@ -474,3 +474,12 @@ console.log('[ok] #282 channel-price filtering and serialized autosave races')
  timers.clear()
 }
 console.log('[ok] Codex settings: hidden without plugin, uninstall fallback and stable selection after reinstall')
+
+{
+  const update=applyConfigPatch(sanitizeConfig({}),{sidebarStyle:"summary",sidebarSummaryPromptSeen:true,billionContextNoticeEnabled:false,billionContextNoticesSeen:["bridge_missing:0.1.201"]})
+  assert.deepEqual(update.errors,[])
+  assert.equal(roundTrip(update.config).sidebarStyle,"summary")
+  assert.equal(roundTrip(update.config).billionContextNoticeEnabled,false)
+  assert.deepEqual(roundTrip(update.config).billionContextNoticesSeen,["bridge_missing:0.1.201"])
+  assert.ok(applyConfigPatch(update.config,{billionContextNoticesSeen:[1]}).errors.length>0)
+}

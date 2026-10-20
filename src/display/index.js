@@ -86,14 +86,14 @@ window.__ModuleLoader__.load({
       const planOn = ['both', 'sidebar'].includes(planConfig.display ?? (selectedPlan === 'minimax' ? 'both' : 'settings'))
       registry.plan = { on: planOn, patch: { codingPlans: { ...config.codingPlans, [selectedPlan]: { ...planConfig, display: planOn ? 'settings' : 'both' } } } }
       registry.customBalance = { on: ['both', 'sidebar'].includes(config.customBalance?.display ?? 'both'), patch: { customBalance: { ...config.customBalance, display: ['both', 'sidebar'].includes(config.customBalance?.display ?? 'both') ? 'settings' : 'both' } } }
-      registry.codex = { on: config.codexQuotaSidebar !== false, patch: { codexQuotaSidebar: config.codexQuotaSidebar === false } }
+      registry.codex = { on: config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false, patch: config.codexQuotaEnabled === true && config.codexQuotaSidebar !== false ? { codexQuotaSidebar: false } : { codexQuotaEnabled: true, codexQuotaSidebar: true } }
       registry.sessionList = { on: config.sessionListCosts === true, patch: { sessionListCosts: config.sessionListCosts !== true } }
       const strip = config.quotaStrip ?? {}
       const codex = previewData.state.displayPreviewCodex
       const codexPercentages = codex?.status === 'ok' ? Object.entries(codex.windows ?? {}).map(([key, win]) => ({ key, pct: Number.isFinite(win?.percent) ? Math.max(0, Math.min(100, 100 - win.percent)) : null })) : []
       const codexStrip = item('strip-codex', text('输入框上方 · Codex 额度', 'Above composer · Codex quota'),
-        strip.enabled === true && config.codexQuotaStrip !== false,
-        { codexQuotaStrip: !(strip.enabled === true && config.codexQuotaStrip !== false), ...(strip.enabled ? {} : { quotaStrip: { ...strip, enabled: true, budget: false, go: false, plans: false, promptSeen: true } }) },
+        strip.enabled === true && config.codexQuotaEnabled === true && config.codexQuotaStrip !== false,
+        { codexQuotaEnabled: true, codexQuotaStrip: !(strip.enabled === true && config.codexQuotaEnabled === true && config.codexQuotaStrip !== false), ...(strip.enabled ? {} : { quotaStrip: { ...strip, enabled: true, budget: false, go: false, plans: false, promptSeen: true } }) },
         el('span', { className: 'cm-qchip' }, el('span', { className: 'cm-qlabel' }, 'Codex'),
           ...(codexPercentages.length ? codexPercentages : [{ pct: null }]).map(({ key, pct }, index) => el('span', { key: index, className: 'cm-qseg' },
             el('span', { className: 'cm-qbar' }, el('span', { className: 'cm-qfill', style: { width: (pct ?? 0) + '%' } })),
@@ -131,6 +131,7 @@ window.__ModuleLoader__.load({
         el(SidebarPreview, { renderSidebar: renderPreviewSidebar, config: previewData.config, selected, selectedPlan, select, labels,
           displayConfig: config, visibility: { balance: balanceOn, budget: registry.budget.on, today: todayOn,
             go: registry.go.on, peak: registry.peak.on, models: registry.models.on, plan: planOn, customBalance: registry.customBalance.on, codex: registry.codex.on },
+          onOrder: order => set({ sidebarOrder: order }),
           listPreview: item('sessionList', labels.sessionList, config.sessionListCosts === true, registry.sessionList.patch,
             el('div', { style: { display: 'flex', alignItems: 'center', gap: 12, padding: 8 } }, el('span', { style: { flex: 1 } }, text('整理项目计划', 'Organize the project plan')),
               el('span', { style: { fontSize: 11, fontVariantNumeric: 'tabular-nums' } }, examples ? money(.84) : '—'))),
@@ -177,9 +178,12 @@ window.__ModuleLoader__.load({
       return el('section', { className: 'cm-display', 'aria-label': text('交互式显示设置', 'Interactive display settings') },
         el('div', { className: 'cm-display-heading' }, el('div', null,
           el('h3', null, text('设置你看到的界面', 'Make the screen yours')),
-          el('p', null, text('点击虚线框，在右侧调整显示与样式。淡化表示已隐藏。', 'Select an outlined item, then customize it on the right. Faded components are hidden.'))),
+          el('p', null, text('点击虚线框调整显示，拖动左侧手柄排序。淡化表示已隐藏。', 'Select an outlined item to customize it. Drag its left handle to reorder. Faded components are hidden.'))),
           el('button', { ref: expandButton, type: 'button', className: 'cm-btn small cm-display-expand', onClick: () => setExpanded(true) }, icon('IconFullscreenOutlineRegular', 14), text('放大预览', 'Expand preview'))),
         el(SkinTransparency, { config, set, text }),
+        el('section', { className: 'cm-display-notifications', 'aria-label': text('兼容提醒', 'Compatibility reminders') },
+          el('label', { className: 'cm-check' }, el('input', { type: 'checkbox', role: 'switch', checked: config.billionContextNoticeEnabled !== false, onChange: event => set({ billionContextNoticeEnabled: event.target.checked }) }), text('弹出 billion-context 计费兼容提醒', 'Show billion-context billing compatibility popups')),
+          el('p', { className: 'cm-note' }, text('关闭只停止自动弹窗，计费检测继续运行。当前状态：', 'Disabling popups keeps billing detection active. Current status: ') + ({ ready: text('已接入', 'Connected'), needs_update: text('需要更新', 'Update required'), changed: text('接口变化', 'Interface changed'), bridge_missing: text('尚未接入', 'Not connected') }[props.state.billionContext?.compatibility] ?? text('未检测到兼容问题', 'No compatibility issue detected')))),
         expanded ? el('dialog', { ref: dialogRef, className: 'cm-display-dialog', 'aria-label': text('桌面显示预览', 'Desktop display preview'),
           onCancel: event => { event.preventDefault(); event.stopPropagation(); setExpanded(false) }, onKeyDown: event => { if(event.key==='Escape')event.stopPropagation() } },
           el('div', { className: 'cm-display-dialog-head' }, text('显示设置', 'Display settings'),
@@ -305,7 +309,8 @@ window.__ModuleLoader__.load({
               el('select', { className: 'cm-input', value: draft?.sidebarTodayMetric ?? 'cost',
                 onChange: event => setField('sidebarTodayMetric', event.target.value) },
                 el('option', { value: 'cost' }, t('sidebarTodayCost')),
-                el('option', { value: 'tokens' }, t('sidebarTodayTokens')))),
+                el('option', { value: 'tokens' }, t('sidebarTodayTokens')),
+                el('option', { value: 'both' }, locale === 'en' ? 'Cost and tokens' : '费用与 Token'))),
             el('div', { className: 'cm-field' },
               el('label', null, t('balanceDisplayLabel')),
               el('select', {

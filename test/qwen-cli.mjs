@@ -100,6 +100,8 @@ process.stdout.write(config.raw ?? JSON.stringify(config.payload));
   setResponse({ payload: { token_plan: { subscribed: false } }, subscription: { payload: subscription } })
   assert.deepEqual((await queryQwenCli('en', options)).windows, personal)
   assert.deepEqual(readFileSync(calls, 'utf8').trim().split('\n').slice(-2).map(JSON.parse), [QWEN_CLI_ARGS, QWEN_SUBSCRIPTION_ARGS])
+  setResponse({ payload: { token_plan: { subscribed: false } }, subscription: { wait: 15500, payload: subscription } })
+  assert.deepEqual((await queryQwenCli('en', options)).windows, personal, 'default fallback accepts a real command beyond 15 seconds (#349)')
   for (const [response, expected] of [[{ exit: 2, stderr: 'SECRET_AUTH' }, 'auth'], [{ raw: 'SECRET_INVALID' }, 'invalid'], [{ payload: { individual: { status: 'expired' } } }, 'unavailable'], [{ wait: 4000 }, 'timeout']]) {
     setResponse({ payload: { token_plan: { subscribed: false } }, subscription: response })
     await assert.rejects(queryQwenCli('en', { ...options, timeoutMs: response.wait ? 2000 : 15000 }), e => e.code === expected && !e.message.includes('SECRET'))
