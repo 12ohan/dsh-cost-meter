@@ -76,6 +76,7 @@ export async function checkSidebarUpdates(page, output) {
     await skin.evaluate(node => node.remove())
   }
   await page.evaluate(() => window.configure({ sidebarSimple: false }))
+  await page.locator('.cm-display-general summary').click()
   const preference = page.getByRole('switch', { name: '弹出 billion-context 计费兼容提醒', exact: true })
   await preference.uncheck()
   await page.waitForFunction(() => window.current().billionContextNoticeEnabled === false)
