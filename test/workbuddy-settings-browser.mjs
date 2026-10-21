@@ -17,10 +17,12 @@ const source = readdirSync('src/client').filter(n => n.endsWith('.js')).sort().m
   .replace('exports.apply = apply', 'exports.test = { PlanQuotaCard, makeT, css }; exports.apply = apply')
 const code = `
 import React from ${literal(req.resolve('react'))};import{createRoot}from ${literal(req.resolve('react-dom/client'))};
-window.__ModuleLoader__={load:mod=>window.ui=mod.factory(name=>name==='react'?React:{Tooltip:({children})=>children})};
+const require=name=>name==='react'?React:{Tooltip:({children})=>children};require.async=async()=>window.planUI;window.__ModuleLoader__={load:mod=>window.ui=mod.factory(require)};
 ${source}
+window.__ModuleLoader__={load:mod=>window.planUI=mod.factory(require)};
+${readFileSync('lib/client.plan-settings.js','utf8')}
 const {PlanQuotaCard,makeT,css}=window.ui.test;
-function App(){const [state,setState]=React.useState(${literal(initial)});const api={refreshCodingPlan:async()=>{const result=await fetch('/refresh').then(r=>r.json());setState(s=>({...s,codingPlans:{workbuddy:result.live}}));return result}};return React.createElement(React.Fragment,null,React.createElement('style',null,css),React.createElement(PlanQuotaCard,{planId:'workbuddy',labelKey:'wbT',state,api,t:makeT('zh'),draft:state.config,setDraft:()=>{}}))}
+function App(){const [state,setState]=React.useState(${literal(initial)});window.populateAccounts=()=>setState(s=>({...s,codingPlans:{workbuddy:{status:'ok',windows:{balance:{text:'120',resetsAt:''}},workbuddy:{scope:'all',incomplete:false,accounts:[{id:'cn:a',name:'测试账号 A',region:'cn',current:true,remaining:100,observedToday:10,observedWeek:30,observedTotal:50},{id:'global:b',name:'测试账号 B',region:'global',current:false,remaining:20,observedToday:0,observedWeek:5,observedTotal:8}]}}}}));window.config=state.config;const api={refreshCodingPlan:async()=>{const result=await fetch('/refresh').then(r=>r.json());setState(s=>({...s,codingPlans:{workbuddy:result.live}}));return result}};return React.createElement(React.Fragment,null,React.createElement('style',null,css),React.createElement(PlanQuotaCard,{planId:'workbuddy',labelKey:'wbT',state,api,t:makeT('zh'),draft:state.config,setDraft:config=>setState(s=>({...s,config}))}))}
 createRoot(document.getElementById('root')).render(React.createElement(App));
 `
 const bundle = (await build({ stdin: { contents: code, resolveDir: process.cwd() }, bundle: true, write: false, platform: 'browser', format: 'iife' })).outputFiles[0].contents
@@ -64,8 +66,21 @@ try {
   await card.getByText('1,011', { exact: true }).waitFor()
   assert.equal(await card.getByText(missing, { exact: true }).count(), 0)
   assert.equal(await card.locator('input[type=password]').count(), 0, 'no credential copy/paste requested')
-  assert.equal(queries, 7, 'four absent routes, then old connector misses and the new CN usage route')
+  assert.equal(queries, 11, 'account-list probes plus legacy fallback routes')
   await page.screenshot({ path: '.tmp-workbuddy-settings/connected-balance.png' })
+  await page.evaluate(()=>window.populateAccounts())
+  await card.locator('button[aria-expanded]').click()
+  await card.getByLabel('统计账号',{exact:true}).selectOption('all')
+  assert.equal(await card.getByRole('checkbox',{name:'测试账号 A',exact:true}).isChecked(),true)
+  assert.equal(await card.getByRole('checkbox',{name:'测试账号 B',exact:true}).isChecked(),true)
+  await card.getByLabel('统计账号',{exact:true}).selectOption('selected')
+  await card.getByRole('checkbox',{name:'测试账号 B',exact:true}).check()
+  assert.deepEqual(await page.evaluate(()=>window.config.codingPlans.workbuddy.accountIds),['global:b'])
+  await card.getByText('启用以来观测减少',{exact:true}).waitFor()
+  await card.getByText('8',{exact:true}).waitFor()
+  await page.setViewportSize({width:390,height:800})
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'account settings fit a narrow screen')
+  await page.screenshot({path:'.tmp-workbuddy-settings/accounts-selected.png',fullPage:true})
   assert.deepEqual(errors, [])
-  console.log('[ok] WorkBuddy enabled/collapsed settings card: real click + HTTP refresh, one encrypted error, connector recovery, visible 1,011 credits')
+  console.log('[ok] WorkBuddy settings: HTTP refresh and connector recovery; all/selected accounts, observed decreases and 390px layout')
 } finally { await browser.close(); server.closeAllConnections(); await new Promise(done => server.close(done)) }

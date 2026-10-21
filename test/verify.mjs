@@ -133,7 +133,7 @@ function readClientSource() {
   const dir = new URL('../src/client/', import.meta.url)
   const parts = readdirSync(dir).filter(name => name.endsWith('.js')).sort()
   assert.ok(parts.length > 0, 'src/client/ 源码片段缺失')
-  return parts.map(name => readFileSync(new URL(name, dir), 'utf8').replace(/\r\n/g, '\n')).join('')
+  return parts.map(name => readFileSync(new URL(name, dir), 'utf8').replace(/\r\n/g, '\n')).join('') + readFileSync(new URL('../src/plan-settings/index.js', import.meta.url), 'utf8')
 }
 const displaySource = readFileSync(new URL('../src/display/index.js', import.meta.url), 'utf8')
 
@@ -1648,7 +1648,7 @@ assert.equal(gtsInvocation.result.mode, 'strict', 'getTopSessions 返回 strict 
 const clientSrc = readClientSource()
 let descriptorFactory
 vm.runInNewContext(clientSrc.replace('exports.apply = apply', 'exports.descriptors = CONTRIBUTION.descriptors; exports.apply = apply'), {
-  window: { __ModuleLoader__: { load: value => { descriptorFactory = value.factory } } }, navigator: { language: 'en' },
+  window: { __ModuleLoader__: { load: value => { if (!value.chunk) descriptorFactory = value.factory } } }, navigator: { language: 'en' },
 })
 const descriptors = descriptorFactory(() => ({})).descriptors
 let statisticsFactory
@@ -6961,6 +6961,8 @@ await import('./mimo-quota.mjs')
 await import('./workbuddy-quota.mjs')
 await import('./workbuddy-billing.mjs')
 await import('./workbuddy-connect.mjs')
+await import('./workbuddy-accounts.mjs')
+await import('./workbuddy-host.mjs')
 await import('./mimo-enable-flow.mjs')
 await import('./mimo-v26-pricing.mjs')
 await import('./host-locale.mjs')

@@ -10,7 +10,7 @@ import { stateSchema } from '../lib/typert.host.js'
 // 执行真实组件和事件回调，再经过服务端清洗与客户端读取；不向发布产物暴露接口。
 const dir = new URL('../src/client/', import.meta.url)
 const source = readdirSync(dir).filter(name => name.endsWith('.js')).sort().map(name => readFileSync(new URL(name, dir), 'utf8')).join('')
-const code = source.replace('exports.apply = apply', 'exports.test = { PlanQuotaCard, CostSection, parseConfig, makeT, codingPlanWindowLabel }; exports.apply = apply')
+const code = source.replace('exports.apply = apply', 'exports.test = { PlanQuotaCard, CostSection, parseConfig, makeT, codingPlanWindowLabel, useQuotaRefresh, miniMaxWindowsOf, MiniMaxPlanCard, barDirectionOf, quotaWindowRow, numInput, CredentialField, QuotaCard, resolveLocale, formatMoneyUsd }; exports.apply = apply')
 let active, pricing, display
 const react = {
   Component: class {},
@@ -52,6 +52,10 @@ vm.runInNewContext(code, {
   setTimeout: fn => { timers.set(++timerId, fn); return timerId }, clearTimeout: id => timers.delete(id),
 })
 const ui = factory(name => name === 'react' ? react : {}).test
+vm.runInNewContext(readFileSync(new URL('../src/plan-settings/index.js', import.meta.url), 'utf8'), {
+  window: { __ModuleLoader__: { load: value => { factory = value.factory } } },
+})
+ui.PlanQuotaCard = factory(name => name === 'react' ? react : {}).mount(ui)
 vm.runInNewContext(readFileSync(new URL('../src/pricing/index.js', import.meta.url), 'utf8').replace('return { mount, CONTRIBUTION }', 'return { Matching, Catalog, RestorePrices, SearchPriceSelect }'), {
   window: { __ModuleLoader__: { load: value => { factory = value.factory } } },
 })

@@ -132,7 +132,7 @@ window.__ModuleLoader__.load({
         el(SidebarPreview, { renderSidebar: renderPreviewSidebar, config: previewData.config, selected, selectedPlan, select, labels,
           displayConfig: config, visibility: { balance: balanceOn, budget: registry.budget.on, today: todayOn,
             go: registry.go.on, peak: registry.peak.on, models: registry.models.on, plan: planOn, customBalance: registry.customBalance.on, codex: registry.codex.on },
-          onOrder: order => set({ sidebarOrder: order }),
+          onOrder: order => { if (Object.hasOwn(config, 'sidebarOrder')) set({ sidebarOrder: order }) },
           listPreview: item('sessionList', labels.sessionList, config.sessionListCosts === true, registry.sessionList.patch,
             el('div', { style: { display: 'flex', alignItems: 'center', gap: 12, padding: 8 } }, el('span', { style: { flex: 1 } }, text('整理项目计划', 'Organize the project plan')),
               el('span', { style: { fontSize: 11, fontVariantNumeric: 'tabular-nums' } }, examples ? money(.84) : '—'))),

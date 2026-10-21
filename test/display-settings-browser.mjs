@@ -26,12 +26,12 @@ const client = readdirSync('src/client').filter(n => n.endsWith('.js')).sort().m
 const day = { ...zeroDay(), cost: 1.28, apiCost: 1.28 }
 const state = { config: saved, today: day, month: day, total: day, history: [], balance: { status: 'error', message: 'Synthetic balance error' }, codingPlans: {}, budgetUsed: 32 }
 const code = `
-import React from ${literal(req.resolve('react'))};import{createRoot}from ${literal(req.resolve('react-dom/client'))};
+import * as ReactDOMPortal from ${literal(req.resolve('react-dom'))};import React from ${literal(req.resolve('react'))};import{createRoot}from ${literal(req.resolve('react-dom/client'))};
 const h=React.createElement;
 const mainRequire=name=>name==='react'?React:{Tooltip:({children,label})=>React.cloneElement(children,{'data-test-tooltip':typeof label==='string'?label:''})};mainRequire.async=async()=>window.peakUI;
 window.__ModuleLoader__={load:mod=>window.mainUI=mod.factory(mainRequire)};
 ${client}
-window.__ModuleLoader__={load:mod=>window.peakUI=mod.factory(()=>React)};
+window.__ModuleLoader__={load:mod=>window.peakUI=mod.factory(name=>name==='react-dom'?ReactDOMPortal:React)};
 ${readFileSync('lib/client.peak.js', 'utf8')}
 window.__ModuleLoader__={load:mod=>window.displayUI=mod.factory(()=>React)};
 ${readFileSync('lib/client.display.js', 'utf8')}

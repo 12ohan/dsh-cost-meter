@@ -143,7 +143,7 @@
         modelStatistics: v.modelStatistics ?? {},
         ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'followSkinTransparency', 'sidebarTodayBalanceInline', 'sessionListCosts', 'hideBudget', 'sessionCostCompact', 'contextCostsEnabled', 'contextCostsPromptSeen', 'showTotalWithPlan', 'sidebarSimple', 'sidebarSimplePromptSeen', 'codexQuotaEnabled', 'codexCompatPromptDismissed', 'includeSubagentCost', 'peakEnabled', 'peakAlertWebNotify', 'peakProgressPromptSeen'], value => value === true),
         sidebarTodayMetric: ['tokens', 'both'].includes(v.sidebarTodayMetric) ? v.sidebarTodayMetric : 'cost',
-        sidebarOrder: Array.isArray(v.sidebarOrder) ? v.sidebarOrder : [],
+        ...(Object.hasOwn(v, 'sidebarOrder') ? { sidebarOrder: Array.isArray(v.sidebarOrder) ? v.sidebarOrder : [] } : {}),
         statisticsBasis: v.statisticsBasis,
         sidebarModels: Object.fromEntries(Object.entries(MODEL_SIDEBAR_DEFAULTS).map(([k, v0]) => [k, v.sidebarModels?.[k] ?? v0])),
         codexQuotaSidebar: v.codexQuotaSidebar !== false,
@@ -153,7 +153,7 @@
         // 直通白名单缺失会导致关闭后重开页面又弹提示,或应用后状态行回落「未应用」。
         codexCompatHistoryAppliedAt: num0(v.codexCompatHistoryAppliedAt),
         sidebarStyle: oneOf(v.sidebarStyle, ['standard', 'compact', 'summary'], 'standard'),
-        sidebarSummaryPromptSeen: v.sidebarSummaryPromptSeen === true,
+        ...(Object.hasOwn(v, 'sidebarSummaryPromptSeen') ? { sidebarSummaryPromptSeen: v.sidebarSummaryPromptSeen === true } : {}),
         billionContextNoticeEnabled: v.billionContextNoticeEnabled !== false,
         billionContextNoticesSeen: Array.isArray(v.billionContextNoticesSeen) ? v.billionContextNoticesSeen.filter(value => typeof value === 'string').slice(-32) : [],
         priceMatchDismissed: Array.isArray(v.priceMatchDismissed) ? v.priceMatchDismissed.filter(key => typeof key === 'string') : [],
@@ -206,6 +206,7 @@
                 apiKey: typeof e.apiKey === 'string' ? e.apiKey : '',
                 ...(id === 'minimax' ? { baseUrl: typeof e.baseUrl === 'string' ? e.baseUrl : '' } : {}),
                 ...(id === 'factory' ? { orgId: typeof e.orgId === 'string' ? e.orgId : '', factoryPool: ['core', 'both'].includes(e.factoryPool) ? e.factoryPool : 'standard' } : {}),
+                ...(id === 'workbuddy' ? { accountScope: e.accountScope ?? 'current', accountIds: Array.isArray(e.accountIds) ? e.accountIds : [] } : {}),
                 ...(id === 'opendesign' ? { workspaceId: typeof e.workspaceId === 'string' ? e.workspaceId : '' } : {}),
                 ...(id === 'qwen' ? { quotaSource: ['cli', 'bailian'].includes(e.quotaSource) ? e.quotaSource : 'local' } : {}),
                 // SCNet / 千问本地计量字段(issue #26/#78):其余厂商无此键,缺省剔除。

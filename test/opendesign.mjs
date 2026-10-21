@@ -111,10 +111,13 @@ const React = { createElement: element, Fragment: 'fragment', useState: value =>
   useRef: value => ({ current: value }), useEffect() {}, useMemo: fn => fn(), useCallback: fn => fn }
 const source = readdirSync(new URL('../src/client/', import.meta.url)).filter(name => name.endsWith('.js')).sort()
   .map(name => readFileSync(new URL('../src/client/' + name, import.meta.url), 'utf8')).join('')
-vm.runInNewContext(source.replace('exports.apply = apply', 'exports.testing = { PlanQuotaCard, CodingPlanBox, QuotaStrip, parseConfig, resolveClientPriceRaw, billingClassOfLocal, MESSAGES }; exports.apply = apply'), {
+vm.runInNewContext(source.replace('exports.apply = apply', 'exports.testing = { PlanQuotaCard, CodingPlanBox, QuotaStrip, parseConfig, resolveClientPriceRaw, billingClassOfLocal, MESSAGES, useQuotaRefresh, miniMaxWindowsOf, MiniMaxPlanCard, barDirectionOf, quotaWindowRow, codingPlanWindowLabel, numInput, CredentialField, QuotaCard, resolveLocale, formatMoneyUsd }; exports.apply = apply'), {
   window: { __ModuleLoader__: { load: value => { factory = value.factory } } }, navigator: { language: 'en' }, console, setTimeout, clearTimeout,
 })
 const ui = factory(name => name === 'react' ? React : {}).testing
+let plansFactory
+vm.runInNewContext(readFileSync(new URL('../src/plan-settings/index.js', import.meta.url), 'utf8'), { window: { __ModuleLoader__: { load: value => { plansFactory = value.factory } } } })
+ui.PlanQuotaCard = plansFactory(() => React).mount(ui)
 const clientConfig = ui.parseConfig({ ...config, codingPlans: { ...config.codingPlans, opendesign: { ...config.codingPlans.opendesign, workspaceId: 'ws-1' } } })
 assert.equal(clientConfig.codingPlans.opendesign.workspaceId, 'ws-1')
 for (const provider of OPENDESIGN_PROVIDER_IDS) {

@@ -20,8 +20,8 @@ const config = sanitizeConfig({ locale: 'zh', sidebar: true, sidebarSummaryPromp
   peakEnabled: true, sidebarSimplePromptSeen: true, quotaStrip: { promptSeen: true }, balance: { clickHintSeen: true } })
 const state = { config, today: zeroDay(), month: zeroDay(), total: zeroDay(), history: [], codingPlans: {} }
 const entry = baseline => `
-import React from ${literal(req.resolve('react'))};import * as ReactDOM from ${literal(req.resolve('react-dom/client'))};
-const require=name=>name==='react'?React:name==='react-dom/client'?ReactDOM:{Tooltip:({children})=>children};
+import * as ReactDOMPortal from ${literal(req.resolve('react-dom'))};import React from ${literal(req.resolve('react'))};import * as ReactDOM from ${literal(req.resolve('react-dom/client'))};
+const require=name=>name==='react'?React:name==='react-dom/client'?ReactDOM:name==='react-dom'?ReactDOMPortal:{Tooltip:({children})=>children};
 window.__ModuleLoader__={load:mod=>window.skinUI=mod.factory(require)};
 ${readFileSync(join(skin, 'lib/client.js'), 'utf8')}
 window.skinErrors=[];const disposers=[];

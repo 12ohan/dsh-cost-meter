@@ -12,7 +12,7 @@ import { queryCodingPlan } from '../lib/coding-plans.js'
 const root = resolve(process.env.DSH_TEST_CONNECT_WORKBUDDY_DIR ?? '.tmp-connect-workbuddy-published/package')
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 assert.equal(pkg.name, 'dsh-connect-workbuddy')
-assert.equal(pkg.version, '4.13.1')
+assert.ok(['4.13.1', '4.14.1'].includes(pkg.version))
 const host = resolve(process.env.DSH_TEST_NODE_MODULES ?? '.tmp-context-host/node_modules')
 const temp = mkdtempSync(join(tmpdir(), 'cm-connect-workbuddy-'))
 const originalFetch = globalThis.fetch
@@ -40,7 +40,7 @@ try {
     store: target => ({ accounts: async () => target === region ? [{ id: 'synthetic-account', selected: true }] : [],
       status: async () => ({ state: target === region ? 'signed-in' : 'signed-out' }),
       resolve: async () => { if (target !== region) throw Error('No sign-in'); return credential },
-      hasExplicitSelection: () => false, selectionLost: async () => false }),
+      credentialFor: async () => credential, hasExplicitSelection: () => false, selectionLost: async () => false }),
     client: { fetchCredits: async value => { assert.equal(value, credential); measured.push(region); if (rejected) throw Error('SYNTHETIC_BILLING_FAILURE'); return { total: balance, packages: [], expiringSoon: 0, nearestExpiryMs: Date.parse('2030-01-01T00:00:00Z') } },
       fetchCheckinStatus: async () => ({ todayCheckedIn: true }) },
     displayModels: () => [], enabledModelIds: () => [], imageModelIds: () => [], offModelIds: () => [], contextBudgets: () => ({}), regionEnabled: () => true,
@@ -59,18 +59,21 @@ try {
     region = target
     const result = await queryCodingPlan('workbuddy', key, 'en', text)
     assert.equal(result.windows.balance.text, '126', 'use the existing WorkBuddy balance formatter')
-    assert.equal(result.windows.cycleReset.resetsAt, '2030-01-01T00:00:00.000Z')
-    assert.ok(result.endpoint.endsWith('?region=' + target))
+    if (!result.workbuddy) {
+      assert.equal(result.windows.cycleReset.resetsAt, '2030-01-01T00:00:00.000Z')
+      assert.ok(result.endpoint.endsWith('?region=' + target))
+    } else assert.equal(result.workbuddy.accounts[0].region, target)
     assert.ok(!JSON.stringify(result).includes('NOT_FOR_FORWARDING'))
   }
   balance = 0
   assert.equal((await queryCodingPlan('workbuddy', key, 'en', text)).windows.balance.text, '0')
   rejected = true
-  await assert.rejects(queryCodingPlan('workbuddy', key, 'en', text), e => e.soft && e.message === 'workbuddyConnectCreditsFailed')
+  if (routes.has('/plugins/dsh-connect-workbuddy/account-credits')) assert.equal((await queryCodingPlan('workbuddy', key, 'en', text)).workbuddy.unknownCount, 1)
+  else await assert.rejects(queryCodingPlan('workbuddy', key, 'en', text), e => e.soft && e.message === 'workbuddyConnectCreditsFailed')
   assert.deepEqual(measured, ['cn', 'global', 'global', 'global'])
   assert.ok(requests.every(row => row.method === 'GET' && row.authorization === undefined))
-  assert.ok(requests.every(row => /\/(status|usage)(\?|$)/.test(row.path)), 'never invoke mutation, model-probe or account-pool routes')
-  console.log('[ok] published dsh-connect-workbuddy ' + pkg.version + ': actual CN/global usage routes, selected-account credits, expiry, zero, failure and no credential forwarding')
+  assert.ok(requests.every(row => /\/(status|usage|account-credits)(\?|$)/.test(row.path)), 'never invoke mutation, model-probe or account-pool routes')
+  console.log('[ok] published dsh-connect-workbuddy ' + pkg.version + ': actual CN/global account or usage routes, selected-account credits, zero, failure and no credential forwarding')
 } finally {
   globalThis.fetch = originalFetch
   if (server) { server.closeAllConnections(); await new Promise(done => server.close(done)) }

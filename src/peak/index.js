@@ -3,6 +3,7 @@ window.__ModuleLoader__.load({
   id: 'dsh-cost-meter', chunk: 'client.peak.js',
   factory: require => {
     const React = require('react')
+    const { createPortal } = require('react-dom')
     const { createElement: el, useState, useEffect, useRef, Fragment } = React
     const css = 'PEAK_STYLE_SOURCE'
     const SEEN_KEY = 'dsh-cost-meter:peak-progress-intro-v1'
@@ -59,20 +60,23 @@ window.__ModuleLoader__.load({
         if (!show) return null
         const dismiss = () => {
           remember(seenKey); setClosed(true)
-          Promise.resolve().then(() => api.updateConfig({ [summary ? 'sidebarSummaryPromptSeen' : 'peakProgressPromptSeen']: true })).catch(() => {})
+          const key = summary ? 'sidebarSummaryPromptSeen' : 'peakProgressPromptSeen'
+          if (Object.hasOwn(config, key)) Promise.resolve().then(() => api.updateConfig({ [key]: true })).catch(() => {})
         }
         const choose = async () => {
           if (pending.current) return
           pending.current = true; setBusy(true); setError(false)
           try {
-            const saved = await api.updateConfig({ peakStyle: 'progress', peakTimeDisplay: mode, peakProgressPromptSeen: true, ...(summary ? { sidebarSummaryPromptSeen: true, sidebarSimplePromptSeen: true, sidebarSimple: false, sidebarStyle: 'summary', sidebarTodayMetric: 'both', sidebarOrder: ['today', 'balance', 'peak', ...(config.sidebarOrder ?? []).filter(key => !['today', 'balance', 'peak'].includes(key))] } : {}) })
+            const saved = await api.updateConfig({ peakStyle: 'progress', peakTimeDisplay: mode, peakProgressPromptSeen: true, ...(summary ? { ...(Object.hasOwn(config, 'sidebarSummaryPromptSeen') ? { sidebarSummaryPromptSeen: true } : {}), sidebarSimplePromptSeen: true, sidebarSimple: false, sidebarStyle: 'summary', sidebarTodayMetric: 'both', ...(Object.hasOwn(config, 'sidebarOrder') ? { sidebarOrder: ['today', 'balance', 'peak', ...(config.sidebarOrder ?? []).filter(key => !['today', 'balance', 'peak'].includes(key))] } : {}) } : {}) })
             if (saved?.config?.peakStyle !== 'progress' || saved.config.peakTimeDisplay !== mode || summary && saved.config.sidebarStyle !== 'summary') throw new Error('save failed')
             remember(seenKey); setClosed(true)
           } catch { setError(true) }
           finally { pending.current = false; setBusy(false) }
         }
         const preview = { ...config, peakEnabled: true, peakNotice: true, peakEffectiveAt: '', peakTimeDisplay: mode }
-        return el('dialog', { ref: dialog, role: 'dialog', className: 'cm-stat-dialog cm-peak-intro', 'aria-label': title, onKeyDown: event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismiss() } }, onCancel: event => { event.preventDefault(); dismiss() } },
+        // The sidebar slot establishes a stacking context below the composer.
+        // A non-modal dialog must escape that ancestor without making DSH inert.
+        return createPortal(el('dialog', { ref: dialog, role: 'dialog', className: 'cm-stat-dialog cm-peak-intro', 'aria-label': title, onKeyDown: event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismiss() } }, onCancel: event => { event.preventDefault(); dismiss() } },
           el('header', { className: 'cm-stat-dialog-head' }, el('strong', null, title),
             el('button', { type: 'button', className: 'cm-btn', 'aria-label': text('关闭', 'Close'), onClick: dismiss }, '×')),
           el('div', { className: 'cm-stat-dialog-body' },
@@ -88,7 +92,7 @@ window.__ModuleLoader__.load({
             error ? el('p', { className: 'cm-msg err', role: 'alert' }, text('保存失败，请重试；也可以先关闭预览。', 'Could not save. Retry or close the preview.')) : null,
             el('div', { className: 'cm-buttons' },
               el('button', { type: 'button', className: 'cm-btn', onClick: dismiss }, text('保留原样', 'Keep current style')),
-              el('button', { type: 'button', className: 'cm-btn primary', disabled: busy, onClick: choose }, busy ? text('正在保存…', 'Saving…') : summary ? text('使用合并卡片', 'Use combined card') : text('使用进度条', 'Use progress bar')))))
+              el('button', { type: 'button', className: 'cm-btn primary', disabled: busy, onClick: choose }, busy ? text('正在保存…', 'Saving…') : summary ? text('使用合并卡片', 'Use combined card') : text('使用进度条', 'Use progress bar'))))), document.body)
       }
       return props => el(props.view === 'alert' ? PeakAlert : props.view === 'guide' || props.view === 'summary-guide' ? PeakProgressGuide : PeakProgress, { ...props, summary: props.view === 'summary-guide' })
     }
