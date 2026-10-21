@@ -23,6 +23,8 @@
 - 套餐设置按需加载，主界面代码减少约 7 KB，为新增界面留出空间。
 - 本轮费用、费用分项和逐次调用金额遵循“小数位数”设置，不再强制显示至少 8 位；单价保留核算精度，修改显示精度不会重算账本。
 
+微小金额仍保留必要精度，避免把搜索等实际费用显示成零。
+
 感谢：[@picklerick422](https://github.com/picklerick422) 在 [#371](https://github.com/Han-1413141/dsh-cost-meter/issues/371) 提供弹窗层级定位与 Portal 建议；[@hua0424](https://github.com/hua0424) 在 [#372](https://github.com/Han-1413141/dsh-cost-meter/issues/372) 报告升级后的未知配置项和显示开关问题；[@paperclip476-sys](https://github.com/paperclip476-sys) 在 [#373](https://github.com/Han-1413141/dsh-cost-meter/issues/373) 提供旧配置的最小复现和默认值补齐建议。
 
 感谢 [@mzjqwq](https://github.com/mzjqwq) 在 [#374](https://github.com/Han-1413141/dsh-cost-meter/issues/374) 报告会话金额不遵循小数位数设置的问题。
@@ -48,3 +50,5 @@ Fill missing settings before validating legacy configurations, without accepting
 Fully exit and restart DSH after updating so both client and host load the same version. Reporter credits and original reports are linked above.
 
 Turn totals, cost breakdowns and individual call amounts now follow the decimal-place setting instead of forcing at least eight places. Unit prices retain calculation precision; changing display precision does not recalculate the ledger.
+
+Tiny charges retain extra precision so small search costs do not appear as zero.

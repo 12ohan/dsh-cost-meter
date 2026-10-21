@@ -1628,7 +1628,13 @@
       if (!config || config.hideTurnCost || start == null || end == null) return null
       const en = resolveLocale(config) === 'en'
       const names = en ? { input: 'Input', output: 'Output', cacheRead: 'Cache read', cacheWrite: 'Cache write', reasoning: 'Reasoning' } : { input: '输入', output: '输出', cacheRead: '缓存读取', cacheWrite: '缓存写入', reasoning: '推理' }
-      const money = n => formatMoneyUsd(n, config)
+      const money = n => {
+        const rate = Number(config.exchangeRate), value = n * (Number.isFinite(rate) && rate > 0 ? rate : 1)
+        const decimals = config.decimals ?? 2
+        // Preserve the existing tiny-charge visibility without forcing ordinary
+        // amounts to eight decimals. The shared formatter already adds two places.
+        return formatMoneyUsd(n, value > 0 && value < 10 ** -(decimals + 2) ? { ...config, decimals: Math.max(8, decimals) } : config)
+      }
       const unitPrice = n => formatMoneyUsd(n, { ...config, decimals: Math.max(8, config.decimals ?? 2) })
       const kinds = en ? { model: 'Model call', compaction: 'Context compaction', search: 'Native search', fetch: 'Web fetch' } : { model: '模型调用', compaction: '上下文压缩', search: '原生搜索', fetch: '网页抓取' }
       const rowView = (row, i) => el('div', { key: i, style: { marginBottom: 4, overflowWrap: 'anywhere' } },
