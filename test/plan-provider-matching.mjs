@@ -76,7 +76,7 @@ function assertBilling(provider, model, cfg, expected) {
   assert.equal(ui.billingClassOfLocal(provider, model, cfg), expected, 'client: ' + provider)
 }
 const workbuddyConfig = sanitizeConfig({ codingPlans: { workbuddy: { enabled: true } } })
-for (const provider of ['workbuddy', 'workbuddy-subscription', 'workbuddy-ai', 'llm-workbuddy-ai', ' WorkBuddy-AI ']) {
+for (const provider of ['workbuddy', 'workbuddy-subscription', 'workbuddy-ai', 'llm-workbuddy-ai', ' WorkBuddy-AI ', 'workbuddy-global', 'llm-workbuddy-global']) {
   assert.equal(planProviderIdOf(provider, workbuddyConfig.planBilling, workbuddyModel), 'workbuddy')
   assert.equal(ui.planProviderIdOfLocal(provider, workbuddyConfig, workbuddyModel), 'workbuddy')
   assertBilling(provider, workbuddyModel, workbuddyConfig, 'plan')

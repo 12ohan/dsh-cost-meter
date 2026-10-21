@@ -1142,7 +1142,7 @@
       kimi: ['kimi', 'kimi-code'],
       commandcode: ['commandcode', 'command-code'],
       clinepass: ['clinepass', 'cline-pass'],
-      workbuddy: ['workbuddy', 'workbuddy-subscription', 'workbuddy-ai'],
+      workbuddy: ['workbuddy', 'workbuddy-subscription', 'workbuddy-ai', 'workbuddy-global'],
       antigravity: ['antigravity'],
       stepfun: ['stepfun', 'step-code'],
       'volcengine-agent': ['volcengine-agent', 'ark-agent-plan', 'volcengine-agent-plan'],

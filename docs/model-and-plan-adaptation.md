@@ -135,7 +135,7 @@
 |---|---|---|
 | anthropic / zai / minimax / commandcode / clinepass / scnet / volcengine | 启用额度查询 → plan | 窗口百分比制订阅 |
 | kimi | 启用额度查询 → plan | 订阅窗口;PAYG 余额场景请把对应模型覆盖为 api |
-| workbuddy / workbuddy-ai | 启用 WorkBuddy 积分查询 → plan | 国内版、国际版沿用 workbuddy 套餐配置；也可显式设置 providers.workbuddy=plan |
+| workbuddy / workbuddy-ai / workbuddy-global | 启用 WorkBuddy 积分查询 → plan | 两种 WorkBuddy 连接插件的国内版、国际版沿用 workbuddy 套餐配置；也可显式设置 providers.workbuddy=plan |
 | openrouter / siliconflow | api | credits/余额为真实扣费 |
 | OpenCode Go(zen/opencode 路由)| 启用 Go 额度 → plan | Go 订阅包含模型;Zen 按量用户请覆盖为 api |
 | Codex(ChatGPT 订阅)| api(手动标记)| 无 API-Key 化额度端点,可在设置中按 provider:model 标记为 plan |

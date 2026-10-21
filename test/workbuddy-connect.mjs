@@ -6,9 +6,13 @@ import { queryCodingPlan } from '../lib/coding-plans.js'
 const encrypted = JSON.stringify({ auth: { accessToken: { $wbEncrypted: 1, ciphertext: 'synthetic' } } })
 const requestLog = []
 let status = { status: 'signed-in', credits: { total: 1011, accounts: [] }, probeKey: 'DO_NOT_COPY', nickname: 'DO_NOT_COPY' }
-let httpStatus = 200, html = false, aiStatus = null
+let httpStatus = 200, html = false, aiStatus = null, connectRoutes = null
 const server = createServer((req, res) => {
   requestLog.push({ path: req.url, method: req.method, authorization: req.headers.authorization })
+  if (connectRoutes) {
+    const body = connectRoutes.get(req.url)
+    res.writeHead(body ? 200 : 404, { 'content-type': 'application/json' }); res.end(JSON.stringify(body ?? {})); return
+  }
   if (req.url.endsWith('/ai/status') && aiStatus) { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(aiStatus)); return }
   res.writeHead(httpStatus, { 'content-type': html ? 'text/html' : 'application/json', ...(httpStatus === 302 ? { location: '/must-not-follow' } : {}) })
   res.end(html ? '<!doctype html>' : JSON.stringify(status))
@@ -52,5 +56,33 @@ try {
   }
   const controller = new AbortController(); controller.abort()
   await assert.rejects(fetchWorkBuddyConnectCredits(hostOrigin, { signal: controller.signal }), e => e.name === 'AbortError')
+  const cn = '/plugins/dsh-connect-workbuddy/usage?region=cn', global = '/plugins/dsh-connect-workbuddy/usage?region=global'
+  connectRoutes = new Map([[cn, { status: 'signed-in', enabled: true, region: 'cn', credits: { total: 0, packages: [], expiringSoon: 0 }, accountId: 'DO_NOT_COPY', pool: { total: 999 } }]])
+  requestLog.length = 0
+  const zero = await queryCodingPlan('workbuddy', key, 'en', t)
+  assert.equal(zero.windows.balance.text, '0', 'use selected account total, including zero, rather than unrelated pool fields')
+  assert.equal(JSON.stringify(zero).includes('DO_NOT_COPY'), false)
+  assert.deepEqual(requestLog.map(row => row.path), ['/plugins/dsh-workbuddy-connect/status', '/plugins/dsh-workbuddy-connect/ai/status', cn])
+  assert.ok(requestLog.every(row => row.method === 'GET' && row.authorization === undefined))
+  connectRoutes.set(cn, { status: 'signed-out', accounts: [], selectionExplicit: false })
+  connectRoutes.set(global, { status: 'signed-in', region: 'global', credits: { total: 700, nearestExpiryMs: Date.parse('2030-01-01T00:00:00Z') } })
+  const international = await queryCodingPlan('workbuddy', key, 'en', t)
+  assert.equal(international.windows.balance.text, '700')
+  assert.equal(international.windows.cycleReset.resetsAt, '2030-01-01T00:00:00.000Z')
+  connectRoutes.set(cn, { status: 'signed-in', enabled: false, credits: { total: 900 } })
+  assert.equal((await queryCodingPlan('workbuddy', key, 'en', t)).windows.balance.text, '700', 'skip a disabled region')
+  connectRoutes.set('/plugins/dsh-workbuddy-connect/status', { status: 'signed-out', reasonCode: 'encrypted-credential-unreadable' })
+  assert.equal((await queryCodingPlan('workbuddy', key, 'en', t)).windows.balance.text, '700', 'an unavailable old connector cannot mask the other connector')
+  connectRoutes.delete('/plugins/dsh-workbuddy-connect/status'); connectRoutes.delete(global)
+  for (const credits of [undefined, { total: null }, { total: -1 }, { total: '1' }, { total: Infinity }]) {
+    connectRoutes.set(cn, { status: 'signed-in', credits, creditsError: 'SECRET_UPSTREAM_ERROR' })
+    await assert.rejects(queryCodingPlan('workbuddy', key, 'en', t), e => e.soft && e.message === 'workbuddyConnectCreditsFailed')
+  }
+  connectRoutes.set(cn, { status: 'signed-in', credentialRejected: true, credits: { total: 300 } })
+  await assert.rejects(queryCodingPlan('workbuddy', key, 'en', t), e => e.soft && e.message === 'workbuddyConnectLoginFailed')
+  connectRoutes.set(cn, { status: 'signed-out', selectionLost: true, accounts: [{}] })
+  await assert.rejects(queryCodingPlan('workbuddy', key, 'en', t), e => e.soft && e.message === 'workbuddyConnectLoginFailed')
+  connectRoutes.set(cn, { status: 'signed-out', accounts: [], selectionExplicit: false })
+  await assert.rejects(queryCodingPlan('workbuddy', key, 'en', t), e => e.soft && e.message === 'workbuddyNotInstalled')
   console.log('[ok] WorkBuddy connector: real loopback HTTP, encrypted-file fallback, CN/global, finite/zero/unlimited credits, sign-out authority, no credential/control-key forwarding, redirects and cancellation')
 } finally { server.closeAllConnections(); await new Promise(done => server.close(done)) }

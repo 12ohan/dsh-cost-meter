@@ -11,7 +11,7 @@ import { javascriptLiteral as literal } from '../scripts/javascript-literal.mjs'
 
 const req = createRequire(resolve(process.env.DSH_TEST_UI_MODULES ?? '.tmp-context-host/node_modules', '__wb.cjs'))
 const { chromium } = req('playwright-core')
-const missing = 'WorkBuddy 的登录文件已加密。请在当前 DSH 中安装并启用匹配内核版本的 dsh-workbuddy-connect，然后刷新积分。'
+const missing = 'WorkBuddy 的登录文件已加密。请在当前 DSH 中启用 dsh-workbuddy-connect 或 dsh-connect-workbuddy，然后刷新积分。'
 const initial = { config: sanitizeConfig({ locale: 'zh', codingPlans: { workbuddy: { enabled: true, display: 'both' } } }), codingPlans: { workbuddy: { status: 'off', message: missing, windows: {} } } }
 const source = readdirSync('src/client').filter(n => n.endsWith('.js')).sort().map(n => readFileSync('src/client/' + n, 'utf8')).join('')
   .replace('exports.apply = apply', 'exports.test = { PlanQuotaCard, makeT, css }; exports.apply = apply')
@@ -30,7 +30,7 @@ const server = createServer(async (req, res) => {
   if (req.url.startsWith('/plugins/')) {
     queries++
     res.setHeader('content-type', 'application/json')
-    if (!connected) { res.writeHead(404); res.end('{}'); return }
+    if (!connected || req.url !== '/plugins/dsh-connect-workbuddy/usage?region=cn') { res.writeHead(404); res.end('{}'); return }
     res.end(JSON.stringify({ status: 'signed-in', credits: { total: 1011, accounts: [] } })); return
   }
   if (req.url === '/refresh') {
@@ -64,7 +64,7 @@ try {
   await card.getByText('1,011', { exact: true }).waitFor()
   assert.equal(await card.getByText(missing, { exact: true }).count(), 0)
   assert.equal(await card.locator('input[type=password]').count(), 0, 'no credential copy/paste requested')
-  assert.equal(queries, 3, 'two absent routes then one connected CN query')
+  assert.equal(queries, 7, 'four absent routes, then old connector misses and the new CN usage route')
   await page.screenshot({ path: '.tmp-workbuddy-settings/connected-balance.png' })
   assert.deepEqual(errors, [])
   console.log('[ok] WorkBuddy enabled/collapsed settings card: real click + HTTP refresh, one encrypted error, connector recovery, visible 1,011 credits')

@@ -127,7 +127,7 @@ The ledger records both the total equivalent cost (cost) and the real-money port
 |---|---|---|
 | anthropic / zai / minimax / commandcode / clinepass / scnet / volcengine | plan while enabled | percent-based subscription windows |
 | kimi | plan while enabled | subscription windows; override models to api for PAYG balance scenarios |
-| workbuddy / workbuddy-ai | plan while WorkBuddy credits query is enabled | Domestic and international routes share the workbuddy family configuration; providers.workbuddy=plan also works explicitly |
+| workbuddy / workbuddy-ai / workbuddy-global | plan while WorkBuddy credits query is enabled | Domestic and international routes from both WorkBuddy connectors share the workbuddy family configuration; providers.workbuddy=plan also works explicitly |
 | openrouter / siliconflow | api | credits/balance are real money |
 | OpenCode Go (zen/opencode routes) | plan while Go enabled | Go-subscription models; Zen PAYG users should override to api |
 | Codex (ChatGPT subscription) | api (manual) | no API-key quota endpoint; mark provider:model as plan in settings |

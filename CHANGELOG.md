@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.9.24] - 2026-10-21
+
+- WorkBuddy 积分新增兼容 `dsh-connect-workbuddy`，读取当前 DSH 的国内、国际版 usage 接口，显示已选账号的积分及最近到期时间；保留 `dsh-workbuddy-connect` 兼容。
+- 跳过未登录或已关闭的区域，积分为零正常显示；登录被拒绝、账号选择失效或积分查询失败时显示错误，不误报为零，也不回退到其他账号的旧凭据。
+- 国际渠道 `workbuddy-global` 沿用 WorkBuddy 套餐分类，升级时修正历史 API 归属，保留原金额、各币种记录、Token 和调用数。
+
+- Read selected-account credits and nearest expiry from dsh-connect-workbuddy's CN/global usage routes while retaining dsh-workbuddy-connect support.
+- Skip signed-out or disabled regions, preserve valid zero balances, and report rejected credentials, lost selections or unavailable credits without stale credential fallback.
+- Classify workbuddy-global under the WorkBuddy Plan family and correct historical API attribution without changing recorded amounts, currencies, tokens or calls.
+
+[更新说明 / Release notes](docs/update-notes-1.9.24.md)
+
 ## [1.9.23] - 2026-10-21
 
 - 智能体团队的主代理窗口自动汇总团队成员及其子代理的费用、Token 和调用明细，保留逐代理明细；父子会话仍分别入账，普通分叉会话不归并。
