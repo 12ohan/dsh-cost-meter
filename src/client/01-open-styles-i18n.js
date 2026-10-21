@@ -348,7 +348,7 @@ window.__ModuleLoader__.load({
       '.cm-footer-stack .cm-foot{width:100%;box-sizing:border-box}.cm-footer-stack .cm-foot:not(.cm-foot-rail){justify-content:space-between}.cm-model-costs .cm-collapse-h{width:100%}.cm-model-costs .cm-collapse-h>.cm-bal-amt{margin-left:auto}',
       '.cm-footer-stack.compact .cm-bbox{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:12px;row-gap:2px;align-items:center}',
       '.cm-footer-stack.compact .cm-bbox>*{grid-column:1/-1}',
-      '.cm-footer-stack.compact .cm-bbox>.cm-mm-row{grid-column:auto}',
+      '.cm-footer-stack.compact .cm-bbox>.cm-mm-row:not(.cm-mm-title){grid-column:auto}',
       '.cm-footer-stack.compact .cm-mm-row{min-width:0;gap:4px;flex-wrap:nowrap}',
       '.cm-footer-stack.compact .cm-mm-row .cm-bbox-label{flex:0 1 auto;min-width:0;max-width:45%;width:auto}',
       '.cm-footer-stack.compact .cm-mm-row .cm-bbox-bar{min-width:0;flex:1 1 0}',

@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- 修复独立复现的 WorkBuddy 紧凑侧栏标题只占半行、余额无法靠右及被截断的问题，标题保持横跨整张卡片。[@SternChiri](https://github.com/SternChiri) 的 [#377](https://github.com/Han-1413141/dsh-cost-meter/issues/377) 反馈触发了排查；报告者随后撤回了原有“文字左对齐”定位，本修复依据实际浏览器中的标题宽度与余额位置验证。
+- Keep the WorkBuddy heading across both compact sidebar columns so its balance reaches the card's right edge.
+
 ## [1.9.26] - 2026-10-21
 
 - 修复 OpenDesign 的 5 小时与每周额度标签颠倒：按接口窗口时长识别，18,000 秒对应 5h，604,800 秒对应每周，额度百分比与重置时间保持配对。覆盖侧栏、设置页和输入区额度条。
