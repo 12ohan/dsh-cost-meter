@@ -21,8 +21,11 @@
 - 前端遇到升级后仍在运行的旧宿主时，不再凭空添加 `sidebarOrder`、`sidebarSummaryPromptSeen` 后提交给旧接口；合并卡片和其他显示设置可独立保存。更新后仍建议完全退出并重启 DSH，让前后端都加载同一版本。
 - 峰谷进度和合并侧栏引导挂到页面顶层，保留非模态行为。解决被侧栏层级限制、被会话区遮住而无法点击的问题；宿主页面继续可操作。
 - 套餐设置按需加载，主界面代码减少约 7 KB，为新增界面留出空间。
+- 本轮费用、费用分项和逐次调用金额遵循“小数位数”设置，不再强制显示至少 8 位；单价保留核算精度，修改显示精度不会重算账本。
 
 感谢：[@picklerick422](https://github.com/picklerick422) 在 [#371](https://github.com/Han-1413141/dsh-cost-meter/issues/371) 提供弹窗层级定位与 Portal 建议；[@hua0424](https://github.com/hua0424) 在 [#372](https://github.com/Han-1413141/dsh-cost-meter/issues/372) 报告升级后的未知配置项和显示开关问题；[@paperclip476-sys](https://github.com/paperclip476-sys) 在 [#373](https://github.com/Han-1413141/dsh-cost-meter/issues/373) 提供旧配置的最小复现和默认值补齐建议。
+
+感谢 [@mzjqwq](https://github.com/mzjqwq) 在 [#374](https://github.com/Han-1413141/dsh-cost-meter/issues/374) 报告会话金额不遵循小数位数设置的问题。
 
 ## English
 
@@ -43,3 +46,5 @@ The published dsh-connect-workbuddy 4.14.1 routes were exercised with synthetic 
 Fill missing settings before validating legacy configurations, without accepting explicit invalid values or repopulating historical prices. Avoid sending unsupported sidebar keys to older running hosts. Mount both update notices directly under the document body so the sidebar stacking context cannot trap them behind the composer, while keeping the host interactive. Load subscription settings on demand to reduce the main client bundle.
 
 Fully exit and restart DSH after updating so both client and host load the same version. Reporter credits and original reports are linked above.
+
+Turn totals, cost breakdowns and individual call amounts now follow the decimal-place setting instead of forcing at least eight places. Unit prices retain calculation precision; changing display precision does not recalculate the ledger.

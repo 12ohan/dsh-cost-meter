@@ -10,7 +10,7 @@ import { stateSchema } from '../lib/typert.host.js'
 // 执行真实组件和事件回调，再经过服务端清洗与客户端读取；不向发布产物暴露接口。
 const dir = new URL('../src/client/', import.meta.url)
 const source = readdirSync(dir).filter(name => name.endsWith('.js')).sort().map(name => readFileSync(new URL(name, dir), 'utf8')).join('')
-const code = source.replace('exports.apply = apply', 'exports.test = { PlanQuotaCard, CostSection, parseConfig, makeT, codingPlanWindowLabel, useQuotaRefresh, miniMaxWindowsOf, MiniMaxPlanCard, barDirectionOf, quotaWindowRow, numInput, CredentialField, QuotaCard, resolveLocale, formatMoneyUsd }; exports.apply = apply')
+const code = source.replace('exports.apply = apply', 'exports.test = { TurnCost, PlanQuotaCard, CostSection, parseConfig, makeT, codingPlanWindowLabel, useQuotaRefresh, miniMaxWindowsOf, MiniMaxPlanCard, barDirectionOf, quotaWindowRow, numInput, CredentialField, QuotaCard, resolveLocale, formatMoneyUsd }; exports.apply = apply')
 let active, pricing, display
 const react = {
   Component: class {},
@@ -85,6 +85,22 @@ const textOf = tree => typeof tree === 'string' ? tree : (tree?.children ?? []).
 const button = (tree, label) => nodes(tree).find(node => node.type === 'button' && textOf(node) === label)
 const rowFor = (tree, model) => nodes(tree).find(node => node.props.className === 'cm-match-row' && textOf(node).includes(model))
 const roundTrip = config => ui.parseConfig(sanitizeConfig(config), 'config')
+{
+  let config = roundTrip({ locale: 'zh', currency: 'USD', symbol: '$', exchangeRate: 1, decimals: 2 }), reads = 0
+  const row = { provider: 'test', model: 'm', bucket: 'input', tokens: 100000000, rate: .12345678, cost: 12.345678, priced: true }
+  const value = { found: true, cost: row.cost, apiCost: row.cost, rows: [row], calls: [{ ...row, kind: 'model', atMs: 1, rows: [row] }] }
+  const render = renderer(ui.TurnCost, () => ({ useCost: () => ({ state: { config } }), sessionId: 'synthetic', turn: { start: { seq: 1 }, end: { seq: 3 } },
+    api: { getTurnCost: async () => { reads++; return value } } }))
+  render(); await Promise.resolve()
+  let tree = render()
+  assert.ok(textOf(tree.children[0]).includes('$12.35'), '#374 turn summary respects two decimal places')
+  assert.ok(textOf(tree).includes('× $0.12345678'), 'unit prices retain calculation precision')
+  assert.ok(!textOf(tree).includes('$12.345678'), 'amounts in rows and individual calls also follow the setting')
+  config = { ...config, decimals: 4 }
+  tree = render()
+  assert.ok(textOf(tree.children[0]).includes('$12.3457'))
+  assert.equal(reads, 1, 'changing display precision does not recompute the bill')
+}
 {
  const key = 'channel:model', custom = { cacheMiss: 2, cacheHit: .1, output: 8, currency: 'CNY', multiplier: .8, separateMultipliers: true, multipliers: { 'base.output': .5 } }
  const config = roundTrip(stateSchema.shape.config.parse(sanitizeConfig({ prices: { custom: { [key]: custom } }, priceOverrides: { [key]: '__custom__' } })))
