@@ -1,6 +1,6 @@
     function ModelSidebarSettings({ draft, setDraft, t, visibilityControl = true, numInput }) {
       const cfg = { enabled: false, period: 'today', topN: 5, summary: 'total', position: 'last', defaultOpen: false, remember: true, tokens: false, shares: true, refreshSeconds: 60, dock: false, ...draft?.sidebarModels }
-      const set = (key, value) => { if (draft) setDraft({ ...draft, ...(key === 'position' ? { sidebarOrder: [] } : {}), sidebarModels: { ...cfg, [key]: value } }) }
+      const set = (key, value) => { if (draft) setDraft({ ...draft, ...(key === 'position' && Object.hasOwn(draft, 'sidebarOrder') ? { sidebarOrder: [] } : {}), sidebarModels: { ...cfg, [key]: value } }) }
       const select = (key, choices) => el('div', { className: 'cm-field', key, 'data-model-field': key }, el('label', null, t('models_' + key)), el('select', { className: 'cm-input', value: cfg[key], onChange: e => set(key, e.target.value) }, choices.map(([value, label]) => el('option', { key: value, value }, t(label)))))
       return el('div', { className: 'cm-grid' },
         visibilityControl ? el('div', { className: 'cm-grid-group' }, t('modelsTitle')) : null,
@@ -143,7 +143,7 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
       ...[['summary', text('合并卡片', 'Combined card')], ['simple', text('简洁', 'Simple')], ['standard', text('标准', 'Standard')], ['compact', text('紧凑', 'Compact')]].map(([value, label]) =>
         el('div', { key: value, role: 'button', tabIndex: 0, 'aria-pressed': mode === value,
           onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.currentTarget.click() } },
-          onClick: () => set({ sidebarSimple: value === 'simple', sidebarSimplePromptSeen: true, ...(value === 'simple' ? {} : { sidebarStyle: value }), ...(value === 'summary' ? { sidebarSummaryPromptSeen: true, sidebarTodayMetric: 'both', peakStyle: 'progress', sidebarOrder: ['today', 'balance', 'peak', ...(config.sidebarOrder ?? []).filter(key => !['today', 'balance', 'peak'].includes(key))] } : {}) }) },
+          onClick: () => set({ sidebarSimple: value === 'simple', sidebarSimplePromptSeen: true, ...(value === 'simple' ? {} : { sidebarStyle: value }), ...(value === 'summary' ? { ...(Object.hasOwn(config, 'sidebarSummaryPromptSeen') ? { sidebarSummaryPromptSeen: true } : {}), sidebarTodayMetric: 'both', peakStyle: 'progress', ...(Object.hasOwn(config, 'sidebarOrder') ? { sidebarOrder: ['today', 'balance', 'peak', ...(config.sidebarOrder ?? []).filter(key => !['today', 'balance', 'peak'].includes(key))] } : {}) } : {}) }) },
           el(SidebarStyleSample, { render: props.renderStyleSample, config: previewData.config, data: previewData.state, examples, mode: value }), el('span', { className: 'cm-style-caption' }, label)))) : null,
     el(DisplayInspector, { props, config, set, selected: 'general', text, general: true }))
 }

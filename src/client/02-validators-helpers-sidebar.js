@@ -143,7 +143,7 @@
         modelStatistics: v.modelStatistics ?? {},
         ...mapFields(v, ['hideSessionCostHeader', 'hideSessionCostDock', 'hideTurnCost', 'followSkinTransparency', 'sidebarTodayBalanceInline', 'sessionListCosts', 'hideBudget', 'sessionCostCompact', 'contextCostsEnabled', 'contextCostsPromptSeen', 'showTotalWithPlan', 'sidebarSimple', 'sidebarSimplePromptSeen', 'codexQuotaEnabled', 'codexCompatPromptDismissed', 'includeSubagentCost', 'peakEnabled', 'peakAlertWebNotify', 'peakProgressPromptSeen'], value => value === true),
         sidebarTodayMetric: ['tokens', 'both'].includes(v.sidebarTodayMetric) ? v.sidebarTodayMetric : 'cost',
-        sidebarOrder: Array.isArray(v.sidebarOrder) ? v.sidebarOrder : [],
+        ...(Object.hasOwn(v, 'sidebarOrder') ? { sidebarOrder: Array.isArray(v.sidebarOrder) ? v.sidebarOrder : [] } : {}),
         statisticsBasis: v.statisticsBasis,
         sidebarModels: Object.fromEntries(Object.entries(MODEL_SIDEBAR_DEFAULTS).map(([k, v0]) => [k, v.sidebarModels?.[k] ?? v0])),
         codexQuotaSidebar: v.codexQuotaSidebar !== false,
@@ -153,7 +153,7 @@
         // 直通白名单缺失会导致关闭后重开页面又弹提示,或应用后状态行回落「未应用」。
         codexCompatHistoryAppliedAt: num0(v.codexCompatHistoryAppliedAt),
         sidebarStyle: oneOf(v.sidebarStyle, ['standard', 'compact', 'summary'], 'standard'),
-        sidebarSummaryPromptSeen: v.sidebarSummaryPromptSeen === true,
+        ...(Object.hasOwn(v, 'sidebarSummaryPromptSeen') ? { sidebarSummaryPromptSeen: v.sidebarSummaryPromptSeen === true } : {}),
         billionContextNoticeEnabled: v.billionContextNoticeEnabled !== false,
         billionContextNoticesSeen: Array.isArray(v.billionContextNoticesSeen) ? v.billionContextNoticesSeen.filter(value => typeof value === 'string').slice(-32) : [],
         priceMatchDismissed: Array.isArray(v.priceMatchDismissed) ? v.priceMatchDismissed.filter(key => typeof key === 'string') : [],
@@ -206,6 +206,7 @@
                 apiKey: typeof e.apiKey === 'string' ? e.apiKey : '',
                 ...(id === 'minimax' ? { baseUrl: typeof e.baseUrl === 'string' ? e.baseUrl : '' } : {}),
                 ...(id === 'factory' ? { orgId: typeof e.orgId === 'string' ? e.orgId : '', factoryPool: ['core', 'both'].includes(e.factoryPool) ? e.factoryPool : 'standard' } : {}),
+                ...(id === 'workbuddy' ? { accountScope: e.accountScope ?? 'current', accountIds: Array.isArray(e.accountIds) ? e.accountIds : [] } : {}),
                 ...(id === 'opendesign' ? { workspaceId: typeof e.workspaceId === 'string' ? e.workspaceId : '' } : {}),
                 ...(id === 'qwen' ? { quotaSource: ['cli', 'bailian'].includes(e.quotaSource) ? e.quotaSource : 'local' } : {}),
                 // SCNet / 千问本地计量字段(issue #26/#78):其余厂商无此键,缺省剔除。
@@ -1627,10 +1628,17 @@
       if (!config || config.hideTurnCost || start == null || end == null) return null
       const en = resolveLocale(config) === 'en'
       const names = en ? { input: 'Input', output: 'Output', cacheRead: 'Cache read', cacheWrite: 'Cache write', reasoning: 'Reasoning' } : { input: '输入', output: '输出', cacheRead: '缓存读取', cacheWrite: '缓存写入', reasoning: '推理' }
-      const money = n => formatMoneyUsd(n, { ...config, decimals: Math.max(8, config.decimals ?? 2) })
+      const money = n => {
+        const rate = Number(config.exchangeRate), value = n * (Number.isFinite(rate) && rate > 0 ? rate : 1)
+        const decimals = config.decimals ?? 2
+        // Preserve the existing tiny-charge visibility without forcing ordinary
+        // amounts to eight decimals. The shared formatter already adds two places.
+        return formatMoneyUsd(n, value > 0 && value < 10 ** -(decimals + 2) ? { ...config, decimals: Math.max(8, decimals) } : config)
+      }
+      const unitPrice = n => formatMoneyUsd(n, { ...config, decimals: Math.max(8, config.decimals ?? 2) })
       const kinds = en ? { model: 'Model call', compaction: 'Context compaction', search: 'Native search', fetch: 'Web fetch' } : { model: '模型调用', compaction: '上下文压缩', search: '原生搜索', fetch: '网页抓取' }
       const rowView = (row, i) => el('div', { key: i, style: { marginBottom: 4, overflowWrap: 'anywhere' } },
-        prettyProviderKey(row.provider + ':' + row.model) + ' · ' + (names[row.bucket] || (row.bucket === 'fetchRequests' ? (en ? 'Fetch requests' : '抓取请求') : (en ? 'Search requests' : '搜索请求'))) + (row.plan ? ' (Plan)' : '') + ': ' + (row.requests ? row.requests + (en ? ' requests' : ' 次') : row.tokens.toLocaleString()) + ' × ' + (row.priced ? money(row.rate) : '?') + (row.requests ? ' ≈ ' : ' / 1,000,000 ≈ ') + (row.priced ? money(row.cost) : '?'),
+        prettyProviderKey(row.provider + ':' + row.model) + ' · ' + (names[row.bucket] || (row.bucket === 'fetchRequests' ? (en ? 'Fetch requests' : '抓取请求') : (en ? 'Search requests' : '搜索请求'))) + (row.plan ? ' (Plan)' : '') + ': ' + (row.requests ? row.requests + (en ? ' requests' : ' 次') : row.tokens.toLocaleString()) + ' × ' + (row.priced ? unitPrice(row.rate) : '?') + (row.requests ? ' ≈ ' : ' / 1,000,000 ≈ ') + (row.priced ? money(row.cost) : '?'),
         !row.priced ? (en ? ' (price unavailable)' : '（未配置价格）') : row.bucket === 'reasoning' && row.rate === 0 ? (en ? ' (no separate charge)' : '（不单独收费）') : '')
       return el('details', { className: 'cm-note', style: { fontSize: 12, marginTop: 6 } },
         el('summary', { style: { cursor: 'pointer' }, title: en ? 'Log estimate at configured prices; session cost uses recorded ledger amounts.' : '本轮按日志和配置价格估算，本会话按账本已入账金额汇总。' }, en ? 'Turn cost' : '本轮费用', value?.found ? ' ≈ ' + money(displayCostOf(value, config)) + (value.rows.some(r => !r.priced) ? (en ? ' + unpriced usage' : ' + 未定价用量') : '') : value?.inherited ? (en ? ' · inherited history' : ' · 继承历史') : error ? ' ⚠' : ''),

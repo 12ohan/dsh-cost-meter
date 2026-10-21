@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.9.25] - 2026-10-21
+
+- WorkBuddy 新增当前账号、全部账号和勾选账号统计，显示剩余积分及今日、近 7 天、启用以来观测到的积分减少；保留全部调用的 API 等值费用。
+- 接入独立多账号接口，本地查询绕开全局网络代理；查询失败保留未知状态，旧接口保留单账号兼容，不把部分数据当作完整总额。
+- 修复旧配置缺少新字段导致保存失败，以及旧宿主不支持新增侧栏字段时的兼容问题。已有价格、历史金额和非法值校验保持有效。
+- 将峰谷与合并侧栏引导挂到页面顶层，保留非模态行为，修复被会话遮挡后无法点击的问题。
+- 修复本轮费用强制显示至少 8 位小数的问题，金额遵循显示设置，单价保留精度；感谢 @mzjqwq 的 #374 报告。
+- 感谢 @picklerick422（#371）、@hua0424（#372）和 @paperclip476-sys（#373）的报告、定位与复现，详细署名见更新说明。
+
+- Add WorkBuddy account selection and observed credit changes, with explicit unknown/partial results and separate API-equivalent values.
+- Fix legacy configuration saves and sidebar update notices hidden behind the composer. Load subscription settings on demand.
+
+[更新说明 / Release notes](docs/update-notes-1.9.25.md)
+
 ## [1.9.24] - 2026-10-21
 
 - WorkBuddy 积分新增兼容 `dsh-connect-workbuddy`，读取当前 DSH 的国内、国际版 usage 接口，显示已选账号的积分及最近到期时间；保留 `dsh-workbuddy-connect` 兼容。
