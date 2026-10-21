@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.9.23] - 2026-10-21
+
+- 智能体团队的主代理窗口自动汇总团队成员及其子代理的费用、Token 和调用明细，保留逐代理明细；父子会话仍分别入账，普通分叉会话不归并。
+- 价格配置按宿主当前供应商和模型目录过滤，已删除的渠道、模型不再残留在待定价列表；历史费用、保存的价格和统计设置保留，目录读取失败时沿用原列表。
+- 修复上下文洞察联动区固定显示 USD 的问题，跟随显示币种和当前显示汇率即时更新，并保留非缓存参考价说明。
+- 感谢 [@Theicecold](https://github.com/Theicecold) 在 [issue #367](https://github.com/Han-1413141/dsh-cost-meter/issues/367) 报告币种不一致并建议统一显示。
+
+- Include team members and their subagents in the lead's session costs, token totals and call details automatically, retaining per-agent records and separate ledger entries. Ordinary conversation forks stay separate.
+- Filter the pricing list against the host's current provider/model directory. Removed routes and models no longer remain in the unpriced list; keep historical costs, saved prices and preferences, and retain the previous list when directory metadata is unavailable.
+- Make the dsh-context integration follow the configured display currency and current display exchange rate, preserving the uncached reference-price explanation.
+
+[更新说明 / Release notes](docs/update-notes-1.9.23.md)
+
 ## [1.9.22] - 2026-10-20
 
 - 修复 WorkBuddy 国际版 `workbuddy-ai` 未沿用套餐分类的问题。启用 WorkBuddy 积分查询或显式选择 Plan 后，国际版调用的等值金额不再计入 API 支出，服务端账本与界面统计保持一致。
