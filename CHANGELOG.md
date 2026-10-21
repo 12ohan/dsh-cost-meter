@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- 修复 OpenDesign 的 5 小时与每周额度标签颠倒：按接口窗口时长识别，18,000 秒对应 5h，604,800 秒对应每周，额度百分比与重置时间保持配对。覆盖侧栏、设置页和输入区额度条。
+- Fix reversed OpenDesign 5-hour and weekly quota labels by mapping each API duration to its matching window, preserving the usage percentage and reset time together across quota displays.
+
 ## [1.9.25] - 2026-10-21
 
 - WorkBuddy 新增当前账号、全部账号和勾选账号统计，显示剩余积分及今日、近 7 天、启用以来观测到的积分减少；保留全部调用的 API 等值费用。

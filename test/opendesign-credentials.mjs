@@ -107,7 +107,7 @@ try {
   assert.equal(secrets.get(credentialName), first)
   await service.updateConfig({ codingPlans: { opendesign: { enabled: true, display: 'both', workspaceId: 'ws-first' } } })
   let state = publicState((await service.refreshCodingPlan('opendesign')).state)
-  assert.equal(state.windows.weekly.percent, 25)
+  assert.equal(state.windows.fiveHour.percent, 25)
   assert.equal(state.windows.balance.text, '$12.5000')
   let count = requests.length
   await Promise.all([service.getState(), service.getState(), service.getState()])
@@ -125,9 +125,9 @@ try {
       else assert.equal((await service.setCredential(target, second)).ok, true)
       assert.ok(old.signals.every(signal => signal.aborted), change + ' change cancels both old reads')
       state = publicState((await service.refreshCodingPlan('opendesign')).state)
-      assert.equal(state.windows.weekly.percent, 50)
+      assert.equal(state.windows.fiveHour.percent, 50)
     } finally { gate = null; old.release(); await inFlight }
-    assert.equal(publicState(await service.getState()).windows.weekly.percent, 50)
+    assert.equal(publicState(await service.getState()).windows.fiveHour.percent, 50)
   }
   preflightStatus = 401
   let refreshed = await service.refreshCodingPlan('opendesign')
@@ -138,7 +138,7 @@ try {
   assert.equal(refreshed.message, state.message, 'manual refresh reports the degraded side too')
   preflightStatus = 200; walletStatus = 403
   state = publicState((await service.refreshCodingPlan('opendesign')).state)
-  assert.equal(state.windows.weekly.percent, 50)
+  assert.equal(state.windows.fiveHour.percent, 50)
   assert.equal(state.windows.balance.text, '$12.5000')
   assert.match(state.message, /billing\/preflight/)
   assert.match(state.message, /Wallet endpoint:.*403/)
@@ -197,7 +197,7 @@ try {
     await service.updateConfig({ codingPlans: { opendesign: { enabled: true } } })
     state = publicState((await service.refreshCodingPlan('opendesign')).state)
     assert.equal(state.keyConfigured, true)
-    assert.equal(state.windows.weekly.percent, 50)
+    assert.equal(state.windows.fiveHour.percent, 50)
     assert.equal((await service.clearCredential(target)).ok, true)
     assert.equal(await runtimeCredentials.resolve(credentialName), undefined)
     await service.updateConfig({ codingPlans: { opendesign: { enabled: false } } })

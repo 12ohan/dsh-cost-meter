@@ -65,10 +65,10 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
 // 1. The parser unwraps `codingPlan` without changing any BigInt/window validation.
 {
   const parsed = parseOpenDesignUsage(preflightBody, workspaceId)
-  assert.equal(parsed.weekly.percent, 31.88)
-  assert.equal(parsed.fiveHour.percent, 10.626)
-  assert.equal(parsed.weekly.resetsAt, fiveHourReset)
-  assert.equal(parsed.fiveHour.resetsAt, weeklyReset)
+  assert.equal(parsed.fiveHour.percent, 31.88)
+  assert.equal(parsed.weekly.percent, 10.626)
+  assert.equal(parsed.fiveHour.resetsAt, fiveHourReset)
+  assert.equal(parsed.weekly.resetsAt, weeklyReset)
   assert.deepEqual(parseOpenDesignUsage({ ...preflightBody, codingPlan: { ...preflightBody.codingPlan, eligible: false, windows: [] } }, workspaceId), {},
     'an eligible:false codingPlan still means no subscription')
   assert.equal(parseOpenDesignUsage({ codingPlan: { eligible: true, windows } }, workspaceId), null,
@@ -83,10 +83,10 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
 {
   const { result, calls } = await run({ usage: rejected(401), preflight: json(preflightBody), wallet: json(wallet) })
   assert.equal(result.endpoint, preflightUrl)
-  assert.equal(result.windows.weekly.percent, 31.88)
-  assert.equal(result.windows.fiveHour.percent, 10.626)
-  assert.equal(result.windows.weekly.resetsAt, fiveHourReset)
-  assert.equal(result.windows.fiveHour.resetsAt, weeklyReset)
+  assert.equal(result.windows.fiveHour.percent, 31.88)
+  assert.equal(result.windows.weekly.percent, 10.626)
+  assert.equal(result.windows.fiveHour.resetsAt, fiveHourReset)
+  assert.equal(result.windows.weekly.resetsAt, weeklyReset)
   assert.equal(result.windows.balance.text, '$2.0000', 'a readable wallet stays authoritative over the preflight balance')
   assert.equal(Object.hasOwn(result, 'partial'), false, 'a successful preflight query is a normal, non-partial answer')
   assert.deepEqual(calls.slice().sort(), [preflightUrl, walletUrl].sort())
@@ -104,7 +104,7 @@ const weeklyReset = new Date('2026-10-20T00:00:00Z').toISOString()
   assert.equal(usageCalls, 0)
   assert.equal(preflightCalls, 1)
   assert.equal(result.endpoint, preflightUrl)
-  assert.equal(result.windows.weekly.percent, 31.88)
+  assert.equal(result.windows.fiveHour.percent, 31.88)
   assert.equal(result.windows.balance.text, '$2.0000')
   assert.equal(Object.hasOwn(result, 'partial'), false)
   assert.equal(calls.length, 2)
@@ -206,7 +206,7 @@ for (const locale of ['zh', 'en']) {
 {
   const { result } = await run({ usage: rejected(401), preflight: json(preflightBody), wallet: rejected(401) })
   assert.equal(result.endpoint, preflightUrl)
-  assert.equal(result.windows.weekly.percent, 31.88)
+  assert.equal(result.windows.fiveHour.percent, 31.88)
   assert.deepEqual(result.windows.balance, { text: '$1.5000', resetsAt: '' })
   assert.deepEqual(result.partial, { wallet: OPEN_DESIGN_QUOTA_FAILURES.unauthorized })
   const numeric = await run({ usage: rejected(401), preflight: json({ ...preflightBody, balanceUsd: 12.5 }), wallet: () => new Response('bad', { status: 500 }) })
@@ -245,7 +245,7 @@ for (const locale of ['zh', 'en']) {
     codingPlan: { eligible: true, tier: 'go', windows }, funding: 'wallet',
   }
   const { result } = await run({ usage: rejected(401), preflight: json(withoutWorkspace), wallet: json(wallet) })
-  assert.equal(result.windows.weekly.percent, 31.88)
+  assert.equal(result.windows.fiveHour.percent, 31.88)
   assert.equal(result.endpoint, preflightUrl)
   const wrong = await run({
     usage: rejected(401), preflight: json({ ...preflightBody, workspaceId: 'ws-other', codingPlan: { ...preflightBody.codingPlan, workspaceId: 'ws-other' } }), wallet: json(wallet),
@@ -267,7 +267,7 @@ for (const locale of ['zh', 'en']) {
     globalThis.fetch = transport({ usage: rejected(401), preflight: json(preflightBody), wallet: json(wallet) }).fetchImpl
     const routed = await queryCodingPlan('opendesign', key, 'en', message, { workspaceId, onAttempt: attempt => attempts.push(attempt) })
     assert.equal(routed.endpoint, preflightUrl)
-    assert.equal(routed.windows.weekly.percent, 31.88)
+    assert.equal(routed.windows.fiveHour.percent, 31.88)
     assert.equal(routed.windows.balance.text, '$2.0000')
     assert.equal(Object.hasOwn(routed, 'partial'), false)
     assert.equal(attempts.length, 0, 'a successful preflight query is not reported as a partial refresh')

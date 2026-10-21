@@ -60,8 +60,8 @@ const query = (routes, locale = 'en') => queryOpenDesignQuota(key, locale, messa
 // 2. usage 200 + wallet 401 -> no throw, quota windows kept, wallet failure recorded.
 {
   const result = await query({ usage: json(quota), wallet: rejected(401) })
-  assert.equal(result.windows.weekly.percent, 25)
-  assert.equal(result.windows.fiveHour.percent, 0)
+  assert.equal(result.windows.fiveHour.percent, 25)
+  assert.equal(result.windows.weekly.percent, 0)
   assert.equal(Object.hasOwn(result.windows, 'balance'), false, 'a failed wallet read is not fabricated as $0')
   assert.equal(result.endpoint, base + '/billing/preflight')
   assert.deepEqual(result.partial, { wallet: OPEN_DESIGN_QUOTA_FAILURES.unauthorized })
@@ -126,7 +126,7 @@ const query = (routes, locale = 'en') => queryOpenDesignQuota(key, locale, messa
 // 8. non-auth HTTP failure on the wallet endpoint -> quota windows preserved.
 {
   const result = await query({ usage: json(quota), wallet: () => new Response('upstream error', { status: 500 }) })
-  assert.equal(result.windows.fiveHour.percent, 0)
+  assert.equal(result.windows.weekly.percent, 0)
   assert.deepEqual(result.partial, { wallet: OPEN_DESIGN_QUOTA_FAILURES.http })
 }
 
