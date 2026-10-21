@@ -314,7 +314,7 @@ window.__ModuleLoader__.load({
         el('div', { className: 'cm-cost-legend' }, ...rows.map(row => el('button', { ...inspect(row), type: 'button', key: row.key, className: 'cm-cost-key', 'aria-label': row.label + ' ' + share(row) }, el('i', { className: 'cm-plan-dot', style: { background: row.color } }), el('span', { className: 'cm-cost-key-label' }, row.label, amounts ? el('small', { className: 'cm-cost-key-amount' }, row.amount, row.caption ? ' · ' + row.caption : '') : null, ranked ? el('span', { className: 'cm-fee-share-track', 'aria-hidden': true }, el('i', { style: { width: (total > 0 ? row.value / total * 100 : 0) + '%', background: row.color } })) : null), el('span', { className: 'cm-cost-key-share' }, share(row))))),
         el('div', { className: 'cm-cost-inspect', role: 'status', 'aria-live': 'polite' }, active ? el(Fragment, null, el('strong', null, active.label), el('span', null, meta(active)), el('strong', null, active.amount)) : null))
     }
-    function ContextCosts({ api, sessionId, revision = '', text = (zh, en) => en, money = value => '$' + value.toLocaleString('en-US', { maximumFractionDigits: 6 }), integrated = false, compact = false, expanded = false }) {
+    function ContextCosts({ api, sessionId, revision = '', text = (zh, en) => en, money = value => '$' + value.toLocaleString('en-US', { maximumFractionDigits: 6 }), currency = 'USD', integrated = false, compact = false, expanded = false }) {
       const root = useRef(null), refresh = useRef(() => {}), revisionRef = useRef(revision)
       revisionRef.current = revision
       const [result, setResult] = useState(() => ({ value: cachedValue(requestEntry(api, 'getContextCosts', { sessionId }), revision), error: '', busy: true }))
@@ -344,7 +344,7 @@ window.__ModuleLoader__.load({
         integrated && api.disableIntegration ? el('button', { type: 'button', onClick: api.disableIntegration }, text('关闭联动', 'Turn off integration')) : null,
         el('button', { type: 'button', onClick: () => refresh.current(true), disabled: result.busy }, text('刷新', 'Refresh'))))
       const wrap = content => el('section', { className: 'cm-plan' + (compact ? ' cm-context-compact' : ''), ref: root, 'aria-label': text('当前上下文费用构成', 'Current context cost breakdown'), 'data-cm-plan-session': sessionId }, el('style', null, contextCostsCss), header,
-        integrated ? el('p', { className: 'cm-plan-sub' }, 'dsh-context × dsh-cost-meter · USD') : null,
+        integrated ? el('p', { className: 'cm-plan-sub' }, 'dsh-context × dsh-cost-meter · ' + currency) : null,
         result.error ? el('p', { role: 'alert', className: 'cm-plan-error' }, result.error) : null, content)
       if (!data || data.status !== 'ready') return wrap(el('p', { className: 'cm-plan-note' }, !data
         ? result.error ? text('点击刷新重试。', 'Select Refresh to retry.') : text('正在读取当前上下文…', 'Reading current context…')
@@ -392,7 +392,7 @@ window.__ModuleLoader__.load({
       let active = true
       function wrap(Original) {
         return function ContextCostBridge(props) {
-          if (localeStore) React.useSyncExternalStore(localeStore.subscribe, getLocale)
+          const config = localeStore ? React.useSyncExternalStore(localeStore.subscribe, () => localeStore.getSnapshot().state?.config) : null
           const container = useRef(null), [target, setTarget] = useState(null)
           const composition = props.useProjection?.('contextBreakdown'), usage = props.useProjection?.('tokenUsage'), pressure = props.useProjection?.('contextPressure')
           const revision = JSON.stringify([composition, usage, pressure])
@@ -412,7 +412,10 @@ window.__ModuleLoader__.load({
             return () => { observer.disconnect(); node.remove() }
           }, [props.sessionId])
           const text = (zh, english) => getLocale() === 'en' ? english : zh
-          const portal = target && props.sessionId ? createPortal(el(ContextCosts, { key: props.sessionId, api, sessionId: props.sessionId, integrated: true, text, revision }), target) : null
+          const currency = ['USD','CNY','EUR'].includes(config?.currency) && (config.currency === 'USD' || Number.isFinite(config.exchangeRate) && config.exchangeRate > 0) ? config.currency : 'USD'
+          const rate = currency === 'USD' ? 1 : config.exchangeRate
+          const money = value => (currency === config?.currency && config.symbol || {USD:'$',CNY:'¥',EUR:'€'}[currency]) + (value * rate).toLocaleString(undefined, { maximumFractionDigits: 6 })
+          const portal = target && props.sessionId ? createPortal(el(ContextCosts, { key: props.sessionId, api, sessionId: props.sessionId, integrated: true, text, revision, currency, money }), target) : null
           return Original ? el('div', { ref: container, style: { display: 'contents' }, 'data-cm-context-bridge': props.sessionId }, el(Original, props), portal)
             : el(Fragment, null, el('span', { ref: container, hidden: true }), portal)
         }

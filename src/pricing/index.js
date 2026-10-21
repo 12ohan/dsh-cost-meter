@@ -296,8 +296,14 @@ window.__ModuleLoader__.load({
           const byProvider = useMemo(() => ({ ...state.total?.byProviderModel, ...state.month?.byProviderModel, ...state.today?.byProviderModel,
             ...Object.fromEntries(Object.keys(statistics).map(key => [key, null])) }), [state.total?.byProviderModel, state.month?.byProviderModel, state.today?.byProviderModel, statistics])
           // Price-source changes never move a model between parent sections or remount its editor.
+          const availability = state.modelDirectory
           const rows = useMemo(() => [...new Set([...Object.keys(byProvider), ...Object.keys(overrides)])]
-            .filter(key => !dismissed.includes(key) && !isRequestKey(key) && !['our-free-model:*', 'our-free-model-region:*'].includes(key)).sort(), [byProvider, overrides, dismissed])
+            .filter(key => {
+              if (dismissed.includes(key) || isRequestKey(key) || ['our-free-model:*', 'our-free-model-region:*'].includes(key)) return false
+              if (!Array.isArray(availability?.providers)) return true
+              const provider = key.slice(0, key.indexOf(':'))
+              return availability.providers.includes(provider) && !availability.missingModels?.includes(key)
+            }).sort(), [byProvider, overrides, dismissed, availability])
           useLayoutEffect(() => {
             const editor = rowNodes.current.get(customTarget.current)?.querySelector('.cm-custom-price')
             if (!editor) return

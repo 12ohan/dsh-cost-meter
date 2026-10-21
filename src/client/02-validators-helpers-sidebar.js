@@ -480,6 +480,7 @@
         // 客户端据此沿用上一份,并按同一版本号回传以避免重复下发。
         pricesRev: typeof v.pricesRev === 'string' ? v.pricesRev : undefined,
         modelLabels: Object.fromEntries(Object.entries(v.modelLabels ?? {}).filter(([, label]) => typeof label === 'string')),
+        modelDirectory: v.modelDirectory,
         reconcile: v.reconcile === null || v.reconcile === undefined ? undefined : { ok: v.reconcile.ok === true, message: typeof v.reconcile.message === 'string' ? v.reconcile.message : '' },
         // 手改过价格的 OpenRouter 模型 id(缺失/畸形回落空表:不显示任何锁定标记)。
         priceLockIds: Array.isArray(v.priceLockIds) ? v.priceLockIds.filter(id => typeof id === 'string') : [],
@@ -1576,9 +1577,9 @@
       }, [props.sessionId, state?.meta?.now, projectionRevision, config?.includeSubagentCost])
       const current = snapshot && snapshot.id === props.sessionId && snapshot.include === (config?.includeSubagentCost === true) ? snapshot : null
       const saved = current?.value
-      return { usage: mergeSessionUsage(projection, saved, config?.includeSubagentCost === true, config), config,
+      return { usage: mergeSessionUsage(projection, saved, config?.includeSubagentCost || saved && saved.subagentCount > 0, config), config,
         pending: !!props.sessionId && !!props.api?.getSessionCost && !current,
-        unrecorded: saved?.found === false && (!config?.includeSubagentCost || !saved.subagentCount) }
+        unrecorded: !!saved && !saved.found && !saved.subagentCount }
     }
 
     function sessionCostStatus(state) {
