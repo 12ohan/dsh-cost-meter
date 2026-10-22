@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- 修复 [@Sieuno](https://github.com/Sieuno) 在 [#382](https://github.com/Han-1413141/dsh-cost-meter/issues/382) 独立复现的 billion-context 漏记：持久化成功不再等同于用量完整。代理模型用量缺失、宿主用量有效时按调用流补记一次，保留独立压缩费用；重启和重复导入不重复入账。旧版已错误标记覆盖、但遗漏的宿主用量可从保留的桥接记录恢复；无法拆分的混合用量保留原始数据并提示核对。
+- Recover missing host usage once per stream when proxy model usage is unavailable; preserve compression charges and prevent duplicate recovery after restart. Keep ambiguous mixed usage explicit instead of adding a potentially overlapping host total.
+- 支持直接读取 DSH 内置 pi-ai 登录的 Codex 额度，新增 `pi-ai` 数据源及自动回退；按实际窗口显示，兼容只有每周额度的账号。额度读取超时后释放等待状态，令牌更新后可重试恢复。
+- 修复开发工具直接重载 `lib/index.js` 后未重新接入 billion-context 观察器、RPC 定义丢失的问题；保留冷启动时的提前观察器。卸载时取消 pi-ai 额度查询，不等待失去响应的请求。
+- 修复今日消费与余额同行时的金额对齐：金额与余额首行对齐，Token 单独置于下方，覆盖标准、紧凑、摘要和简洁布局。
+- 完成 [#379](https://github.com/Han-1413141/dsh-cost-meter/issues/379)、[#380](https://github.com/Han-1413141/dsh-cost-meter/issues/380) 的实际发布包兼容验证，更新 billion-context 0.1.204、dsh-codex-subscription 3.1.4 基线和持续集成。
+- 合并 [@Oct1AtJoe](https://github.com/Oct1AtJoe) 的 [#381](https://github.com/Han-1413141/dsh-cost-meter/pull/381)：过滤 Antigravity 占位项目 ID，补全 Gemini 模型额度；审查修正后逐模型保留额度和重置时间，取消查询后停止回退。
+- Read Codex quota from native DSH pi-ai OAuth without an extra subscription plugin; bound requests and handle weekly-only accounts. Restore startup observers on direct host reload and align inline Today/Balance amounts.
+
 - 修复独立复现的 WorkBuddy 紧凑侧栏标题只占半行、余额无法靠右及被截断的问题，标题保持横跨整张卡片。[@SternChiri](https://github.com/SternChiri) 的 [#377](https://github.com/Han-1413141/dsh-cost-meter/issues/377) 反馈触发了排查；报告者随后撤回了原有“文字左对齐”定位，本修复依据实际浏览器中的标题宽度与余额位置验证。
 - Keep the WorkBuddy heading across both compact sidebar columns so its balance reaches the card's right edge.
 

@@ -13,7 +13,7 @@
     function BillionCompatibilityGuide(props) {
       const state = props.useCost?.(s => s)?.state, meter = state?.billionContext
       const [Page, setPage] = useState(null)
-      const show = state?.config?.billionContextNoticeEnabled !== false && meter?.noticeId && !state?.config?.billionContextNoticesSeen?.includes(meter.noticeId) && ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility)
+      const show = state?.config?.billionContextNoticeEnabled !== false && meter?.noticeId && !state?.config?.billionContextNoticesSeen?.includes(meter.noticeId) && (meter.unresolved > 0 || ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility))
       useEffect(() => {
         if (!show) return
         let active = true
@@ -2107,8 +2107,9 @@
       if (costMeter === undefined) return
       ctx.inject(['connection'], connectionCtx => connectionCtx.effect(() => {
         const rpc = connectionCtx.get('connection')?.rpc
-        resetCodexQuota(rpc)
-        return () => { if (codexQuotaCache.rpc === rpc) resetCodexQuota(null) }
+        resetCodexQuota(rpc, () => costMeter.getPiAiCodexQuota())
+        notifyCodexQuota()
+        return () => { if (codexQuotaCache.rpc === rpc) { resetCodexQuota(null); notifyCodexQuota() } }
       }, 'cost-meter: Codex quota transport'))
       const readLocale = () => {
         try { return supportedLocale(ctx.get('locale')?.getSnapshot?.().active) }

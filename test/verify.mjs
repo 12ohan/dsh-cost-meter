@@ -10,6 +10,8 @@ import './ledger-lock-recovery.mjs'
 // This service fixture owns startup timers and must not overlap slow static imports.
 import './context-costs.mjs'
 import './clinepass-quota.mjs'
+import './pi-ai-codex-quota.mjs'
+import './pi-ai-codex-client.mjs'
 import { readFileSync, rmSync, mkdirSync, writeFileSync, readdirSync, mkdtempSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join, dirname, resolve } from 'node:path'
