@@ -562,7 +562,7 @@ window.__ModuleLoader__.load({
       const text = (zh, en) => locale === 'en' ? en : zh
       let seen = dismissed === id
       try { seen ||= window.localStorage.getItem(storageKey) === 'seen' } catch {}
-      const visible = config?.billionContextNoticeEnabled !== false && !config?.billionContextNoticesSeen?.includes(id) && id && !seen && ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility)
+      const visible = config?.billionContextNoticeEnabled !== false && !config?.billionContextNoticesSeen?.includes(id) && id && !seen && (meter.unresolved > 0 || ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility))
       const [saving, setSaving] = useState(false), [saveError, setSaveError] = useState('')
       const dismiss = async (mute = false) => {
         if (saving) return
@@ -593,7 +593,9 @@ window.__ModuleLoader__.load({
         onCancel: event => { event.preventDefault(); dismiss() } },
         el('style', null, '.cm-billion-notice{box-sizing:border-box;width:min(500px,calc(100vw - 32px));padding:24px;border:1px solid var(--dsw-alias-border-l1,#8885);border-radius:14px;background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-1,#fff) r g b / 1);color:var(--dsw-alias-label-primary,#25262b);font:13px/1.6 system-ui;box-shadow:0 18px 70px #0003}.cm-billion-notice::backdrop{background:#0005}.cm-billion-notice h2{margin:0 0 12px;font-size:16px}.cm-billion-notice footer{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:20px}.cm-billion-notice a{color:var(--dsw-alias-state-business-primary,#4d6bfe)}.cm-billion-notice button{margin-left:auto;padding:6px 14px;border:1px solid var(--dsw-alias-border-l1,#8885);border-radius:7px;background:transparent;color:inherit;cursor:pointer}'),
         el('h2', { id: 'cm-billion-title' }, text('billion-context 计费兼容提醒', 'billion-context billing compatibility')),
-        el('p', { id: 'cm-billion-description' }, meter.compatibility === 'needs_update'
+        el('p', { id: 'cm-billion-description' }, meter.unresolved > 0
+          ? text('部分代理调用同时包含已知与缺失的用量，无法确定宿主汇总是否与已有记录重叠。已保留确定的代理费用及宿主原始用量，尚未叠加不明确的金额。请反馈此问题以核对缺失部分。', 'Some proxy streams mix known and missing usage. The host total may overlap the recorded calls. Known proxy costs and the original host usage are retained; ambiguous amounts are not added. Report the issue to resolve the missing portion.')
+          : meter.compatibility === 'needs_update'
           ? text('检测到 billion-context ', 'Detected billion-context ') + meter.version + text('。请更新到 0.1.181 或更新版本，再接入完整内部计费。', '. Update to 0.1.181 or later for complete internal billing.')
           : meter.compatibility === 'changed'
             ? text('检测到 billion-context 计费接口变化，内部费用尚未完整采集。请到交流群反馈，或提交 issue，以便更新接入。', 'The billion-context metering interface has changed. Internal cost coverage is incomplete. Report this in the community group or open an issue so the integration can be updated.')
@@ -1290,7 +1292,8 @@ window.__ModuleLoader__.load({
       return el('p', { className: 'cm-stat-note', 'data-billing-coverage': 'billion-context' },
         status?.connected ? text('已接入 billion-context 的逐次请求，包括内部压缩、重试和追加请求。只从启用后开始采集，启用前的缺失记录无法补齐。', 'billion-context request metering is connected, including internal compression, retries and additional calls. Collection starts when enabled; earlier missing records cannot be recovered.')
           + (status.failed ? text(' 用量读取失败，保留已有金额。', ' Usage refresh failed; saved amounts are retained.') : '')
-          + (status.uncovered ? text(' 未建立完整采集的请求：', ' Requests without the full metering bridge: ') + status.uncovered + text('；这些请求沿用 DSH 用量。', '; these requests retain DSH usage accounting.') : '')
+          + (status.uncovered ? text(' 未建立完整采集的请求：', ' Requests without the full metering bridge: ') + status.uncovered + text('；可确定的宿主用量按流补记一次。', '; identifiable host usage is recorded once per stream.') : '')
+          + (status.unresolved ? text(' 待核对的混合用量：', ' Mixed usage awaiting reconciliation: ') + status.unresolved + text('；宿主原始汇总已保留，未与代理费用重复相加。', '; original host totals are retained without adding them on top of proxy costs.') : '')
           + (status.unreported || status.partial ? text(' 没有完整用量回执的请求：', ' Requests without complete usage: ') + (status.unreported + status.partial) + text('；这些请求的未知费用没有估补。', '; unknown charges are not inferred.') : '')
           : text('已检测到 billion-context。此处统计它上报给 DSH 的用量；代理内部未上报的压缩、重试和追加请求未计入。', 'billion-context detected. These totals use its reported DSH usage; unreported internal compression, retries and additional requests are excluded.'),
         href ? el('a', { href, target: '_blank', rel: 'noopener noreferrer', style: { marginInlineStart: 8 } }, text('查看代理统计', 'Open proxy statistics')) : null)

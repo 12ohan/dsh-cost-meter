@@ -466,7 +466,7 @@
         ourFreeModel: v.ourFreeModel?.enabled === true ? { enabled: true, version: typeof v.ourFreeModel.version === 'string' ? v.ourFreeModel.version : '' } : undefined,
         history: Array.isArray(v.history) ? v.history.map((d, i) => parseDay(d, path + '.history[' + i + ']')) : [],
         billionContext: v.billionContext?.protocol === 1 ? { protocol: 1, connected: v.billionContext.connected === true, failed: v.billionContext.failed === true,
-          requests: Number(v.billionContext.requests) || 0, unreported: Number(v.billionContext.unreported) || 0, partial: Number(v.billionContext.partial) || 0, uncovered: Number(v.billionContext.uncovered) || 0,
+          requests: Number(v.billionContext.requests) || 0, unreported: Number(v.billionContext.unreported) || 0, partial: Number(v.billionContext.partial) || 0, uncovered: Number(v.billionContext.uncovered) || 0, unresolved: Number(v.billionContext.unresolved) || 0,
           detected: v.billionContext.detected === true, version: typeof v.billionContext.version === 'string' ? v.billionContext.version.slice(0, 100) : '',
           compatibility: ['needs_update', 'changed', 'bridge_missing', 'ready'].includes(v.billionContext.compatibility) ? v.billionContext.compatibility : 'unknown',
           noticeId: typeof v.billionContext.noticeId === 'string' ? v.billionContext.noticeId.slice(0, 240) : '' } : undefined,

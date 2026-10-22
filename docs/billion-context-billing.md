@@ -21,7 +21,11 @@ The integration adds observers in memory when the verified local Node proxy star
 - Uncached input, cache reads, cache writes, output and reasoning usage across OpenAI Chat Completions, Responses, Anthropic Messages and Google GenerateContent, including streams.
 - Actual upstream origin/model, request identity, attempt, completion status, owning DSH conversation and active turn/step.
 
-After durable proxy records are confirmed, those requests replace the corresponding ordinary DSH usage charge. Producer sequences and ledger receipts prevent repeated imports. Main/subagent totals, daily/week/all statistics, turn details and step views share these records and historical price versions. Inherited fork history is not charged again.
+After usable proxy records are confirmed, those requests replace the corresponding ordinary DSH usage charge. A persistence receipt alone does not establish usage coverage. Producer sequences and ledger receipts prevent repeated imports. Main/subagent totals, daily/week/all statistics, turn details and step views share these records and historical price versions. Inherited fork history is not charged again.
+
+When proxy model usage is missing but the host reports valid usage, one host sample is recorded for the correlated stream, regardless of the number of missing retries or groups. Independently measured compression remains separate. Mixed known and missing model usage is not added to an overlapping host aggregate: known calls and the original host sample are retained, with a notice when the overlap cannot be resolved. Known zero usage remains distinct from missing usage.
+
+On import, retained legacy bridge records with `covered:true` and missing model usage can restore an omitted host sample even if proxy cursors already advanced or the session contains another provider. A durable stream receipt prevents repeated recovery. Records marked `covered:false` are not automatically repaired because ordinary host billing may already have accounted them. Missing original host usage cannot be reconstructed.
 
 Main requests retain the configured DSH provider price. Internal models use their actual upstream/model. Zero usage, missing usage, partial responses and missing prices remain distinct. Charges are not inferred from savings percentages or balance changes. The correlation header is removed before forwarding to a model endpoint.
 
@@ -52,7 +56,11 @@ Checks use original npm packages, isolated local responses, both plugin loading 
 
 记录内部压缩、HTTP 重试和追加请求，以及未缓存输入、缓存读取、缓存写入、输出和推理用量；支持四种模型协议的 JSON 与流式响应。每条记录关联实际上游、模型、请求、重试次数、完成状态、所属 DSH 会话和轮次／步骤。
 
-收到持久化回执后，逐次请求替换对应的普通 DSH 汇总记账。调用序号和账本入账凭据防止重复收费。会话金额、子代理、日／周／全部统计、单轮和步骤明细共用记录，并沿用保存的历史价格版本；分叉继承的历史不重复计费。
+确认代理记录含有可用用量后，逐次请求替换对应的普通 DSH 汇总记账；持久化成功本身不代表用量完整。调用序号和账本入账凭据防止重复收费。会话金额、子代理、日／周／全部统计、单轮和步骤明细共用记录，并沿用保存的历史价格版本；分叉继承的历史不重复计费。
+
+代理模型用量缺失、宿主用量有效时，按对应调用流补记一次宿主用量，不按缺失的重试次数或请求组数重复补记；独立测得的压缩费用仍单独保留。已知与缺失的模型用量混在一起时，保留已知调用和宿主原始汇总；无法判断重叠部分时提示核对，不把两者直接相加。已知零用量仍作为有效记录处理。
+
+导入时，旧版保留的桥接记录若标记 `covered:true`、模型用量缺失而宿主用量有效，可恢复遗漏的宿主费用，即使代理游标已经推进，或同一会话已记入其他渠道费用。每次恢复都有持久化凭据，重启后不重复。`covered:false` 的旧记录可能已走普通宿主记账，不自动补记；缺少原始宿主用量的历史无法重建。
 
 主请求沿用 DSH 渠道配置价格，内部模型按实际上游和模型匹配。零用量、缺失用量、部分回执和未定价分别显示，不按节省比例或余额差补算。关联标识在转发模型端点前删除。
 

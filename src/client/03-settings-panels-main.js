@@ -13,7 +13,7 @@
     function BillionCompatibilityGuide(props) {
       const state = props.useCost?.(s => s)?.state, meter = state?.billionContext
       const [Page, setPage] = useState(null)
-      const show = state?.config?.billionContextNoticeEnabled !== false && meter?.noticeId && !state?.config?.billionContextNoticesSeen?.includes(meter.noticeId) && ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility)
+      const show = state?.config?.billionContextNoticeEnabled !== false && meter?.noticeId && !state?.config?.billionContextNoticesSeen?.includes(meter.noticeId) && (meter.unresolved > 0 || ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility))
       useEffect(() => {
         if (!show) return
         let active = true

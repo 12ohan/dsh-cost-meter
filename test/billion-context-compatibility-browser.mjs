@@ -81,8 +81,15 @@ try {
   await page.evaluate(()=>window.configure({billionContextNoticeEnabled:true}));await dialog.waitFor({state:'visible'});
   await page.evaluate(() => window.setMeter({ version: '1.0.0', compatibility: 'ready', noticeId: '' }))
   await dialog.waitFor({ state: 'detached' })
+  await page.evaluate(() => window.setMeter({ version: '0.1.204', compatibility: 'ready', unresolved: 1, noticeId: 'usage_missing:1' }))
+  await dialog.waitFor({ state: 'visible' })
+  assert.match(await dialog.innerText(), /用量.*缺失|缺失.*用量/s)
+  assert.match(await dialog.innerText(), /重复|叠加/)
+  await dialog.getByRole('button', { name: '知道了' }).click()
+  await page.evaluate(() => window.setMeter({ version: '0.1.204', compatibility: 'ready', unresolved: 0, noticeId: '' }))
+  await dialog.waitFor({ state: 'detached' })
   assert.deepEqual(errors, []); assert.deepEqual(external, [])
-  const report = { upgrade: true, changed: true, groupAndIssueLinks: true, deduplicated: true, restored: true, browserErrors: errors.length, externalRequests: external.length }
+  const report = { upgrade: true, changed: true, missingUsage: true, groupAndIssueLinks: true, deduplicated: true, restored: true, browserErrors: errors.length, externalRequests: external.length }
   writeFileSync('.tmp-billion-notice-browser/report.json', JSON.stringify(report, null, 2) + '\n')
   console.log(JSON.stringify(report))
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)) }

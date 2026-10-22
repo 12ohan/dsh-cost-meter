@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- 修复 [@Sieuno](https://github.com/Sieuno) 在 [#382](https://github.com/Han-1413141/dsh-cost-meter/issues/382) 独立复现的 billion-context 漏记：持久化成功不再等同于用量完整。代理模型用量缺失、宿主用量有效时按调用流补记一次，保留独立压缩费用；重启和重复导入不重复入账。旧版已错误标记覆盖、但遗漏的宿主用量可从保留的桥接记录恢复；无法拆分的混合用量保留原始数据并提示核对。
+- Recover missing host usage once per stream when proxy model usage is unavailable; preserve compression charges and prevent duplicate recovery after restart. Keep ambiguous mixed usage explicit instead of adding a potentially overlapping host total.
 - 支持直接读取 DSH 内置 pi-ai 登录的 Codex 额度，新增 `pi-ai` 数据源及自动回退；按实际窗口显示，兼容只有每周额度的账号。额度读取超时后释放等待状态，令牌更新后可重试恢复。
 - 修复开发工具直接重载 `lib/index.js` 后未重新接入 billion-context 观察器、RPC 定义丢失的问题；保留冷启动时的提前观察器。卸载时取消 pi-ai 额度查询，不等待失去响应的请求。
 - 修复今日消费与余额同行时的金额对齐：金额与余额首行对齐，Token 单独置于下方，覆盖标准、紧凑、摘要和简洁布局。
