@@ -148,7 +148,7 @@
         sidebarModels: Object.fromEntries(Object.entries(MODEL_SIDEBAR_DEFAULTS).map(([k, v0]) => [k, v.sidebarModels?.[k] ?? v0])),
         codexQuotaSidebar: v.codexQuotaSidebar !== false,
         codexQuotaStrip: v.codexQuotaStrip !== false,
-        codexQuotaSource: ['connect', 'subscription', 'chatgpt'].includes(v.codexQuotaSource) ? v.codexQuotaSource : 'auto',
+        codexQuotaSource: ['connect', 'subscription', 'chatgpt', 'pi-ai'].includes(v.codexQuotaSource) ? v.codexQuotaSource : 'auto',
         // Codex 订阅兼容(契约 B-5):用户已关闭一次性提示 / 已应用历史归类的时点。
         // 直通白名单缺失会导致关闭后重开页面又弹提示,或应用后状态行回落「未应用」。
         codexCompatHistoryAppliedAt: num0(v.codexCompatHistoryAppliedAt),
@@ -578,6 +578,20 @@
         {
           method: 'refreshGoQuota',
           },
+        {
+          method: 'getPiAiCodexQuota',
+          result: strictCodec('PiAiCodexQuota', codecOf(v => {
+            needObject(v, 'pi-ai quota')
+            if (!['off', 'ok', 'error'].includes(v.status)) fail('pi-ai quota status', 'off/ok/error')
+            const windows = {}, raw = needObject(v.windows, 'pi-ai windows')
+            for (const key of ['five', 'weekly']) if (raw[key] !== undefined) {
+              const percent = needNum(raw[key].percent, key)
+              if (percent < 0 || percent > 100) fail(key, '0-100 percent')
+              windows[key] = { percent, resetsAt: needStr(raw[key].resetsAt, 'resetsAt') }
+            }
+            return { status: v.status, windows, message: needStr(v.message, 'message') }
+          })),
+        },
         {
           method: 'refreshCustomBalance',
           // index(v1.7.1):与宿主侧 manifest 同口径——acceptsUndefined 允许旧调用
@@ -2627,7 +2641,7 @@
     }
 
     // ── ChatGPT PLUS(Codex)额度(issue #59 / dsh-codex-subscription)──────────
-    // 数据源:dsh-codex-subscription RPC、dsh-chatgpt-subscription HTTP、connect 状态。
+    // 数据源:dsh-codex-subscription RPC、DSH pi-ai 登录、ChatGPT HTTP、connect 状态。
     // 只查询额度,启用后查询失败保留提示与重试入口。
 
     const CODEX_STATUS_PATH = '/plugins/dsh-openai-codex/auth/status'
@@ -2657,19 +2671,27 @@
       return parseCodexWindows(data.usage?.rateLimits)
     }
 
+    async function boundedCodexRead(read) {
+      const signal = AbortSignal.timeout(8000)
+      let abort
+      const cancelled = new Promise((_, reject) => { abort = () => reject(signal.reason); signal.addEventListener('abort', abort, { once: true }) })
+      try { return await Promise.race([Promise.resolve().then(() => read(signal)), cancelled]) }
+      finally { signal.removeEventListener('abort', abort) }
+    }
+
     /** 读取 dsh-codex-subscription 的 DSH 同源认证 RPC;失败返回 null 以便 auto 回退。 */
     async function fetchCodexSubscription(force) {
       try {
-        const result = await codexQuotaCache.rpc?.call('/api', 'codex-subscription/usage', { force }, AbortSignal.timeout(8000))
+        const result = await boundedCodexRead(signal => codexQuotaCache.rpc?.call('/api', 'codex-subscription/usage', { force }, signal))
         return result?.ok ? parseCodexWindows(result.value?.rateLimits) : null
       } catch { return null }
     }
 
     const codexQuotaCache = { source: 'auto', listeners: [] }
-    const resetCodexQuota = rpc => Object.assign(codexQuotaCache, { rpc, request: null, inFlight: null, fetchedAt: 0, status: 'idle', windows: {} })
+    const resetCodexQuota = (rpc, readPiAi = null) => Object.assign(codexQuotaCache, { rpc, readPiAi, request: null, inFlight: null, fetchedAt: 0, status: 'idle', windows: {}, message: '' })
     resetCodexQuota(null)
     const codexQuotaSnapshot = () => {
-      const { rpc, request, inFlight, listeners, ...view } = codexQuotaCache
+      const { rpc, readPiAi, request, inFlight, listeners, ...view } = codexQuotaCache
       return view
     }
     const subscribeCodexQuota = fn => {
@@ -2679,7 +2701,7 @@
     const notifyCodexQuota = () => { for (const fn of codexQuotaCache.listeners) { try { fn() } catch { /* 订阅方异常不扩散 */ } } }
 
     /**
-     * 探测 Codex 额度。auto 按 subscription → chatgpt → connect 顺序回退;
+     * 探测 Codex 额度。auto 按 subscription → pi-ai → chatgpt → connect 顺序回退;
      * 成功缓存 5 分钟,失败 1 分钟后可重试。
      */
     async function fetchCodexQuota(force = false, enabled = false, source = 'auto') {
@@ -2691,9 +2713,16 @@
       if (codexQuotaCache.source !== source) Object.assign(codexQuotaCache, { status: 'idle', windows: {}, fetchedAt: 0, source })
       notifyCodexQuota()
       const task = Promise.resolve().then(async () => {
-        let windows = {}
+        let windows = {}, message = ''
         try {
           if (source === 'auto' || source === 'subscription') windows = await fetchCodexSubscription(force) ?? {}
+          if (Object.keys(windows).length === 0 && (source === 'auto' || source === 'pi-ai')) {
+            try {
+              const result = await boundedCodexRead(() => codexQuotaCache.readPiAi?.())
+              if (result?.ok === true && result.value?.status === 'ok') windows = result.value.windows
+              else if (result?.ok === true && result.value?.status === 'error') message = result.value.message
+            } catch {}
+          }
           if (Object.keys(windows).length === 0 && (source === 'auto' || source === 'chatgpt')) {
             try { windows = await (await require.async('./client.codex.js')).readChatgptQuota(force) ?? {} } catch {}
           }
@@ -2706,6 +2735,7 @@
           if (codexQuotaCache.request !== request) return
           codexQuotaCache.status = Object.keys(windows).length > 0 ? 'ok' : 'unavailable'
           codexQuotaCache.windows = windows
+          codexQuotaCache.message = Object.keys(windows).length ? '' : message
           codexQuotaCache.fetchedAt = Date.now()
           codexQuotaCache.inFlight = null
           notifyCodexQuota()
@@ -2728,7 +2758,7 @@
         void fetchCodexQuota(false, true, source)
         const timer = setInterval(() => { void fetchCodexQuota(false, true, source) }, 60_000)
         return () => { mounted = false; clearInterval(timer); unsubscribe() }
-      }, [enabled, source])
+      }, [enabled, source, codexQuotaCache.rpc])
       return snap.source === source ? snap : { status: 'idle', windows: {}, fetchedAt: 0 }
     }
 
@@ -2746,9 +2776,9 @@
       if (!enabled) return el('div', { 'data-cm-display': 'codex', className: 'cm-bbox cm-mm clickable' + (wide === false ? ' rail' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) }, refresh.err || (wide === false ? 'Codex' : t('codexQuotaEnable')))
       if (snap.status !== 'ok') return el('div', {
         'data-cm-display': 'codex', className: 'cm-bbox cm-mm clickable' + (wide === false ? ' rail' : ''),
-        title: t('codexQuotaUnavailable'), ...clickableRefreshProps(refresh.busy, refresh.run),
+        title: snap.message || t('codexQuotaUnavailable'), ...clickableRefreshProps(refresh.busy, refresh.run),
       }, el('div', { className: 'cm-mm-title' }, wide === false ? 'Codex' : t('codexQuotaTitle')),
-      el('span', { className: 'cm-hint' }, wide === false ? '—' : t(snap.status === 'idle' || refresh.busy ? 'refreshing' : 'codexQuotaUnavailable')))
+      el('span', { className: 'cm-hint' }, wide === false ? '—' : snap.status === 'idle' || refresh.busy ? t('refreshing') : snap.message || t('codexQuotaUnavailable')))
       const views = [['five', 'codexQuotaFive', '5h'], ['weekly', 'codexQuotaWeek', '7d']].flatMap(([key, label, short]) => {
         const win = snap.windows[key]
         if (!win) return []

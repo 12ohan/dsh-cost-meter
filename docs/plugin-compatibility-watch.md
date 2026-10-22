@@ -11,3 +11,5 @@ GitHub Actions 工作流 `plugin-compatibility-watch` 每日北京时间 08:23 �
 本地查看：`node scripts/watch-plugin-compatibility.mjs`。本地默认不创建 issue。单元检查：`node test/plugin-compatibility-watch.mjs`。
 
 2026-10-20 已验证并接受 `billion-context@0.1.202` 与 `dsh-codex-subscription@3.1.2`。前者通过实际发布包的代理、原生传输、重试、摘要、历史回放与原版 CLI 自动接入检查，后者通过实际额度解析和 RPC 的单周、双窗口、刷新、失败回退检查。测试使用合成数据与本机服务器，未查询用户账户或调用外部模型。两者接入接口指纹均未变化，v1.9.16 无需修改运行时代码即可兼容；对应版本已加入持续集成。
+
+2026-10-22 已验证并接受 `billion-context@0.1.204` 与 `dsh-codex-subscription@3.1.4`（监控 issue [#379](https://github.com/Han-1413141/dsh-cost-meter/issues/379)、[#380](https://github.com/Han-1413141/dsh-cost-meter/issues/380)）。前者使用实际发布包验证代理、原生传输、重试、压缩、父子会话、历史回放和无配套包的 CLI 自动接入；后者验证发布包的单周、双窗口、强制刷新与失败回退。3.1.4 的 RPC 分发变化涉及语音功能，额度接口保持兼容。两版均加入持续集成，本次只接受已验证的两个版本，保留 `dsh-codex-connect` 原基线。

@@ -111,9 +111,9 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
   if (selected === 'codex' || selected === 'strip-codex') controls = [
     check(t('codexQuotaEnabled'), config.codexQuotaEnabled === true, value => set({ codexQuotaEnabled: value }), { 'data-display-option': 'codex-enabled' }),
     choice(text('数据源', 'Data source'), config.codexQuotaSource ?? 'auto',
-      [['auto', text('自动检测', 'Auto-detect')], ['connect', 'dsh-codex-connect'], ['subscription', 'dsh-codex-subscription'], ['chatgpt', 'dsh-chatgpt-subscription']],
+      [['auto', text('自动检测', 'Auto-detect')], ['pi-ai', text('DSH pi-ai 登录', 'DSH pi-ai login')], ['connect', 'dsh-codex-connect'], ['subscription', 'dsh-codex-subscription'], ['chatgpt', 'dsh-chatgpt-subscription']],
       value => set({ codexQuotaSource: value })),
-    el('p', { className: 'cm-inspector-note cm-inspector-help' }, text('自动检测依次尝试 dsh-codex-subscription、dsh-chatgpt-subscription、dsh-codex-connect。', 'Auto tries dsh-codex-subscription, dsh-chatgpt-subscription, then dsh-codex-connect.')),
+    el('p', { className: 'cm-inspector-note cm-inspector-help' }, text('自动检测依次尝试 dsh-codex-subscription、DSH pi-ai 登录、dsh-chatgpt-subscription、dsh-codex-connect。', 'Auto tries dsh-codex-subscription, DSH pi-ai login, dsh-chatgpt-subscription, then dsh-codex-connect.')),
     config.codexQuotaEnabled !== true ? el('p', { className: 'cm-inspector-note' }, text('额度查询未开启。打开上方开关后，可在侧栏和输入区显示。', 'Quota queries are disabled. Enable the switch above to show quota in the sidebar and composer.')) : null,
     el('button', { type: 'button', className: 'cm-btn small', onClick: openQuota }, text('账户与额度设置 →', 'Account and quota settings →'))]
   if (selected === 'general') controls = [

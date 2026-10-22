@@ -29,11 +29,11 @@ jobs:
           npm install -g pnpm
           pnpm install --frozen-lockfile
           mkdir -p .tmp-billion-matrix
-          npm pack billion-context@0.1.181 billion-context@0.1.190 billion-context@0.1.197 billion-context@0.1.201 billion-context@0.1.202 --ignore-scripts --pack-destination .tmp-billion-matrix
+          npm pack billion-context@0.1.181 billion-context@0.1.190 billion-context@0.1.197 billion-context@0.1.201 billion-context@0.1.202 billion-context@0.1.204 --ignore-scripts --pack-destination .tmp-billion-matrix
       - name: Verify automatic interface compatibility and actual native/proxy billing
         run: |
           node test/billion-context-compatibility.mjs
-          for version in 0.1.181 0.1.190 0.1.197 0.1.201 0.1.202; do
+          for version in 0.1.181 0.1.190 0.1.197 0.1.201 0.1.202 0.1.204; do
             DSH_TEST_BILLION_PACKAGE="$PWD/.tmp-billion-matrix/billion-context-$version.tgz" node test/billion-context-billing.mjs
             DSH_TEST_BILLION_PACKAGE="$PWD/.tmp-billion-matrix/billion-context-$version.tgz" node test/billion-context-auto.mjs
           done
@@ -75,6 +75,8 @@ jobs:
           mkdir -p .tmp-billion-matrix
           npm pack dsh-codex-subscription@3.1.2 --ignore-scripts --pack-destination .tmp-billion-matrix
           DSH_TEST_CODEX_PACKAGE="$PWD/.tmp-billion-matrix/dsh-codex-subscription-3.1.2.tgz" node test/codex-subscription-published.mjs
+          npm pack dsh-codex-subscription@3.1.4 --ignore-scripts --pack-destination .tmp-billion-matrix
+          DSH_TEST_CODEX_PACKAGE="$PWD/.tmp-billion-matrix/dsh-codex-subscription-3.1.4.tgz" node test/codex-subscription-published.mjs
           npm pack @eddyskywalker/dsh-chatgpt-subscription@0.29.0 --ignore-scripts --pack-destination .tmp-billion-matrix
           DSH_TEST_CHATGPT_PACKAGE="$PWD/.tmp-billion-matrix/eddyskywalker-dsh-chatgpt-subscription-0.29.0.tgz" node test/chatgpt-subscription-quota.mjs
           mkdir -p .tmp-our-free-model
@@ -280,6 +282,8 @@ jobs:
           node test/host-peer-compatibility.mjs
           node test/verify.mjs
           node test/go-quota-host.mjs
+          node scripts/fetch-injector-fixture.mjs
+          DSH_TEST_INJECTOR_SOURCE="$PWD/.tmp-injector-fixture/index.ts" node test/pi-ai-codex-host.mjs
           node test/market-hot-install.mjs
           node test/codex-compat-http.mjs
           node test/plugin-compatibility-watch.mjs
@@ -295,6 +299,8 @@ jobs:
           mkdir -p .tmp-billion-matrix
           npm pack dsh-codex-subscription@3.1.2 --ignore-scripts --pack-destination .tmp-billion-matrix
           DSH_TEST_CODEX_PACKAGE="$PWD/.tmp-billion-matrix/dsh-codex-subscription-3.1.2.tgz" node test/codex-subscription-published.mjs
+          npm pack dsh-codex-subscription@3.1.4 --ignore-scripts --pack-destination .tmp-billion-matrix
+          DSH_TEST_CODEX_PACKAGE="$PWD/.tmp-billion-matrix/dsh-codex-subscription-3.1.4.tgz" node test/codex-subscription-published.mjs
           node test/context-costs.mjs --host
           node test/context-costs-regression-browser.mjs
           node test/native-search-host.mjs
@@ -328,6 +334,7 @@ jobs:
           export DSH_TEST_NODE_MODULES="$PWD/.tmp-market-host/node_modules"
           node test/market-hot-install.mjs
           node test/go-quota-host.mjs
+          node test/pi-ai-codex-host.mjs
 
   source-host-codecs:
     runs-on: ubuntu-latest

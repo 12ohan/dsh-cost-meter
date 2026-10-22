@@ -2107,8 +2107,9 @@
       if (costMeter === undefined) return
       ctx.inject(['connection'], connectionCtx => connectionCtx.effect(() => {
         const rpc = connectionCtx.get('connection')?.rpc
-        resetCodexQuota(rpc)
-        return () => { if (codexQuotaCache.rpc === rpc) resetCodexQuota(null) }
+        resetCodexQuota(rpc, () => costMeter.getPiAiCodexQuota())
+        notifyCodexQuota()
+        return () => { if (codexQuotaCache.rpc === rpc) { resetCodexQuota(null); notifyCodexQuota() } }
       }, 'cost-meter: Codex quota transport'))
       const readLocale = () => {
         try { return supportedLocale(ctx.get('locale')?.getSnapshot?.().active) }
