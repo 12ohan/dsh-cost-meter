@@ -313,6 +313,7 @@
         })(),
         // Plan/API 双轨计费分类(issue #64):读侧白名单,非法值回落默认。
         planBilling: {
+          ...(Array.isArray(v.planBilling?.autoProviders) ? { autoProviders: v.planBilling.autoProviders.filter(id => PLAN_PROVIDER_IDS_LOCAL.includes(id)) } : {}),
           providers: parseBillingClasses(v.planBilling?.providers),
           models: parseBillingClasses(v.planBilling?.models, true),
           modelPlans: Object.fromEntries(Object.entries(v.planBilling?.modelPlans ?? {}).filter(([key, value]) => key.includes(':') && PLAN_PROVIDER_IDS_LOCAL.includes(value))),
@@ -1211,6 +1212,7 @@
       return PLAN_PROVIDER_IDS_LOCAL.includes(name) ? name : inferPlanProviderIdLocal(provider, modelId)
     }
     function enabledPlanSetOfLocal(config) {
+      if (Array.isArray(config?.planBilling?.autoProviders)) return new Set(config.planBilling.autoProviders)
       const out = new Set()
       const plans = config?.codingPlans
       if (plans !== null && typeof plans === 'object') {
@@ -3323,7 +3325,7 @@
       const mode = config.sidebarTodayMetric ?? 'cost'
       return el('span', { className: 'cm-today-values', 'data-both': mode === 'both' },
         mode !== 'tokens' ? el('span', { 'data-cm-today': 'cost' }, formatMoneyUsd(displayCostOf(today, config), config)) : null,
-        mode !== 'cost' ? el('span', { 'data-cm-today': 'tokens' }, formatTokens(['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning'].reduce((sum, key) => sum + (Number(today?.[key]) || 0), 0)) + ' ' + t('tokensUnit')) : null)
+        mode !== 'cost' ? el('span', { 'data-cm-today': 'tokens' }, formatTokens(['input', 'output', 'cacheRead', 'cacheWrite'].reduce((sum, key) => sum + (Number(today?.[key]) || 0), 0)) + ' ' + t('tokensUnit')) : null)
     }
 
     function BudgetBoxContent(props) {

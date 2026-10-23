@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+## [1.9.28] - 2026-10-23
+
+- 修复跨读取块的合法 zstd 大帧漏读，按实际解压输出执行预算；普通 JSONL、单行和事件数采用有界读取。
+- 修复乱序并发调用的错误去重，以及 billion-context 完成但调用明细为空时的宿主用量漏记；覆盖重启、重复导入和归档后的恢复。
+- 统一 Token 总量，推理作为输出细分；套餐统计按供应商实际重置周期聚合，小时桶保留 35 天并从可读会话恢复派生统计。
+- 日常账本保存移入串行工作线程，保留跨进程合并、原子替换和卸载提交；提交回执防止确认消息丢失后重复计费。
+- 保存自动套餐归属集合，额度查询及显示开关不再重新分类历史 API/Plan 费用。
+- 辅助日志达到 8 MiB 后轮转，对封存分段受限压缩，保留可读取的历史明细；增加变更标记与增量文件发现。
+- 余额、套餐、汇率和价格页面统一使用有界正文读取、解压输出限制与超时取消；网关不再把空百分比误报为 0% 已用。
+- 修复发布说明生成被自身写入拦截，以及已有标签未核对提交的问题；同步网络声明、MiniMax 自定义来源文档和边界回归测试。
+- Fix nine review findings covering compressed history, decompression limits, out-of-order deduplication, empty proxy streams, token totals, quota cycles, gateway percentages and release integrity.
+- Move routine ledger saves to a worker with atomic commit recovery; separate quota switches from billing ownership; rotate and archive journals without deleting history, bound network reads and expand behavior tests.
+
+[更新说明 / Release notes](docs/update-notes-1.9.28.md)
+
 ## [1.9.27] - 2026-10-23
 
 - 修复 OpenRouter 每次启动都重拉价目表的问题：启动与小时级定时任务共用跨重启的一小时冷却，失败和中途退出也保留最近尝试时间；多个宿主共用一次自动刷新机会，冷却期间不改写账本或刷新状态。手动同步仍可立即执行。

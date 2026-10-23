@@ -12,7 +12,7 @@ import './context-costs.mjs'
 import './clinepass-quota.mjs'
 import './pi-ai-codex-quota.mjs'
 import './pi-ai-codex-client.mjs'
-import { readFileSync, rmSync, mkdirSync, writeFileSync, readdirSync, mkdtempSync } from 'node:fs'
+import { readFileSync, rmSync as removeFixtureFiles, mkdirSync, writeFileSync, readdirSync, mkdtempSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join, dirname, resolve } from 'node:path'
 import { tmpdir as osTmpdir } from 'node:os'
@@ -99,6 +99,26 @@ import {
   qwenTokenPlanWindows,
 } from '../lib/coding-plans.js'
 import { extractByRule } from '../lib/custom-balance.js'
+
+// Minimal host mocks still execute effects and dispose them before removing their homes.
+// This covers real background writes instead of depending on a 2-second timer race.
+const fixtureEffects = new Map()
+function trackFixtureEffect(factory) {
+  const dispose = factory(), root = process.env.DSH_HOME
+  if (typeof dispose === 'function' && root) {
+    const key = resolve(root), entries = fixtureEffects.get(key) ?? []
+    entries.push(dispose); fixtureEffects.set(key, entries)
+  }
+  return dispose
+}
+function rmSync(path, options) {
+  const target = resolve(String(path)).toLowerCase()
+  for (const [root, effects] of fixtureEffects) if (root.toLowerCase() === target || root.toLowerCase().replaceAll('\\', '/').startsWith(target.replaceAll('\\', '/') + '/')) {
+    for (const dispose of effects.reverse()) dispose()
+    fixtureEffects.delete(root)
+  }
+  removeFixtureFiles(path, { ...options, maxRetries: 5, retryDelay: 100 })
+}
 
 // Wait for the static multi-process fixtures before probing Windows native IDs.
 await import('./ledger-lock-compatibility.mjs')
@@ -3338,7 +3358,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   const provided = {}
   const fakeCtx = {
     on: () => () => {},
-    effect: () => {},
+    effect: trackFixtureEffect,
     inject: () => {},
     provide: (key, value) => { provided[key] = value },
     logger: console,
@@ -3454,7 +3474,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
     const provided = {}
     apply({
       on: () => () => {},
-      effect: () => {},
+      effect: trackFixtureEffect,
       inject: () => {},
       provide: (k, v) => { provided[k] = v },
       logger: console,
@@ -3551,7 +3571,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
     const provided = {}
     apply({
       on: () => () => {},
-      effect: () => {},
+      effect: trackFixtureEffect,
       inject: () => {},
       provide: (k, v) => { provided[k] = v },
       logger: console,
@@ -3602,7 +3622,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   const provided = {}
   apply({
     on: () => () => {},
-    effect: () => {},
+    effect: trackFixtureEffect,
     inject: () => {},
     provide: (key, value) => { provided[key] = value },
     logger: console,
@@ -3674,7 +3694,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   const provided = {}
   apply({
     on: () => () => {},
-    effect: () => {},
+    effect: trackFixtureEffect,
     inject: () => {},
     provide: (key, value) => { provided[key] = value },
     logger: console,
@@ -4376,9 +4396,9 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   bucketsAcc = appendHourBucket(bucketsAcc, 'minimax', 3600_000 + 1800_000, 50, 0.05) // 同小时累加
   assert.equal(Object.values(bucketsAcc.minimax)[0].tokens, 150, '同小时桶累加')
   const pruned = pruneHourBuckets({ minimax: { 3600_000: { tokens: 1, cost: 1 } }, zai: 'bad' }, 3600_000 + HOUR_BUCKET_RETENTION_MS - 1000)
-  assert.equal(pruned.minimax['3600000'].tokens, 1, '48h 内桶保留')
+  assert.equal(pruned.minimax['3600000'].tokens, 1, '月周期内的小时桶保留')
   assert.equal(pruned.zai, undefined, '非法厂商槽剔除')
-  const stalePruned = pruneHourBuckets({ minimax: { 3600_000: { tokens: 1, cost: 1 } } }, 3600_000 * 72)
+  const stalePruned = pruneHourBuckets({ minimax: { 3600_000: { tokens: 1, cost: 1 } } }, HOUR_BUCKET_RETENTION_MS + 7200_000)
   assert.equal(stalePruned.minimax, undefined, '超龄桶丢弃')
   const converted = convertRecentCallsToBuckets([
     { t: 7200_000, provider: 'go', tokens: 10, cost: 0.01 },
@@ -4818,7 +4838,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   const { apply } = await import('../lib/index.js')
   apply({
     on: () => () => {},
-    effect: () => {},
+    effect: trackFixtureEffect,
     inject: () => {},
     provide: (k, v) => { provided[k] = v },
     logger: console,
@@ -5036,7 +5056,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
     const { apply } = await import('../lib/index.js')
     apply({
       on: () => () => {},
-      effect: () => {},
+      effect: trackFixtureEffect,
       inject: () => {},
       provide: (k, v) => { provided[k] = v },
       logger: console,
@@ -5356,7 +5376,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
     const { apply: apply11 } = await import('../lib/index.js')
     apply11({
       on: () => () => {},
-      effect: () => {},
+      effect: trackFixtureEffect,
       inject: () => {},
       provide: (k, v) => { provided11[k] = v },
       logger: console,
@@ -5588,7 +5608,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
     const { apply: apply13 } = await import('../lib/index.js')
     apply13({
       on: () => () => {},
-      effect: () => {},
+      effect: trackFixtureEffect,
       inject: () => {},
       provide: (k, v) => { provided13[k] = v },
       logger: console,
@@ -5712,7 +5732,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
     const { apply: apply79 } = await import('../lib/index.js')
     apply79({
       on: () => () => {},
-      effect: () => {},
+      effect: trackFixtureEffect,
       inject: () => {},
       provide: (k, v) => { provided79[k] = v },
       logger: console,
@@ -5809,20 +5829,15 @@ await import('./typert-codecs.mjs')
     const provided81 = {}
     // 拦截官方余额查询:注入 CNY 账户(总额 58 → 当日变动 ¥42,与 $3.99 偏差巨大)。
     const origFetch81 = globalThis.fetch
-    globalThis.fetch = async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
+    globalThis.fetch = async () => Response.json({
         is_available: true,
         balance_infos: [{ currency: 'CNY', total_balance: '58', granted_balance: '1', topped_up_balance: '57' }],
-      }),
-      text: async () => '',
     })
     try {
       const { apply: apply81 } = await import('../lib/index.js')
       apply81({
         on: () => () => {},
-        effect: () => {},
+        effect: trackFixtureEffect,
         inject: () => {},
         provide: (k, v) => { provided81[k] = v },
         logger: console,
@@ -5871,20 +5886,15 @@ await import('./typert-codecs.mjs')
     const provided302 = {}
     const origFetch302 = globalThis.fetch
     // 当日主要使用第三方渠道:官方余额只在赠送桶减少,充值桶不变。
-    globalThis.fetch = async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
+    globalThis.fetch = async () => Response.json({
         is_available: true,
         balance_infos: [{ currency: 'CNY', total_balance: '821.7149', granted_balance: '32.8532', topped_up_balance: '788.8617' }],
-      }),
-      text: async () => '',
     })
     try {
       const { apply: apply302 } = await import('../lib/index.js')
       apply302({
         on: () => () => {},
-        effect: () => {},
+        effect: trackFixtureEffect,
         inject: () => {},
         provide: (k, v) => { provided302[k] = v },
         logger: console,
@@ -6996,3 +7006,8 @@ console.log('[ok] 全部验证通过')
 await import('./exchange-rates.mjs')
 await import('./custom-model-prices.mjs')
 await import('./context-activity.mjs')
+await import('./review-billing-regressions.mjs')
+await import('./review-ledger-writer.mjs')
+await import('./review-journal-storage.mjs')
+await import('./review-release.mjs')
+await import('./billion-null-usage.mjs')

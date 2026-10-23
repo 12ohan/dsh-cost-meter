@@ -1,14 +1,15 @@
 // #382: actual producer, stream wrapper, durable journals and Ledger; no network.
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync, appendFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { Ledger, sanitizeConfig } from '../lib/store.js'
 import { createLlmStreamBilling } from '../lib/billing-stream.js'
 import { installBillionContextBilling } from '../lib/billion-context-billing.js'
 import { meterBillionRequest, beginBillionCall, meterBillionResponse, withBillionMeterKind, withBillionMeterAttempt } from '../lib/billion-context-proxy.js'
-import { billionRoot, billionSessionKey, billionRecordsFor, excludeBillionReportedUsage, usageBuckets, billionHostMeter } from '../lib/billion-context-history.js'
+import { billionRoot, billionSessionKey, billionRecordsFor, excludeBillionReportedUsage, usageBuckets, billionHostMeter, listBillionFiles } from '../lib/billion-context-history.js'
+import { JOURNAL_SEGMENT_BYTES, archiveSealedJournals } from '../lib/journal-storage.js'
 
 const usage = { inputTokens: 19804, outputTokens: 144, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0 }
 const raw = value => ({ input_tokens: value.inputTokens, output_tokens: value.outputTokens })
@@ -59,7 +60,7 @@ async function fixture(test) {
     assert.equal(dirname(home), tmpdir()); rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
 }
-for (const groups of [[[{ usage: null }]], [[{ usage: null, attempt: 1 }, { usage: null, attempt: 2 }]], [[{ usage: null }], [{ usage: null }]]]) await fixture(async h => {
+for (const groups of [[[]], [[{ usage: null }]], [[{ usage: null, attempt: 1 }, { usage: null, attempt: 2 }]], [[{ usage: null }], [{ usage: null }]]]) await fixture(async h => {
   await h.run('missing', groups)
   assert.equal(h.hostCalls, 0, 'the bridge owns the once-per-stream fallback')
   assert.equal(h.ledger.sumDays().calls, 1); assert.equal(h.ledger.sumDays().input, usage.inputTokens)
@@ -137,4 +138,16 @@ await fixture(async h => {
   assert.equal((await billionRecordsFor(h.path, 'already-accounted')).length, 0, 'ordinary host history is not replaced')
   await h.restart(); assert.equal(h.ledger.sumDays().calls, 1)
 })
-console.log('[ok] #382: null usage, one fallback per stream, retries/groups, compaction, mixed unresolved coverage, known zero, concurrent agents, late usage and historical cursor recovery; no external requests')
+await fixture(async h => {
+  await h.run('rotation', [[{ usage }]])
+  const first = listBillionFiles(h.path, 'rotation')[0]
+  appendFileSync(first.path, '\n' + 'x'.repeat(JOURNAL_SEGMENT_BYTES) + '\n')
+  await h.run('rotation', [[{ usage }]])
+  assert.equal(listBillionFiles(h.path, 'rotation').length, 2)
+  assert.equal(h.ledger.sumDays().calls, 2)
+  assert.equal(await archiveSealedJournals(join(billionRoot(h.path), 'calls'), { minAgeMs: 0 }), 1)
+  assert.equal((await billionRecordsFor(h.path, 'rotation')).filter(row => row.type.endsWith('-usage')).length, 2)
+  await h.restart(); await h.bridge.ingest()
+  assert.equal(h.ledger.sumDays().calls, 2, 'archived source UUIDs and byte cursors preserve exactly-once import')
+})
+console.log('[ok] #382: empty/null usage, fallback, retries, compaction, mixed coverage, concurrency, late usage, restart and archived journals; no external requests')
