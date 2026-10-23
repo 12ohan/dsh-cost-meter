@@ -1,5 +1,16 @@
 # dsh-cost-meter 版本更新历史
 
+## v1.9.31(2026-10-23)—— 插件配置入口与费用一致性修复
+
+- 插件详情页接入完整费用设置，与左下角设置共用组件、实时快照、配置保存和按需加载；旧宿主保留设置入口。
+- 预备只展示实时费用、余额、额度、预算、Token 用量和今日会话的设置页，不提供配置控件；本版本保持关闭，两个现有入口仍可配置。
+- 修复两个入口并发保存时旧请求覆盖新操作的问题；共用串行保存队列，失败后后续修改仍可提交。
+- 修复外部调用记录和旧账本价格修复使用显示汇率的问题；人民币价格统一使用 CNY 汇率，美元或欧元显示不再改变计费金额。
+- 价格修复同步更新已冻结的人民币、欧元金额，保留记录时的汇率；日级模型汇总即使美元金额一致，也会修复可由完整会话记录确认的币种金额差异，缺失记录不当作零。
+- Add shared settings to plugin details and prepare a disabled read-only overview. Serialize saves across both entries, use CNY FX for CNY billing, and keep repaired historical currency amounts consistent with recorded rates.
+
+[更新说明](update-notes-1.9.31.md)
+
 ## v1.9.30(2026-10-23)—— 后台保存降级与 OpenCode Go 计费修复
 
 - 后台线程失败后立即同步保存待写用量，本次运行只告警一次，后续定时保存继续使用同步路径；保留跨宿主锁重试与提交回执恢复。
