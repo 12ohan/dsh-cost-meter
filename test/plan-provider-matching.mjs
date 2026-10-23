@@ -75,6 +75,47 @@ function assertBilling(provider, model, cfg, expected) {
   assert.equal(billingClassOf(provider, model, cfg.planBilling, enabledPlanSetOf(cfg), cfg.prices), expected, 'server: ' + provider)
   assert.equal(ui.billingClassOfLocal(provider, model, cfg), expected, 'client: ' + provider)
 }
+// #389: the dedicated OpenCode Go plugin uses a different request provider id.
+const goConfig = sanitizeConfig({ goQuota: { enabled: true } })
+for (const provider of ['dsh-opencode-go', 'llm-dsh-opencode-go', ' DSH-OpenCode-Go ', 'opencode-go', 'opencode-go-plus', 'zen']) {
+  for (const model of ['deepseek-v4.1-flash', 'gpt-6-luna', 'gemini-4-argon-contributor', 'future-go-model']) {
+    assert.equal(planProviderIdOf(provider, goConfig.planBilling, model), 'go')
+    assert.equal(ui.planProviderIdOfLocal(provider, goConfig, model), 'go')
+    assertBilling(provider, model, goConfig, 'plan')
+    assertBilling(provider, model, sanitizeConfig({ goQuota: { enabled: false } }), 'api')
+    assertBilling(provider, model, sanitizeConfig({ planBilling: { providers: { go: 'plan' } } }), 'plan')
+    assertBilling(provider, model, sanitizeConfig({ ...goConfig, planBilling: { providers: { go: 'api' } } }), 'api')
+    assertBilling(provider, model, sanitizeConfig({ ...goConfig, planBilling: { providers: { [provider]: 'api' } } }), 'api')
+    assertBilling(provider, model, sanitizeConfig({ ...goConfig, planBilling: { models: { [provider + ':' + model]: 'api' } } }), 'api')
+  }
+}
+assertBilling('opencode-zen', 'gpt-6-luna', goConfig, 'api')
+assertBilling('unknown-go-route', 'gpt-6-luna', goConfig, 'api')
+
+const goRoot = mkdtempSync(join(tmpdir(), 'cm-go-alias-'))
+try {
+  for (const [name, goEnabled, classification, expected] of [
+    ['enabled-auto', true, 'auto', 'plan'], ['explicit-plan', false, 'plan', 'plan'],
+    ['explicit-api', true, 'api', 'api'], ['disabled-auto', false, 'auto', 'api'],
+  ]) {
+    const models = ['deepseek-v4.1-flash', 'gpt-6-luna', 'gemini-4-argon-contributor']
+    const goLedger = new Ledger(sanitizeConfig({ goQuota: { enabled: goEnabled },
+      planBilling: { providers: { go: classification } },
+      prices: { providers: { 'dsh-opencode-go': { models: Object.fromEntries(models.map(model => [model, { input: 1, output: 4 }])) } } },
+    }), {}, join(goRoot, name + '.json'))
+    try {
+      for (const model of models) goLedger.account({ input: 1000, output: 200 }, model, name, Date.now(), 'dsh-opencode-go')
+      await goLedger.flushAsync()
+      const saved = JSON.parse(readFileSync(goLedger.path, 'utf8'))
+      for (const day of Object.values(saved.days)) for (const row of [day, ...day.sessions, ...Object.values(day.byProviderModel)]) {
+        assert.ok(row.cost > 0, 'API-equivalent amount remains available')
+        assert.equal(row.apiCost, expected === 'plan' ? 0 : row.cost, 'new Go usage has the correct persisted API spend: ' + name)
+      }
+      assertBilling('dsh-opencode-go', models[0], ui.parseConfig(stateSchema.shape.config.parse(saved.config), 'config'), expected)
+    } finally { await goLedger.close() }
+  }
+} finally { rmSync(goRoot, { recursive: true, force: true }) }
+
 const workbuddyConfig = sanitizeConfig({ codingPlans: { workbuddy: { enabled: true } } })
 for (const provider of ['workbuddy', 'workbuddy-subscription', 'workbuddy-ai', 'llm-workbuddy-ai', ' WorkBuddy-AI ', 'workbuddy-global', 'llm-workbuddy-global']) {
   assert.equal(planProviderIdOf(provider, workbuddyConfig.planBilling, workbuddyModel), 'workbuddy')

@@ -46,14 +46,19 @@ try {
   assert.equal(JSON.parse(readFileSync(settings.path)).config.historyDays, 45)
   assert.equal(persistedCalls(settings.path), 1)
 
+  let recoveredWrites = 0
   const lostAck = new Ledger(sanitizeConfig({}), {}, join(dir, 'lost-ack', 'ledger.json'), [], {
-    backgroundWriter: (payload, receive) => startLedgerWrite(payload, () => receive({ error: { message: 'synthetic lost acknowledgement' } })),
+    backgroundWriter: (payload, receive) => {
+      recoveredWrites++
+      return startLedgerWrite(payload, () => receive({ error: { message: 'synthetic lost acknowledgement' } }))
+    },
   })
   ledgers.push(lostAck)
   call(lostAck, 'once'); await lostAck.flushAsync()
   assert.equal(lostAck.pendingWrite, false)
   call(lostAck, 'twice'); await lostAck.flushAsync(); lostAck.flush()
   assert.equal(persistedCalls(lostAck.path), 2, 'an atomic commit with a lost worker acknowledgement is recovered, not replayed twice')
+  assert.equal(recoveredWrites, 2, 'a recovered receipt keeps the working background writer enabled')
 
   const large = fresh('performance'), base = { input: 100, output: 50, cacheRead: 1000, cacheWrite: 0, reasoning: 0, calls: 1, cost: .1, apiCost: .1 }
   for (let n = 0; n < 100; n++) {
