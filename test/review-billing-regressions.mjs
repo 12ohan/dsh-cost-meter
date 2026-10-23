@@ -105,6 +105,6 @@ try {
   finally { clearTimeout(keepAlive) }
   assert.equal(cancelled, true)
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)))
-  assert.ok(manifest.dshhub.permissions.network.includes('https://chatgpt.com'))
+  assert.ok(new Set(manifest.dshhub.permissions.network).has('https://chatgpt.com'))
 } finally { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }) }
 console.log('[ok] review regressions: large/truncated frames, output/line/event budgets, out-of-order calls, token totals, stable classification, real reset cycles, null quotas and bounded responses')
