@@ -1149,7 +1149,7 @@
     //    (bundle 无法导入 Node 模块,修改时两处同步)。──
     const PLAN_PROVIDER_ALIASES_LOCAL = {
       opendesign: OPENDESIGN_PROVIDER_IDS,
-      go: ['go', 'zen', 'opencode', 'opencode-go', 'opencode-go-plus'],
+      go: ['go', 'zen', 'opencode', 'opencode-go', 'opencode-go-plus', 'dsh-opencode-go'],
       codex: ['codex', 'openai-codex', 'dsh-openai-codex', 'codex-chatgpt'],
       // 以下别名来自 ChatGPT 订阅渠道的订阅线路(与 lib/plan-billing.js PLAN_PROVIDER_ALIASES 同步)。
       anthropic: ['anthropic', 'claude-subscription'],

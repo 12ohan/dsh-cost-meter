@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [1.9.30] - 2026-10-23
+
+- 后台账本线程启动、导入或超时失败后立即降级为同步保存，本次运行只告警一次且不再启动故障线程；日常定时保存继续工作。临时账本锁冲突仍可重试，已提交但丢失回执的交易仍先恢复回执，防止重复计费。
+- 补齐 `dsh-opencode-go` 的 Go 套餐别名，服务端与前端同步识别；新调用遵循 Go 的自动归属与显式分类，套餐用量不再误计为 API 花费，保留 API 等值金额。
+- 感谢 [@2239058652](https://github.com/2239058652) 在 [#387](https://github.com/Han-1413141/dsh-cost-meter/issues/387) 提供运行环境、最小复现、依赖链测试与异步失败定位；感谢 [@ZIye1208](https://github.com/ZIye1208) 在 [#389](https://github.com/Han-1413141/dsh-cost-meter/issues/389) 提供渠道对照、别名定位与补丁验证。
+- Fall back to synchronous ledger saves once a worker fails, without repeatedly restarting it. Preserve transient lock retries and lost-acknowledgement recovery. Recognize the dedicated `dsh-opencode-go` route as the Go family in both host and client billing.
+
+[更新说明 / Release notes](docs/update-notes-1.9.30.md)
+
 ## [1.9.29] - 2026-10-23
 
 - 修复 v1.9.28 后台账本线程缺少宿主模块解析器时找不到 `@deepseek-ai/dsh-home-paths`、反复写入失败的问题；工作线程独立打包，不再依赖 Desktop/Web 宿主的解析环境。
