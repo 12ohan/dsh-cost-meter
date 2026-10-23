@@ -52,7 +52,9 @@ if (process.argv[2] === '--claim') {
     await manual.refresh()
     assert.equal(calls, 2, 'manual sync bypasses automatic cooldown')
     clock += OPENROUTER_REFRESH_MS - 1
-    assert.equal((await manual.refresh({ automatic: true })).skipped, true)
+    const almostDue = await manual.refresh({ automatic: true })
+    assert.equal(almostDue.skipped, true)
+    assert.equal(almostDue.retryAfterMs, 1, 'schedule the remaining cooldown instead of delaying another full hour')
     clock++
     await manual.refresh({ automatic: true })
     assert.equal(calls, 3, 'automatic refresh resumes at the exact hourly boundary')
