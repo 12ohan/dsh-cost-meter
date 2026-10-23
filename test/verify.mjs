@@ -3870,8 +3870,8 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   assert.ok(planSrc.includes('function codingPlanWindowLabel(name, t)'), '窗口名本地化(fiveHour/weekly/monthly)')
   // 通用卡片样式:宽标签与文本窗口行的 CSS。
   assert.ok(planSrc.includes('.cm-mm-row.wide .cm-bbox-label{') && planSrc.includes('.cm-mm-row.wide .cm-mm-text{'), '通用卡片行样式存在')
-  // 单行余额来源(WorkBuddy):余额并入标题行右端,正文不再重复一行。
-  assert.ok(planSrc.includes("const titleValue = id === 'workbuddy'") && planSrc.includes("entries.filter(([name]) => name !== 'balance')"), '余额从正文窗口行剔除')
+  // WorkBuddy/OpenDesign 余额并入标题行,实际渲染由浏览器检查。
+  assert.ok(planSrc.includes("entries.filter(([name]) => name !== 'balance')"), '余额从正文窗口行剔除')
   assert.ok(planSrc.includes("className: titleValue ? 'cm-mm-title cm-mm-row wide' : 'cm-mm-title'"), '标题行右端余额节点(复用通用行样式,零新增 CSS)')
   console.log('[ok] Coding Plan 侧边栏显示(display 门控/通用卡片/双语文案/设置页下拉)通过')
 }
@@ -7008,6 +7008,7 @@ await import('./custom-model-prices.mjs')
 await import('./context-activity.mjs')
 await import('./review-billing-regressions.mjs')
 await import('./review-ledger-writer.mjs')
+await import('./ledger-worker-isolation.mjs')
 await import('./review-journal-storage.mjs')
 await import('./review-release.mjs')
 await import('./billion-null-usage.mjs')

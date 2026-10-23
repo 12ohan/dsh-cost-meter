@@ -13,6 +13,7 @@ import { checkSidebarAlignment } from './sidebar-alignment-checks.mjs'
 import { checkInlineBalance } from './inline-balance-checks.mjs'
 import { checkTodayAndOrder } from './today-sidebar-order-checks.mjs'
 import { checkDisplayPreview } from './display-preview-checks.mjs'
+import { checkFeedbackSidebar } from './feedback-sidebar-checks.mjs'
 
 const modules = resolve(process.env.DSH_TEST_UI_MODULES ?? '.tmp-pr240-host/node_modules')
 const req = createRequire(join(modules, '__display.cjs'))
@@ -28,7 +29,7 @@ const state = { config: saved, today: day, month: day, total: day, history: [], 
 const code = `
 import * as ReactDOMPortal from ${literal(req.resolve('react-dom'))};import React from ${literal(req.resolve('react'))};import{createRoot}from ${literal(req.resolve('react-dom/client'))};
 const h=React.createElement;
-const mainRequire=name=>name==='react'?React:{Tooltip:({children,label})=>React.cloneElement(children,{'data-test-tooltip':typeof label==='string'?label:''})};mainRequire.async=async()=>window.peakUI;
+const mainRequire=name=>name==='react'?React:{Tooltip:({children,label})=>React.cloneElement(children,{'data-test-tooltip':typeof label==='string'?label:typeof label?.props?.children==='string'?label.props.children:''})};mainRequire.async=async()=>window.peakUI;
 window.__ModuleLoader__={load:mod=>window.mainUI=mod.factory(mainRequire)};
 ${client}
 window.__ModuleLoader__={load:mod=>window.peakUI=mod.factory(name=>name==='react-dom'?ReactDOMPortal:React)};
@@ -87,6 +88,11 @@ await page.exposeFunction('saveConfig', patch => {
 })
 try {
   await page.goto(url)
+  if (process.argv.includes('--feedback-only')) {
+    const result = await checkFeedbackSidebar(page, output)
+    assert.deepEqual(errors, []); assert.deepEqual(external, [])
+    console.log('[ok] feedback ' + JSON.stringify(result))
+  } else {
   await page.evaluate(()=>{
     const host=document.createElement('div');host.id='host-fixture';host.style.cssText='position:absolute;top:5000px;height:1px;contain:strict;overflow:hidden'
     const sidebar=document.createElement('aside');sidebar.className='_2H3hWW_root';sidebar.style.cssText='background:rgb(238,243,248);border-radius:19px;width:324px'
@@ -333,7 +339,9 @@ try {
   assert.ok(previewQueries.every(url=>new URL(url).pathname==='/plugins/dsh-openai-codex/auth/status'),'only the explicitly enabled Codex component starts its account query')
   const sidebarUpdates=await checkSidebarUpdates(page,output);assert.deepEqual(errors,[]);
   const sidebarAlignment=await checkSidebarAlignment(page,output);assert.deepEqual(errors,[]);
+  const feedback=await checkFeedbackSidebar(page,output);assert.deepEqual(errors,[]);console.log('[ok] feedback '+JSON.stringify(feedback));
   const result={sidebarUpdates,sidebarAlignment,themes:2,widths:[1100,720,390],regions:3,normalFontSize:true,skinSurfaces:true,autosave:true,keyboard:true,...previewChecks,reopenCount:25,hostConversationNodes:20000,cpuThrottle:4,openMedianMs:Math.round(sorted[Math.floor(sorted.length/2)]),openP95Ms:Math.round(p95),...metrics,externalRequests:external.length,browserErrors:errors.length}
   writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log('[ok] '+JSON.stringify(result))
+  }
 } catch(error){await page.screenshot({path:join(output,'failure.png'),fullPage:true});console.error(errors);throw error}
 finally{await browser.close();await new Promise(resolve=>server.close(resolve))}

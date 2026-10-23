@@ -2841,9 +2841,9 @@
         ? Math.max(0, Math.min(100, Math.round(Number(win.percent) || 0))) : null
       // 条形方向(issue #67):Plan 卡默认已用方向,剩余方向时填充与标签显示剩余%。
       const planDirection = barDirectionOf(state.config, 'plan')
-      // 单行余额来源(WorkBuddy):余额提到标题行右端,正文不再重复一行;
+      // 余额放在标题行右端,正文只保留额度窗口;
       // 窗口文本只装数值,标题行自己补「余额:」标签。textWindowOf 只产非空文本,真值检查即可。
-      const titleValue = id === 'workbuddy' && windows.balance?.text
+      const titleValue = (id === 'workbuddy' || id === 'opendesign') && windows.balance?.text
         ? t('codingPlanWindowBalance') + ': ' + windows.balance.text : null
       const rows = (titleValue ? entries.filter(([name]) => name !== 'balance') : entries).map(([name, win]) => {
         const pct = pctOf(win)
@@ -2880,7 +2880,7 @@
           wide === false
             ? el('div', { className: 'cm-bbox-rail cm-num' }, railText)
             : el(Fragment, null,
-              // WorkBuddy 有余额时标题行复用宽行样式,余额以正文档贴右端。
+              // 标题和余额共用一行,保留悬停提示中的完整余额标签。
               el('div', { className: titleValue ? 'cm-mm-title cm-mm-row wide' : 'cm-mm-title' },
                 t(rowDef.labelKey),
                 titleValue && el('span', { className: 'cm-mm-text' }, titleValue)),
