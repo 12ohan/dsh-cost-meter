@@ -29,7 +29,7 @@ async function fixture(test) {
     },
     late(id) { listeners.get('session/event')({ id }, { type: 'assistant/message', seq: 3, data: { usage, turn: 1, step: 1, message: { source: { model: 'main' } } } }) },
     async restart(rewrite) {
-      for (const fn of effects.splice(0)) fn?.(); ledger.close()
+      for (const fn of effects.splice(0)) await fn?.(); await ledger.close()
       if (rewrite) rewrite()
       ledger = Ledger.load(path); bridge = installBillionContextBilling(ctx, ledger); await bridge.ingest()
     },
@@ -55,7 +55,7 @@ async function fixture(test) {
     },
   }
   try { await test(h) } finally {
-    for (const fn of effects.reverse()) fn?.(); ledger.close()
+    for (const fn of effects.reverse()) await fn?.(); await ledger.close()
     saved === undefined ? delete process.env.DSH_HOME : process.env.DSH_HOME = saved
     assert.equal(dirname(home), tmpdir()); rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }

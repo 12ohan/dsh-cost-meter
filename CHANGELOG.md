@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- 修复 v1.9.28 后台账本线程缺少宿主模块解析器时找不到 `@deepseek-ai/dsh-home-paths`、反复写入失败的问题；工作线程独立打包，不再依赖 Desktop/Web 宿主的解析环境。
+- 卸载插件时异步等待正在写入的账本，避免阻塞宿主事件循环；线程超时后终止并清理其独占锁，最终提交保留未保存用量。
+- 修复桌面皮肤拉伸侧栏底部容器产生的大块空白，卡片随内容占高；OpenDesign 余额移至标题行右侧，保留 5h 和周额度行。
+- 今日消费与余额同行时，今日金额和 Token 数按实际内容撑开行高，避免第二行被裁切；保留与余额首行对齐。
+- Bundle the ledger worker independently of the DSH resolver; keep disposal responsive and recover a stopped worker's lock before the final write. Keep Desktop footer cards at their content height and show the OpenDesign balance in the title row.
+
 ## [1.9.28] - 2026-10-23
 
 - 修复跨读取块的合法 zstd 大帧漏读，按实际解压输出执行预算；普通 JSONL、单行和事件数采用有界读取。

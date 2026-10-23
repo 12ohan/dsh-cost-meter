@@ -27,7 +27,7 @@ const fixture = async (config, fetchImpl, run) => {
   const previousHome = process.env.DSH_HOME, previousFetch = globalThis.fetch
   const cleanups = []
   let api
-  const dispose = () => { for (const fn of cleanups.splice(0).reverse()) fn() }
+  const dispose = async () => { for (const fn of cleanups.splice(0).reverse()) await fn() }
   try {
     const dir = join(root, 'storages', 'cost-meter')
     mkdirSync(dir, { recursive: true })
@@ -46,7 +46,7 @@ const fixture = async (config, fetchImpl, run) => {
     })
     await run(api, dispose)
   } finally {
-    dispose()
+    await dispose()
     globalThis.fetch = previousFetch
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
@@ -212,7 +212,7 @@ await check('自定义余额卸载时取消在途请求', async () => {
     signal = init.signal; await gate.promise; return Response.json({ balance: 10 })
   }, async (api, dispose) => {
     const pending = api.getState()
-    try { await until(() => signal); dispose() }
+    try { await until(() => signal); await dispose() }
     finally { gate.resolve(); await pending }
     assert.equal(signal.aborted, true)
   })

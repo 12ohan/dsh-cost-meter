@@ -340,7 +340,9 @@ window.__ModuleLoader__.load({
       // footer.action 与其它插件共用 flex 容器；宽栏费用独占一行，窄栏图标纵排。
       // SlotOutlet 会多一层 display:contents 容器（当前宿主同样如此），布局规则需命中外层 flex。
       // 没有这层包裹时直接子节点就是费用栈，两种结构都要命中；卡片隐藏/卸载后规则自动失效。
-      ':has(>.cm-footer-stack),:has(>[data-slot="sidebar.footer.action"]>.cm-footer-stack){flex-wrap:wrap}',
+      ':has(>.cm-footer-stack),:has(>[data-slot="sidebar.footer.action"]>.cm-footer-stack){flex-wrap:wrap;flex:0 0 auto;height:auto;min-height:0;align-content:flex-start}',
+      // Desktop skins can stretch both footer containers; keep the cards next to settings.
+      ':has(>div>[data-slot="sidebar.footer.action"]>.cm-footer-stack){flex:0 0 auto;height:auto;min-height:0}',
       ':has(>.cm-footer-stack.rail),:has(>[data-slot="sidebar.footer.action"]>.cm-footer-stack.rail){flex-direction:column;flex-wrap:nowrap;align-items:center;gap:6px}',
       '.cm-footer-stack{display:flex;flex:none;order:-1;flex-direction:column;gap:6px;width:100%;min-width:0;max-width:100%;align-items:stretch;box-sizing:border-box}',
       '.cm-footer-stack.rail{align-items:center;order:1}',

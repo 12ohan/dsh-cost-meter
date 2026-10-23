@@ -40,10 +40,11 @@ export async function checkInlineBalance(page, output) {
         const balance = node.querySelector('.cm-inline-balance .cm-bbox-head .cm-bbox-pct')
         const cost = value.getBoundingClientRect(), other = balance.getBoundingClientRect()
         const tokens = today.querySelector('[data-cm-today=tokens]')?.getBoundingClientRect()
-        return { top: cost.top, balanceTop: other.top, bottom: cost.bottom, tokenTop: tokens?.top }
+        return { top: cost.top, balanceTop: other.top, bottom: cost.bottom, tokenTop: tokens?.top, tokenBottom: tokens?.bottom, rowBottom: today.getBoundingClientRect().bottom }
       })
       assert.ok(Math.abs(geometry.top - geometry.balanceTop) <= 1, `${mode}/${metric}/${width} today amount aligns with balance: ` + JSON.stringify(geometry))
       if (metric === 'both') assert.ok(geometry.tokenTop >= geometry.bottom, 'tokens follow the amount without shifting its first line')
+      if (metric === 'both') assert.ok(geometry.tokenBottom <= geometry.rowBottom, 'the two-line amount is not clipped by the former fixed row height')
     }
   }
   await host.evaluate(n => { n.style.width = '311px' })

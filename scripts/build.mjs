@@ -22,6 +22,13 @@ import { javascriptLiteral } from './javascript-literal.mjs'
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
+// Worker threads have no DSH module resolver. Ship their dependency graph in
+// one file, including the pure home-path helper, rather than importing host peers.
+await build({ entryPoints: [resolve(projectRoot, 'src/ledger-writer-worker.js')], outfile: resolve(projectRoot, 'lib/ledger-writer-worker.js'),
+  bundle: true, platform: 'node', format: 'esm', minify: true, target: 'node20', legalComments: 'inline',
+  banner: { js: '// Generated from src/ledger-writer-worker.js by scripts/build.mjs; do not edit.' } })
+assert.ok(Buffer.byteLength(readFileSync(resolve(projectRoot, 'lib/ledger-writer-worker.js'))) <= 262144, 'ledger worker exceeds DSH STORE bound')
+
 // A single import installs the local proxy observer before loading price/UI
 // dependencies. Bundle its parser too, avoiding asynchronous dependency loading
 // while the host starts other plugins in parallel.
