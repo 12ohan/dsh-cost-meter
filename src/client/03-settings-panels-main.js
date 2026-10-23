@@ -1705,6 +1705,15 @@
       return el(CodexLazy, { ...props, state, view: 'prompt', ready: state?.codexCompat?.enabled === true && state?.codexCompat?.promptDue, locale: snapshot?.locale })
     }
 
+    // 迁移阶段两个入口均保留完整配置；DSH 切换设置页用途时再改为 true。
+    const SETTINGS_DISPLAY_ONLY = false
+    function CostOverview(props) {
+      const snapshot = props.useCost?.(s => s)
+      return el(BillingStatistics, { state: snapshot?.state, snapshot, api: props.api, load: props.api.loadSettingsOverview,
+        helpers: { makeT, Card, displayCostOf, quotaWindowRow, codingPlanWindowLabel, formatBalanceMoney,
+          formatCustomBalanceMoney, CODING_PLAN_ROWS, UsagePanel, TodaySessions, BudgetBoxContent, useCodexQuota } })
+    }
+
     function CostSection(props) {
       const costStore = props.useCost ? props.useCost(s => s) : undefined
       const api = props.api
@@ -2135,7 +2144,7 @@
       let lastPoll = Date.now()
       let reloading = false
       let active = true, retrySeconds = 1
-      let configRevision = 0, savingConfig = 0
+      let configRevision = 0, savingConfig = 0, configWrites = Promise.resolve()
       // 宿主在价格表版本未变时省略 config.prices(占轮询载荷 56%):此时沿用上一份,
       // 保证 config.prices 在客户端始终存在(渲染与改价逻辑都按它非空处理)。
       // 版本号相同即价格表逐字节相同,因此沿用上一份与用新下发的那份等价;
@@ -2214,6 +2223,7 @@
         return pages[name]
       }
       const api = {
+        loadSettingsOverview: () => loadPage('settings-overview'),
         loadStatistics: () => loadPage('statistics'),
         loadOpenRouter: () => loadPage('openrouter'),
         loadCommunity: () => loadPage('community'),
@@ -2225,12 +2235,15 @@
           const { activeLocale: _local, ...savedPatch } = patch
           // 使保存前发出的旧查询失效，避免套餐开关或工作区回退。
           configRevision++; savingConfig++
-          try {
+          // All mounted entries share this queue; a slow earlier save cannot undo a later one.
+          const write = configWrites.catch(() => {}).then(async () => {
             const state = await call('updateConfig', [savedPatch])
             store.set({ status: 'ready', error: null, state })
             if (patch.planBilling) setTimeout(() => { void reload() }, 1500)
             return state
-          } finally { savingConfig--; configRevision++ }
+          })
+          configWrites = write
+          try { return await write } finally { savingConfig--; configRevision++ }
         },
         fetchPrices: async () => receive(costMeter.fetchPrices()),
         // 交回自动同步(OpenRouter 手改价):成功即刷新本地快照,失败抛出带原因的错误。
@@ -2291,6 +2304,9 @@
       ;['conversation.view', 'sidebar.right.pane.tab', 'conversation.input.overlay'].forEach(contextPrices)
 
       const injected = () => ({ hooks: { cost: store }, api })
+      slots.inject('plugins.bundle.config', () => slots.register({
+        name: 'plugins.bundle.config', key: 'dsh-cost-meter', inject: injected,
+      }, CostSection))
       for (const [entryPosition, name] of [['header', 'conversation.session.header.actions'], ['dock', 'conversation.composer.dock']]) slots.inject(name, () => slots.register({ name, id: 'cost-meter-statistics', order: 1, inject: () => ({ ...injected(), entryPosition }) }, SessionStatisticsButton))
       slots.inject('conversation.chat.turnTail', () => slots.register({ name: 'conversation.chat.turnTail', id: 'cost-meter-turn', order: 10, inject: injected }, TurnCost))
       // 通用插槽注册去重:共享「失效旧注册→bump gen→注入→生成期护栏→记录 dispose→卸载清理」逻辑。
@@ -2384,7 +2400,7 @@
       // 设置页「费用/Cost」分节:语言变化时撤销旧注册并重建,让侧边栏标签同步。
       const sectionActive = slotActive()
       const registerSection = locale => {
-        registerSlot(sectionActive, 'settings.section', { name: 'settings.section', id: 'cost-meter', order: 30, label: locale === 'en' ? MESSAGES.en.sectionLabel : MESSAGES.zh.sectionLabel, inject: injected }, CostSection, true)
+        registerSlot(sectionActive, 'settings.section', { name: 'settings.section', id: 'cost-meter', order: 30, label: locale === 'en' ? MESSAGES.en.sectionLabel : MESSAGES.zh.sectionLabel, inject: injected }, SETTINGS_DISPLAY_ONLY ? CostOverview : CostSection, true)
       }
       // Token 用量统计「通用设置」行(position = general 时,注入宿主通用设置页的 settings.general.item 插槽)。
       const generalUsageActive = slotActive()

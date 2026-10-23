@@ -163,7 +163,7 @@ const displaySource = readFileSync(new URL('../src/display/index.js', import.met
 // classic script 语法错误不触发 error 事件、宿主只报「loaded without registering」,
 // 而本套件此前只做字符串断言、从不解析该文件——语法错误一路溜到线上。
 // 这里用 vm.Script 整份编译(只编译不执行,window 引用无碍),任何语法错误当场失败。
-for (const browserBundle of ['../lib/client.js', '../lib/client.codex.js', '../lib/client.statistics.js', '../lib/client.openrouter.js', '../lib/client.community.js', '../lib/client.pricing.js', '../lib/client.display.js']) {
+for (const browserBundle of ['../lib/client.js', '../lib/client.settings-overview.js', '../lib/client.codex.js', '../lib/client.statistics.js', '../lib/client.openrouter.js', '../lib/client.community.js', '../lib/client.pricing.js', '../lib/client.display.js']) {
   const src = readFileSync(new URL(browserBundle, import.meta.url), 'utf8')
   new vm.Script(src, { filename: browserBundle })
 }
@@ -7012,3 +7012,7 @@ await import('./ledger-worker-isolation.mjs')
 await import('./review-journal-storage.mjs')
 await import('./review-release.mjs')
 await import('./billion-null-usage.mjs')
+
+await import('./settings-pages.mjs')
+
+await import('./review-fx-consistency.mjs')
