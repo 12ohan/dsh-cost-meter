@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [1.9.27] - 2026-10-23
+
+- 修复 OpenRouter 每次启动都重拉价目表的问题：启动与小时级定时任务共用跨重启的一小时冷却，失败和中途退出也保留最近尝试时间；多个宿主共用一次自动刷新机会，冷却期间不改写账本或刷新状态。手动同步仍可立即执行。
+- 感谢 [@yanzhaohui1999](https://github.com/yanzhaohui1999) 在 [#384](https://github.com/Han-1413141/dsh-cost-meter/issues/384) 提供重启循环的流量测量、代码定位与持久化冷却建议。
+- Bound automatic OpenRouter catalog downloads with an hourly cooldown that survives restarts, failures and interrupted requests. Concurrent hosts share one refresh claim; manual sync remains immediate.
 
 - 修复 [@Sieuno](https://github.com/Sieuno) 在 [#382](https://github.com/Han-1413141/dsh-cost-meter/issues/382) 独立复现的 billion-context 漏记：持久化成功不再等同于用量完整。代理模型用量缺失、宿主用量有效时按调用流补记一次，保留独立压缩费用；重启和重复导入不重复入账。旧版已错误标记覆盖、但遗漏的宿主用量可从保留的桥接记录恢复；无法拆分的混合用量保留原始数据并提示核对。
 - Recover missing host usage once per stream when proxy model usage is unavailable; preserve compression charges and prevent duplicate recovery after restart. Keep ambiguous mixed usage explicit instead of adding a potentially overlapping host total.
@@ -13,6 +17,8 @@
 
 - 修复独立复现的 WorkBuddy 紧凑侧栏标题只占半行、余额无法靠右及被截断的问题，标题保持横跨整张卡片。[@SternChiri](https://github.com/SternChiri) 的 [#377](https://github.com/Han-1413141/dsh-cost-meter/issues/377) 反馈触发了排查；报告者随后撤回了原有“文字左对齐”定位，本修复依据实际浏览器中的标题宽度与余额位置验证。
 - Keep the WorkBuddy heading across both compact sidebar columns so its balance reaches the card's right edge.
+
+[更新说明 / Release notes](docs/update-notes-1.9.27.md)
 
 ## [1.9.26] - 2026-10-21
 

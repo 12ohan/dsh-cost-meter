@@ -209,15 +209,15 @@ try {
   directoryOk = true
   let beforeTimer = directoryCalls
   await lifecycleTimers.get(3000).fn()
-  assert.equal(directoryCalls, beforeTimer + 1, 'startup refresh reaches the public directory')
+  assert.equal(directoryCalls, beforeTimer, 'startup reuses the fresh snapshot from manual sync')
   beforeTimer = directoryCalls
   lifecycleTimers.get(3600_000).fn()
   for (let n = 0; n < 20; n++) await Promise.resolve()
-  assert.equal(directoryCalls, beforeTimer + 1, 'hourly timer refreshes the directory')
+  assert.equal(directoryCalls, beforeTimer, 'timer also observes the persisted cooldown')
   for (const cleanup of cleanups.splice(0).reverse()) cleanup()
   assert.ok([...lifecycleTimers.values()].every(timer => timer.cleared))
   lifecycleTimers.get(3600_000).fn()
-  assert.equal(directoryCalls, beforeTimer + 1, 'disposed timer cannot issue another request')
+  assert.equal(directoryCalls, beforeTimer, 'disposed timer cannot issue another request')
 } finally {
   for (const cleanup of cleanups.reverse()) cleanup()
   Object.assign(globalThis, nativeTimers)
