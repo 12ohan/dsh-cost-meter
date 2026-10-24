@@ -26,6 +26,7 @@ export async function checkInlineBalance(page, output) {
   assert.ok(await host.evaluate(n => n.getBoundingClientRect().height) < oldHeight, 'inline setting reduces sidebar height')
   assert.match(await row('today').getAttribute('data-test-tooltip'), /调用|请求/)
   assert.match(await row('balance').getAttribute('data-test-tooltip'), /赠送.*充值/)
+  assert.match(await row('balance').getAttribute('data-test-tooltip'), /DeepSeek/, 'the official balance identifies its source in inline layouts too')
   for (const mode of ['standard', 'compact', 'summary', 'simple']) for (const metric of ['cost', 'tokens', 'both']) {
     await page.evaluate(({ mode, metric }) => window.configure({ sidebarStyle: mode === 'simple' ? 'standard' : mode, sidebarSimple: mode === 'simple', sidebarTodayMetric: metric, balance: { ...window.current().balance, showProgressBar: true, budgetCap: 200 } }), { mode, metric })
     await sameRow()

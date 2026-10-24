@@ -492,6 +492,7 @@
           now: typeof v.meta?.now === 'number' ? v.meta.now : Date.now(),
           timezoneOffsetMinutes: typeof v.meta?.timezoneOffsetMinutes === 'number' ? v.meta.timezoneOffsetMinutes : 0,
           timezone: typeof v.meta?.timezone === 'string' ? v.meta.timezone : '',
+          ...(typeof v.meta?.defaultProvider === 'string' ? { defaultProvider: v.meta.defaultProvider } : {}),
           dayKey: typeof v.meta?.dayKey === 'string' ? v.meta.dayKey : '',
           monthKey: typeof v.meta?.monthKey === 'string' ? v.meta.monthKey : '',
         },
@@ -743,6 +744,7 @@
       if (base === undefined) return null
       Object.assign(base, priceMultiplierSettings(raw))
       if (raw.billingMode === 'utc-peak') base.billingMode = 'utc-peak'
+      if (raw.peakSchedule === 'volcengine') base.peakSchedule = 'volcengine'
       // 峰谷/历史子档必须随主档一起保留:usageSplit 回退计价与 Plan 拆分靠 tierFor
       // 取子档,剥掉会把峰时调用按基础价(= 谷价)重算、低估约一半(v1.6.9 审计修复)。
       for (const key of ['offPeak', 'peak', 'legacyBase']) {
@@ -827,7 +829,7 @@
       if (peak?.enabled !== true) return asTier(base)
       // 非有限(如 Date.parse('') 的 NaN)视同「未知生效时刻」,与服务端 tierFor 同口径。
       const effectiveAtMs = typeof peak.effectiveAtMs === 'number' && Number.isFinite(peak.effectiveAtMs) ? peak.effectiveAtMs : undefined
-      if (isPeakHour(atMs, effectiveAtMs, peak.windows, peak.holidays)) {
+      if (isPeakHour(atMs, effectiveAtMs, peak.windows, base.peakSchedule === 'volcengine' ? [] : peak.holidays)) {
         const p = base.peak
         return p === undefined ? asTier(base) : asTier(p, 'peak')
       }
@@ -915,15 +917,16 @@
      * 模型名自动匹配(与 lib/pricing.js 的 matchModelId 同逻辑;bundle 无法导入,修改时两处同步)。
      * 精确 → 归一化等价 → 去日期/版本后缀 → 安全后缀。
      */
-    function stripIdDecor(id, snapshotTags = true) {
+    function stripIdDecor(id, snapshotTags = true, shortSnapshotTags = true) {
       // Strip request decorations one at a time; candidate snapshots keep their identity.
       const text = modelNameText(id)
       if (snapshotTags && /[-_./:@](?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])$/.test(text)) return text.slice(0, -5)
+      if (snapshotTags && shortSnapshotTags && /[-_./:@]\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])$/.test(text)) return text.slice(0, -7)
       return text.replace(/[-_./:@](?:\d{4}-?\d{2}-?\d{2}|v\d+(?:\.\d+)*|\d+k|latest)$/, '')
     }
 
     /** Exact IDs precede unique punctuation aliases and request-only safe decorations. */
-    function matchModelIdLocal(modelId, candidates, exactId = modelId, snapshotTags = true) {
+    function matchModelIdLocal(modelId, candidates, exactId = modelId, snapshotTags = true, shortSnapshotTags = true) {
       if (typeof modelId !== 'string' || modelId.length === 0) return null
       const list = Array.isArray(candidates) ? candidates.filter(c => typeof c === 'string' && c.length > 0) : []
       const exact = list.find(c => c === exactId)
@@ -935,7 +938,7 @@
         if (canon.length === 0) return null
         const hits = list.filter(c => canonModelIdLocal(c) === canon)
         if (hits.length > 0) return hits.length === 1 ? hits[0] : null
-        const stripped = stripIdDecor(target, snapshotTags)
+        const stripped = stripIdDecor(target, snapshotTags, shortSnapshotTags)
         if (stripped === target.toLowerCase()) return null
         target = stripped
       }
@@ -966,11 +969,11 @@
         if (Object.hasOwn(MODEL_VENDOR_PREFIXES, vendor)
           && (vendor === provider || (provider === 'opencode-zen' || provider === 'opencode-go')
             && (MODEL_VENDOR_PREFIXES[vendor].test(bare)
-              || matchModelIdLocal(bare, Object.keys(vendor === 'deepseek' ? prices?.models ?? {} : prices?.providers?.[vendor]?.models ?? {}), bare, prices?.snapshotTags !== false) !== null))) target = bare
+              || matchModelIdLocal(bare, Object.keys(vendor === 'deepseek' ? prices?.models ?? {} : prices?.providers?.[vendor]?.models ?? {}), bare, prices?.snapshotTags !== false, prices?.shortSnapshotTags !== false) !== null))) target = bare
         else if (Object.hasOwn(MODEL_VENDOR_PREFIXES, vendor)) return null
       }
       // Formatting a request must not create a literal hit that bypasses alias collisions.
-      return matchModelIdLocal(target, Object.keys(models), modelId, prices?.snapshotTags !== false)
+      return matchModelIdLocal(target, Object.keys(models), modelId, prices?.snapshotTags !== false, prices?.shortSnapshotTags !== false)
     }
     /**
      * 客户端价格解析(与 pricing.js providerPriceEntryFor 同口径):手动覆盖 → 精确 → 自动匹配。
@@ -1001,7 +1004,7 @@
         && typeof override === 'string' && override.length > 0 && override !== '__local__' && !override.includes(':')) {
         const dsModels = prices.models ?? {}
         const retryHit = Object.hasOwn(dsModels, override) ? override
-          : (mode === 'auto' ? matchModelIdLocal(override, Object.keys(dsModels), override, prices?.snapshotTags !== false) : null)
+          : (mode === 'auto' ? matchModelIdLocal(override, Object.keys(dsModels), override, prices?.snapshotTags !== false, prices?.shortSnapshotTags !== false) : null)
         if (retryHit !== null && dsModels[retryHit]?.unpriced !== true) return { entry: dsModels[retryHit], priced: true, billingMode: 'deepseek-peak', matched: true }
       }
       return null
@@ -1116,15 +1119,17 @@
     }
     function resolveClientPrice(provider, modelId, config) {
       let result = resolveClientPriceRaw(provider, modelId, config)
-      if (result.currency) return result
-      if (!result.priced) {
-        const normalized = String(provider ?? '').trim().toLowerCase().replace(/^llm-/, '') || 'deepseek'
+      const normalized = String(provider ?? '').trim().toLowerCase().replace(/^llm-/, '') || 'deepseek'
+      if (!result.currency && !result.priced) {
         result = legacyDeepseekOverride(normalized, config?.priceOverrides?.[normalized + ':' + modelId], config?.prices ?? {}, config?.priceMatch === 'exact' ? 'exact' : 'auto') ?? result
       }
-      if (result.priced && config?.prices?.currency === 'CNY' && result.entry?.cny) {
-        return { ...result, entry: cnyPrice(result.entry), currency: 'CNY' }
+      if (!result.currency) {
+        result = result.priced && config?.prices?.currency === 'CNY' && result.entry?.cny
+          ? { ...result, entry: cnyPrice(result.entry), currency: 'CNY' }
+          : { ...result, currency: result.priced && result.billingMode === 'deepseek-peak' && config?.prices?.currency === 'CNY' ? 'CNY' : 'USD' }
       }
-      return { ...result, currency: result.priced && result.billingMode === 'deepseek-peak' && config?.prices?.currency === 'CNY' ? 'CNY' : 'USD' }
+      return ['volcengine', 'ark'].includes(normalized) && config?.prices?.volcenginePeak !== false && result.entry && result.billingMode === 'deepseek-peak'
+        ? { ...result, entry: { ...result.entry, peakSchedule: 'volcengine' } } : result
     }
     /** 投影 token 桶 → 按当前时刻档位计价的美元成本。 */
     /**
@@ -1932,22 +1937,19 @@
       if (balance.status === 'error') {
         return el(Tooltip, { portal: true, label: [t('balanceQueryFailed', { message: balance.message || t('unknownError') }), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
           el('div', { 'data-cm-display': 'balance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
-            wide ? el(Fragment, null, t('balance'), ' ', el('span', { className: 'cm-num' }, t('queryFailed'))) : '⚠'))
+            wide ? el(Fragment, null, t('officialBalance'), ' ', el('span', { className: 'cm-num' }, t('queryFailed'))) : '⚠'))
       }
-      const detail = [
-        t('balanceTitle'),
-        t('totalBalance', { amount: formatBalanceMoney(balance.totalBalance, state.config, balance.currency) }),
-        t('grantedToppedUp', {
-          granted: formatBalanceMoney(balance.grantedBalance, state.config, balance.currency),
-          toppedUp: formatBalanceMoney(balance.toppedUpBalance, state.config, balance.currency),
-        }),
-        t('updatedAt', { time: balance.fetchedAt > 0 ? new Date(balance.fetchedAt).toLocaleTimeString() : '—' }),
-        ...(state.reconcile?.ok === false ? ['⚠ ' + state.reconcile.message] : []),
-        ...clickRefreshTipLines(t, refresh),
-      ].join('; ')
+      const detail = officialBalanceTooltip(t, balance, state.config, state.reconcile, refresh)
       return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { 'data-cm-display': 'balance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
-          wide ? el(Fragment, null, el('span', { className: 'cm-balance-name' }, t('balance'), rechargeLinkEl(t)), el('span', { className: 'cm-num cm-bal-amt' }, formatBalanceMoney(balance.totalBalance, state.config, balance.currency)), state.reconcile?.ok === false ? ' ⚠' : '') : el(WalletIcon, { size: 16 })))
+          wide ? el(Fragment, null, el('span', { className: 'cm-balance-name' }, t('officialBalance'), rechargeLinkEl(t)), el('span', { className: 'cm-num cm-bal-amt' }, formatBalanceMoney(balance.totalBalance, state.config, balance.currency)), state.reconcile?.ok === false ? ' ⚠' : '') : el(WalletIcon, { size: 16 })))
+    }
+
+    function officialBalanceTooltip(t, balance, config, reconcile, refresh) {
+      const lines = [t('officialBalance') + ' ' + formatBalanceMoney(balance.totalBalance, config, balance.currency),
+        t('grantedToppedUp', { granted: formatBalanceMoney(balance.grantedBalance, config, balance.currency), toppedUp: formatBalanceMoney(balance.toppedUpBalance, config, balance.currency) }),
+        ...(reconcile?.ok === false ? ['⚠ ' + reconcile.message] : []), ...clickRefreshTipLines(t, refresh)]
+      return el('div', { style: { maxWidth: 'min(280px, 70vw)', whiteSpace: 'normal' } }, ...lines.map((line, key) => el('div', { key }, line)))
     }
 
     function BalanceBox(props) {
@@ -1959,21 +1961,10 @@
       if (!balance || balance.status !== 'ok') return null
       const segments = segmentsForOfficialBalance(state, config)
       const remaining = formatBalanceMoney(balance.totalBalance, config, balance.currency)
-      const formatAmt = v => formatBalanceMoney(v, config, balance.currency)
-      const detail = [
-        t('balanceTitle'),
-        balanceBarTooltipLines(t, formatAmt, segments, remaining, segments.cap),
-        t('grantedToppedUp', {
-          granted: formatBalanceMoney(balance.grantedBalance, config, balance.currency),
-          toppedUp: formatBalanceMoney(balance.toppedUpBalance, config, balance.currency),
-        }),
-        t('updatedAt', { time: balance.fetchedAt > 0 ? new Date(balance.fetchedAt).toLocaleTimeString() : '—' }),
-        ...(state.reconcile?.ok === false ? ['⚠ ' + state.reconcile.message] : []),
-        ...clickRefreshTipLines(t, refresh),
-      ].join('; ')
+      const detail = officialBalanceTooltip(t, balance, config, state.reconcile, refresh)
       const body = el(Fragment, null,
         el('div', { className: 'cm-bbox-head' },
-          el('span', { className: 'cm-balance-name' }, el('span', { className: 'cm-bbox-label' }, t('balance')), rechargeLinkEl(t)),
+          el('span', { className: 'cm-balance-name' }, el('span', { className: 'cm-bbox-label' }, t('officialBalance')), rechargeLinkEl(t)),
           el('span', { className: 'cm-bbox-pct cm-num cm-bal-amt' }, remaining)),
         el(BalanceBar, { segments, direction: barDirectionOf(config, 'balance') }))
       return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
@@ -2211,7 +2202,8 @@
      * 修改时两处需同步)。窗口半开区间 [start, end),兼容跨午夜窗口。
      * 周末/公众假期全天谷价；返回 weekend 或 holiday 标记，跳过期间的峰窗。
      */
-    function peakPhaseAt(atMs, windows, holidays) {
+    function peakPhaseAt(atMs, windows, holidays, schedule) {
+      if (schedule === 'volcengine') holidays = []
       if (!Array.isArray(windows) || windows.length === 0 || !Number.isFinite(atMs)) return null
       const hourAt = (dayOffset, hour) => {
         const date = new Date(atMs)
@@ -2257,8 +2249,18 @@
       if (!config || config.peakNotice === false || config.peakEnabled !== true) return null
       const effectiveAtMs = Date.parse(config.peakEffectiveAt || '')
       if (Number.isFinite(effectiveAtMs) && now < effectiveAtMs) return null
-      const windows = Array.isArray(config.peakWindows) ? config.peakWindows : []
-      return peakPhaseAt(now, windows, config.peakHolidays)
+      return peakPhaseForConfig(config, now)
+    }
+
+    function peakPhaseForConfig(config, now) {
+      const provider = String(config?.peakProvider ?? '').trim().toLowerCase().replace(/^llm-/, '')
+      return peakPhaseAt(now, config?.peakWindows ?? [], config?.peakHolidays, ['volcengine', 'ark'].includes(provider) ? 'volcengine' : undefined)
+    }
+
+    function peakConfigForState(state, provider) {
+      const config = state?.config
+      const selected = provider ?? config?.peakProvider ?? state?.meta?.defaultProvider
+      return config && selected ? { ...config, peakProvider: selected } : config
     }
 
     /** 相位标签键:周末全谷价 / 峰时 / 谷时(chip = 展开态文案,short = 收起态短词,notice = 悬停说明)。 */
@@ -2391,7 +2393,7 @@
     // 进度条与首次介绍共用按需模块，不增加旧样式的定时器和主包体积。
     let peakPage
     function loadPeakPage() {
-      return peakPage ??= require.async('./client.peak.js').then(module => module.mount({ peakView, peakPhaseAt, phaseLabelKeys, countdownText, resolveLocale, makeT, Tooltip, FloatingCard, renderSidebarFooter }))
+      return peakPage ??= require.async('./client.peak.js').then(module => module.mount({ peakView, peakPhaseAt, peakPhaseForConfig, peakConfigForState, phaseLabelKeys, countdownText, resolveLocale, makeT, Tooltip, FloatingCard, renderSidebarFooter }))
         .catch(error => { peakPage = null; throw error })
     }
     function PeakProgress(props) {
@@ -3427,13 +3429,14 @@
         try { projectionUsage = props.useProjection('costUsage') } catch { projectionUsage = undefined }
       }
       useProjectionRefresh(props, projectionUsage)
-      const state = costStore?.state
+      const current = costStore?.state
+      const state = current ? { ...current, config: peakConfigForState(current, projectionUsage?.provider) } : null
       return state ? renderSidebarFooter(state, !!props.wide, props.api) : null
     }
 
     // Shared presentation only: no store, projection or quota subscription.
     function renderSidebarFooter(state, wide, api, preview = false) {
-      const config = state.config
+      const config = peakConfigForState(state)
       const t = makeT(resolveLocale(config))
       const showBalance = (config.balance?.display === 'sidebar' || config.balance?.display === 'both')
         && config.hideOfficialBalance !== true
