@@ -232,6 +232,7 @@
           currency: typeof v.prices?.currency === 'string' && v.prices.currency.length > 0 ? v.prices.currency : undefined,
         },
         historyDays: needNum(v.historyDays, path + '.historyDays'),
+        billingStorageRetentionDays: [0, 7, 30].includes(v.billingStorageRetentionDays) ? v.billingStorageRetentionDays : 7,
         fetchedAt: v.fetchedAt === null || v.fetchedAt === undefined ? null : needStr(v.fetchedAt, path + '.fetchedAt'),
         priceSource: typeof v.priceSource === 'string' ? v.priceSource : 'bundled',
         budget: {
@@ -543,6 +544,16 @@
     // ── RPC 贡献(与服务端 ./typert 清单一一对应) ───────────────────────────
     const strictCodec = (name, schema) => ({ mode: 'strict', typeSymbol: 'dsh-cost-meter#' + name, schema, create: () => schema })
     const rpcParam = (name, type, schema, optional = false) => ({ name, wire: name, source: 'json', codec: strictCodec(type, schema), ...(optional ? { acceptsUndefined: true } : {}) })
+    const billingStorageOptionsCodec = codecOf(v => {
+      needObject(v, 'billing storage options')
+      if (Object.keys(v).some(key => !['retentionDays', 'apply', 'streams', 'groups'].includes(key)) || ![0, 7, 30].includes(v.retentionDays)) fail('billing storage options', 'retentionDays 0/7/30')
+      const out = { retentionDays: v.retentionDays }
+      for (const key of ['apply', 'streams', 'groups']) {
+        if (v[key] !== undefined && typeof v[key] !== 'boolean') fail(key, 'boolean')
+        out[key] = v[key] ?? key !== 'apply'
+      }
+      return out
+    })
 
     const CONTRIBUTION = {
       package: 'dsh-cost-meter',
@@ -557,6 +568,23 @@
           result: strictCodec('CostState', stateCodec),
         },
         ...['getState', 'getLocalState'].map(method => ({ method, result: strictCodec('CostState', stateCodec) })),
+        {
+          method: 'billingStorage',
+          parameters: [rpcParam('options', 'BillingStorageOptions', billingStorageOptionsCodec)],
+          result: strictCodec('BillingStorage', codecOf(v => {
+            needObject(v, 'billing storage')
+            const out = {}
+            for (const key of ['retentionDays', 'scannedAt', 'sessions', 'reclaimableBytes', 'archivedStreams', 'removedFiles', 'releasedBytes', 'archiveBytes', 'skipped']) out[key] = needNum(v[key], key)
+            for (const key of ['applied', 'limited']) { if (typeof v[key] !== 'boolean') fail(key, 'boolean'); out[key] = v[key] }
+            for (const key of ['streams', 'groups', 'archives']) {
+              const row = needObject(v[key], key), metric = {}
+              for (const field of ['files', 'bytes', 'eligibleFiles', 'eligibleBytes']) metric[field] = needNum(row[field], key + '.' + field)
+              for (const field of ['oldestAt', 'newestAt']) metric[field] = row[field] === null ? null : needNum(row[field], key + '.' + field)
+              out[key] = metric
+            }
+            return out
+          })),
+        },
         {
           method: 'updateConfig',
           parameters: [rpcParam('patch', 'ConfigPatch', patchCodec)],
