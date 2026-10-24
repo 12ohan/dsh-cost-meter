@@ -1152,8 +1152,8 @@
           onRemove ? el('button', { className: 'cm-btn small', onClick: onRemove }, t('quotaRemove')) : null,
           el('button', {
             className: 'cm-btn small', onClick: buttonAction,
-            disabled: busy === true || enabled !== true || saved?.enabled !== true || saved.display === 'off',
-            title: enabled !== true ? t('quotaEnableFirst') : saved?.enabled !== true || saved.display === 'off' ? t('quotaRefreshReady') : loginRequired ? t('loginCodingPlan') : t('refresh'),
+            disabled: busy === true || enabled !== true || saved?.enabled !== true || saved.display === 'off' && saved.showInComposer !== true,
+            title: enabled !== true ? t('quotaEnableFirst') : saved?.enabled !== true || saved.display === 'off' && saved.showInComposer !== true ? t('quotaRefreshReady') : loginRequired ? t('loginCodingPlan') : t('refresh'),
           }, buttonText)),
         statusNode,
         expandable && open === true ? el('div', { className: 'cm-collapse-body' }, configNode) : null,
@@ -1396,7 +1396,7 @@
       const set = (key, value) => { if (draft) setDraft({ ...draft, goQuota: { ...cfg, [key]: value } }) }
       return el(Fragment, null,
         [['display', 'goQuotaDisplayLabel'], ['main', 'goMainLabel']].map(([key, label]) => el('div', { key, className: 'cm-field' }, el('label', null, t(label)),
-          el('select', { className: 'cm-input', value: cfg[key], onChange: e => set(key, e.target.value) }, key === 'display' ? displayOptions(t) : ['rolling', 'weekly', 'monthly'].map((v, i) => el('option', { key: v, value: v }, t(['goWindowRolling', 'goWindowWeekly', 'goWindowMonthly'][i])))))),
+          el('select', { className: 'cm-input', value: key === 'display' ? quotaPlacementValue(cfg, (draft ?? config).quotaStrip, 'go') : cfg[key], onChange: e => key === 'display' ? draft && setDraft({ ...draft, goQuota: { ...cfg, ...quotaPlacementPatch(e.target.value) } }) : set(key, e.target.value) }, key === 'display' ? quotaPlacementOptions(t) : ['rolling', 'weekly', 'monthly'].map((v, i) => el('option', { key: v, value: v }, t(['goWindowRolling', 'goWindowWeekly', 'goWindowMonthly'][i])))))),
         el('div', { className: 'cm-field' }, el('label', null, t('goQuotaRefreshIntervalLabel')),
           numInput({ value: cfg.refreshMinutes }, v => set('refreshMinutes', Math.min(1440, Math.max(1, Math.floor(v)))))),
         el('label', null, t('goQuotaKeyLabel')),
@@ -1522,7 +1522,7 @@
     /** 单个 Coding Plan 订阅卡片(11 家共用:开关在标题行,展示/间隔/计划额度/凭据收在展开区)。 */
     let planSettingsPage
     function loadPlanSettings() {
-      return planSettingsPage ??= require.async('./client.plan-settings.js').then(module => module.mount({ useQuotaRefresh, miniMaxWindowsOf, MiniMaxPlanCard, barDirectionOf, quotaWindowRow, codingPlanWindowLabel, numInput, CredentialField, QuotaCard, resolveLocale, formatMoneyUsd })).catch(error => { planSettingsPage = null; throw error })
+      return planSettingsPage ??= require.async('./client.plan-settings.js').then(module => module.mount({ useQuotaRefresh, miniMaxWindowsOf, MiniMaxPlanCard, barDirectionOf, quotaWindowRow, codingPlanWindowLabel, numInput, CredentialField, QuotaCard, resolveLocale, formatMoneyUsd, quotaPlacementValue, quotaPlacementPatch, quotaPlacementOptions })).catch(error => { planSettingsPage = null; throw error })
     }
     function PlanQuotaCard(props) { return el(BillingStatistics, { ...props, load: loadPlanSettings }) }
 
@@ -2028,7 +2028,7 @@
           : null,
         // 显示设置：独立加载的交互预览，共用草稿与自动保存。
         el(BillingStatistics, { state: { ...state, displayPreviewCodex: codexQuotaCache.source === (state.config.codexQuotaSource ?? 'auto') ? codexQuotaSnapshot() : { status: 'idle', windows: {} } }, api, load: api.loadDisplay, draft, setDraft, t, locale,
-          numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, formatMoneyUsd,
+          numInput, displayOptions, quotaPlacementValue, quotaPlacementPatch, quotaPlacementOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, formatMoneyUsd,
           planOptions: CODING_PLAN_ROWS.map(row => [row.id, t(row.labelKey)]),
           onNavigate: (page, plan) => { setQuotaTarget(plan); setTab(page) },
           renderSidebar: (preview, data = state) => renderSidebarFooter({ ...data, config: preview }, true, undefined, true),

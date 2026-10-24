@@ -2,7 +2,7 @@
 window.__ModuleLoader__.load({ id: 'dsh-cost-meter', chunk: 'client.plan-settings.js', factory: require => {
   const { createElement: el, useState, Fragment } = require('react')
   return { mount(helpers) {
-    const { useQuotaRefresh, miniMaxWindowsOf, MiniMaxPlanCard, barDirectionOf, quotaWindowRow, codingPlanWindowLabel, numInput, CredentialField, QuotaCard, resolveLocale, formatMoneyUsd } = helpers
+    const { useQuotaRefresh, miniMaxWindowsOf, MiniMaxPlanCard, barDirectionOf, quotaWindowRow, codingPlanWindowLabel, numInput, CredentialField, QuotaCard, resolveLocale, formatMoneyUsd, quotaPlacementValue, quotaPlacementPatch, quotaPlacementOptions } = helpers
     function WorkBuddyAccounts({ live, config, setPlan, state }) {
       const text = (zh, en) => resolveLocale(state.config) === 'en' ? en : zh
       const data = live.workbuddy, rows = data?.accounts ?? [], scope = config.accountScope ?? 'current'
@@ -136,13 +136,15 @@ window.__ModuleLoader__.load({ id: 'dsh-cost-meter', chunk: 'client.plan-setting
           el('label', null, t('codingPlanDisplayLabel')),
           el('select', {
             className: 'cm-input',
-            value: typeof cfgEntry.display === 'string' ? cfgEntry.display : (planId === 'minimax' ? 'both' : 'settings'),
-            onChange: event => setPlan('display', event.target.value),
+            'aria-label': t('codingPlanDisplayLabel'),
+            value: quotaPlacementValue(cfgEntry, (draft ?? config).quotaStrip, 'plans'),
+            onChange: event => {
+              if (draft === null) return
+              const base = draft.codingPlans ?? config.codingPlans ?? {}
+              setDraft({ ...draft, codingPlans: { ...base, [planId]: { ...cfgEntry, ...quotaPlacementPatch(event.target.value) } } })
+            },
           },
-            el('option', { value: 'sidebar' }, t('balanceSidebar')),
-            el('option', { value: 'settings' }, t('balanceSettings')),
-            el('option', { value: 'both' }, t('balanceBoth')),
-            el('option', { value: 'off' }, t('off'))),
+            ...quotaPlacementOptions(t)),
           el('span', { className: 'cm-hint' }, t('codingPlanDisplayNote'))),
         // 刷新间隔(issue #33):进程内缓存过期分钟数,1-1440,保存后生效;
         // 本地估算无缓存间隔；千问 CLI 使用可配置的查询间隔。

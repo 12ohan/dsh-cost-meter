@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.9.36] - 2026-10-24
+
+- “DeepSeek 余额”名称改为可选：默认显示“余额”，在显示设置的官方余额组件中开启“显示余额来源（DeepSeek）”后显示来源；悬停提示始终保留账户来源。
+- Coding Plan 与 OpenCode Go 的显示位置增加“输入框上方”，支持侧栏、设置页与输入框上方的组合选择；额度设置和显示预览使用同一选项。
+- 单家位置可独立控制输入区额度横条，不会同时显示其他厂商，也不会启用原先关闭的查询；选择“仅输入框上方”后仍支持自动查询和点击刷新。
+- 保留已有横条默认设置的显示效果；手动选择单家位置后，以单家选择为准。配置经过校验、保存、重新加载与双端 codec。
+- Make the DeepSeek balance label optional and add per-vendor placement above the composer, including location combinations, persisted choices and composer-only refresh.
+
+[更新说明 / Release notes](docs/update-notes-1.9.36.md)
+
 ## [1.9.35] - 2026-10-24
 
 - 修复 6 位 YYMMDD 快照模型名未匹配价格的问题，支持火山方舟 deepseek-v4-1-flash-260910 / -261017；精确匹配和独立快照价格仍优先。

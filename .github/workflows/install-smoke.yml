@@ -112,6 +112,7 @@ jobs:
           node test/factory-quota-browser.mjs
           node test/codex-quota-browser.mjs
           node test/display-settings-browser.mjs
+          node test/quota-placement-browser.mjs
           node test/balance-gateway-browser.mjs
           node test/sidebar-guide-browser.mjs
           node test/peak-alert-browser.mjs
@@ -151,6 +152,7 @@ jobs:
             .tmp-codex-quota-browser/*
             .tmp-session-list-browser/*
             .tmp-peak-progress-preview/
+            .tmp-quota-placement/
             .tmp-notice-skin/
             .tmp-workbuddy-settings/
             .tmp-notice-layer/
