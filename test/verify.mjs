@@ -1399,7 +1399,7 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   assert.ok(clientSource.includes("id: 'cost-meter-qstrip-guide'"), '引导卡挂常驻 sidebar 插槽')
   assert.ok(clientSource.includes('function QuotaStrip(') && clientSource.includes('function QuotaStripGuide('), '两个组件定义存在')
   assert.ok(clientSource.includes("if (config.quotaStrip?.promptSeen === true) return null"), '引导卡按 promptSeen 门控')
-  assert.ok(clientSource.includes("if (strip.enabled !== true) return null"), '横条按 enabled 门控')
+  assert.ok(clientSource.includes("if (strip.enabled !== true && config.goQuota?.showInComposer !== true") && clientSource.includes('function quotaInComposer('), '横条保留默认门控，并允许单家显式选择输入框上方')
   assert.ok(clientSource.includes('cm-qstrip') && clientSource.includes('cm-qchip') && clientSource.includes('cm-qguide'), '横条/引导卡 CSS 类存在')
   assert.ok(clientSource.includes('quotaStripEnable') && clientSource.includes('quotaStripShowBudget') && clientSource.includes('quotaStripShowGo') && clientSource.includes('quotaStripShowPlans'), '设置 UI 开关文案存在')
   assert.ok(clientSource.includes('quotaStripGuideTitle') && clientSource.includes('quotaStripGuideOn') && clientSource.includes('quotaStripGuideOff'), '引导卡文案存在')
@@ -3860,7 +3860,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   }
   // 设置页:每张 provider 卡片内的显示位置下拉(统一卡片外壳后 planId 由卡片组件持有,setPlan 不再带 id)。
   assert.ok(planSrc.includes("t('codingPlanDisplayLabel')"), '显示位置标签在设置页渲染')
-  assert.ok(planSrc.includes("setPlan('display', event.target.value)"), '显示位置下拉写回该厂商 display')
+  assert.ok(planSrc.includes('...quotaPlacementPatch(event.target.value)') && planSrc.includes('...quotaPlacementOptions(t)'), '显示位置下拉写回该厂商的侧栏/设置页与输入区选择')
   // 选项值、文案及列表身份由 model-quota-cards.mjs 执行实际组件验证。
   // 侧边栏:按 display 门控的循环 + MiniMax 专用卡片 + 通用 CodingPlanBox。
   assert.ok(planSrc.includes('const sidebarPlanIds = CODING_PLAN_ROWS'), '侧边栏按 CODING_PLAN_ROWS 遍历厂商')
@@ -6947,6 +6947,7 @@ await import('./pricing-model-matching.mjs')
 await import('./provider-pricing-coverage.mjs')
 await import('./ollama-cloud-pricing.mjs')
 await import('./volcengine-pricing.mjs')
+await import('./quota-placement.mjs')
 await import('./ollama-cloud-upgrade.mjs')
 await import('./ollama-snapshot-upgrade.mjs')
 await import('./subagent-billing.mjs')

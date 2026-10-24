@@ -130,6 +130,13 @@ try {
   const customize=async key=>{await item(key).first().click({position:{x:8,y:8}});await page.locator('[data-inspector="'+key+'"]').waitFor()}
   const toggle=async key=>{await page.getByLabel('调整组件',{exact:true}).selectOption(key);await page.locator('[data-display-toggle="'+key+'"]').click()}
   const examples=page.getByRole('checkbox',{name:'使用示例数据',exact:true})
+  await customize('balance')
+  const sourceSwitch = page.getByRole('switch', { name: '显示余额来源（DeepSeek）', exact: true })
+  assert.equal(await sourceSwitch.isChecked(), false)
+  await sourceSwitch.check()
+  await page.waitForFunction(() => window.current().balance.showSource === true && document.querySelector('.cm-sidebar-live .cm-balance-name')?.textContent.includes('DeepSeek'))
+  await sourceSwitch.uncheck()
+  await page.waitForFunction(() => window.current().balance.showSource === false && !document.querySelector('.cm-sidebar-live .cm-balance-name')?.textContent.includes('DeepSeek'))
   assert.equal(await examples.isChecked(),true,'examples are on by default')
   assert.equal(await page.locator('.cm-display-model-options,.cm-display-details').count(),0,'options live in the inspector instead of folded forms')
   assert.equal(await page.locator('iframe,.cm-native-desktop,.cm-preview-reference').count(),0,'no desktop copy or scaled reference')

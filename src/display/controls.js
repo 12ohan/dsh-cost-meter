@@ -33,7 +33,7 @@ function PeakStyleSample({ render, config, data, style }) {
 }
 
 function DisplayInspector({ props, config, set, selected, selectedPlan, selectPlan, openQuota, select, labels, registry, text, region, general = false, examples, previewData, stylesOpen = false, setStylesOpen }) {
-  const { t, numInput, CURRENCY_PRESETS, displayOptions, USAGE_POSITION_SWITCHABLE } = props
+  const { t, numInput, CURRENCY_PRESETS, displayOptions, quotaPlacementValue, quotaPlacementPatch, quotaPlacementOptions, USAGE_POSITION_SWITCHABLE } = props
   const nested = (key, patch) => set({ [key]: { ...config[key], ...patch } })
   const check = (label, value, change, extra = {}) => el('label', { className: 'cm-check cm-display-switch', key: label },
     el('span', null, label), el('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: value, onChange: e => change(e.target.checked), ...extra }))
@@ -60,12 +60,13 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
     check(t('budgetDetailLabel'), config.budget?.detail !== false, value => nested('budget', { detail: value }), { 'data-display-option': 'budget-detail' }), direction('budget')]
   if (selected === 'today') controls = todayControls()
   if (selected === 'balance') controls = [display('balance'),
+    check(t('balanceShowSource'), config.balance?.showSource === true, value => nested('balance', { showSource: value }), { 'data-display-option': 'balance-source' }),
     check(t('balanceShowProgressBar'), config.balance?.showProgressBar === true, value => nested('balance', { showProgressBar: value }), { 'data-display-option': 'balance-progress' }),
     config.balance?.showProgressBar === true ? number(t('balanceBudgetCapLabel'), config.balance?.budgetCap ?? '', value => nested('balance', { budgetCap: value || null }), 0, 1e12) : null,
     direction('balance'), number(t('refreshIntervalLabel'), config.balance?.refreshMinutes ?? 5, value => nested('balance', { refreshMinutes: Math.floor(value) }), 1)]
   if (selected === 'go') controls = [
     props.state.goQuota?.status !== 'ok' && !examples ? el('p', { className: 'cm-inspector-note' }, text('配置并获取 Go 额度后显示；这里只调整外观。', 'Shown after Go quota is configured and available.')) : null,
-    display('goQuota'), choice(text('主进度条', 'Primary window'), config.goQuota?.main ?? 'rolling', [['rolling', '5h'], ['weekly', text('周', 'Week')], ['monthly', text('月', 'Month')]], value => nested('goQuota', { main: value })),
+    field(text('显示位置', 'Placement'), el('select', { className: 'cm-input', value: quotaPlacementValue(config.goQuota, config.quotaStrip, 'go'), onChange: e => nested('goQuota', quotaPlacementPatch(e.target.value)) }, ...quotaPlacementOptions(t).filter(option => option.props.value !== 'off'))), choice(text('主进度条', 'Primary window'), config.goQuota?.main ?? 'rolling', [['rolling', '5h'], ['weekly', text('周', 'Week')], ['monthly', text('月', 'Month')]], value => nested('goQuota', { main: value })),
     check(t('goDetailLabel'), config.goQuota?.detail !== false, value => nested('goQuota', { detail: value }), { 'data-display-option': 'go-detail' }), direction('go'),
     number(t('refreshIntervalLabel'), config.goQuota?.refreshMinutes ?? 15, value => nested('goQuota', { refreshMinutes: Math.floor(value) }), 1)]
   if (selected === 'peak') controls = [el('div', { className: 'cm-peak-control' },
@@ -100,10 +101,10 @@ function DisplayInspector({ props, config, set, selected, selectedPlan, selectPl
     check(text('余额进度条（与官方余额共用）', 'Progress bar (shared with official balance)'), config.balance?.showProgressBar === true, value => nested('balance', { showProgressBar: value }), { 'data-display-option': 'balance-progress' }), direction('balance')]
   if (selected === 'plan') {
     const entry = config.codingPlans?.[selectedPlan] ?? {}
-    const setPlanDisplay = value => set({ codingPlans: { ...config.codingPlans, [selectedPlan]: { ...entry, display: value } } })
+    const setPlanDisplay = value => set({ codingPlans: { ...config.codingPlans, [selectedPlan]: { ...entry, ...quotaPlacementPatch(value) } } })
     controls = [
       choice(text('套餐', 'Plan'), selectedPlan, props.planOptions, selectPlan),
-      field(text('显示位置', 'Placement'), el('select', { className: 'cm-input', value: entry.display === 'off' ? 'sidebar' : entry.display ?? (selectedPlan === 'minimax' ? 'both' : 'settings'), onChange: e => setPlanDisplay(e.target.value) }, ...displayOptions(t).filter(option => option.props.value !== 'off'))),
+      field(text('显示位置', 'Placement'), el('select', { className: 'cm-input', value: quotaPlacementValue(entry, config.quotaStrip, 'plans'), onChange: e => setPlanDisplay(e.target.value) }, ...quotaPlacementOptions(t).filter(option => option.props.value !== 'off'))),
       direction('plan', text('所有套餐的进度条方向', 'Bar direction for all plans')),
       el('button', { type: 'button', className: 'cm-btn small', onClick: openQuota }, text('账户与额度设置 →', 'Account and quota settings →')),
     ]

@@ -10,6 +10,7 @@ const sourceDir = new URL('../src/client/', import.meta.url)
 const source = readdirSync(sourceDir).filter(name => name.endsWith('.js')).sort().map(name => readFileSync(new URL(name, sourceDir), 'utf8')).join('')
 const expose = ['SidebarModelCosts', 'sidebarModelRows', 'modelStatsRows', 'MODEL_SIDEBAR_DEFAULTS', 'MODEL_OPEN_KEY', 'QuotaCard', 'useQuotaRefresh', 'QuotasSection', 'PlanQuotaCard', 'GatewayQuotaCard', 'GoQuotaCard', 'GoQuotaSettings', 'CustomBalanceEntryPanel', 'SidebarFooter', 'CornerChips', 'parseConfig', 'makeT', 'CODING_PLAN_ROWS']
 expose.push('CostSection', 'MiniMaxPlanCard')
+expose.push('quotaPlacementValue', 'quotaPlacementPatch', 'quotaPlacementOptions')
 expose.push('BalancePanel', 'CredentialField', 'parseBalance', 'miniMaxWindowsOf', 'barDirectionOf', 'quotaWindowRow', 'codingPlanWindowLabel', 'numInput', 'resolveLocale', 'formatMoneyUsd')
 const element = (type, props, ...children) => ({ type, props: props ?? {}, children })
 const nodes = value => Array.isArray(value) ? value.flatMap(nodes) : value && typeof value === 'object' ? [value, ...nodes(value.children)] : []
@@ -335,7 +336,7 @@ for (const settings of [goSettings, planRows.tree.props.configNode]) {
   const select = nodes(settings).find(n => n.type === 'select' && nodes(n).some(o => o.type === 'option' && o.props.value === 'sidebar'))
   assert.ok(select, 'Go 和 Coding Plan 均有显示位置选择器')
   assert.deepEqual(nodes(select).filter(n => n.type === 'option').map(n => [n.props.value, textOf(n)]),
-    [['sidebar', t('balanceSidebar')], ['settings', t('balanceSettings')], ['both', t('balanceBoth')], ['off', t('off')]], '显示位置选项与余额文案一致')
+    [['sidebar', t('balanceSidebar')], ['settings', t('balanceSettings')], ['both', t('quotaSidebarSettings')], ['composer', t('quotaComposer')], ['sidebar-composer', t('quotaSidebarComposer')], ['settings-composer', t('quotaSettingsComposer')], ['all', t('quotaAllPositions')], ['off', t('off')]], 'Go 和各家套餐均包含输入框上方及组合位置')
 }
 
 // 实际 activate API：共享快照计时器、隐藏页面门控、slot 注册和 RPC 返回传播。

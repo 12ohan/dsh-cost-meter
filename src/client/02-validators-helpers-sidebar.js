@@ -202,6 +202,7 @@
               out[id] = {
                 enabled: e.enabled === true,
                 display: e.display === 'sidebar' || e.display === 'both' || e.display === 'off' ? e.display : 'settings',
+                ...(typeof e.showInComposer === 'boolean' ? { showInComposer: e.showInComposer } : {}),
                 refreshMinutes: typeof e.refreshMinutes === 'number' && Number.isFinite(e.refreshMinutes) ? e.refreshMinutes : 15,
                 apiKey: typeof e.apiKey === 'string' ? e.apiKey : '',
                 ...(id === 'minimax' ? { baseUrl: typeof e.baseUrl === 'string' ? e.baseUrl : '' } : {}),
@@ -247,11 +248,13 @@
           display: oneOf(v.balance?.display, ['sidebar', 'settings', 'off'], 'both'),
           refreshMinutes: typeof v.balance?.refreshMinutes === 'number' && Number.isFinite(v.balance.refreshMinutes) ? v.balance.refreshMinutes : 5,
           showProgressBar: v.balance?.showProgressBar === true,
+          showSource: v.balance?.showSource === true,
           budgetCap: typeof v.balance?.budgetCap === 'number' && Number.isFinite(v.balance.budgetCap) && v.balance.budgetCap > 0 ? v.balance.budgetCap : null,
           clickHintSeen: v.balance?.clickHintSeen === true,
         },
         goQuota: {
           enabled: v.goQuota?.enabled !== false,
+          ...(typeof v.goQuota?.showInComposer === 'boolean' ? { showInComposer: v.goQuota.showInComposer } : {}),
           display: oneOf(v.goQuota?.display, ['sidebar', 'settings', 'off'], 'both'),
           refreshMinutes: typeof v.goQuota?.refreshMinutes === 'number' && Number.isFinite(v.goQuota.refreshMinutes) ? v.goQuota.refreshMinutes : 15,
           apiKey: typeof v.goQuota?.apiKey === 'string' ? v.goQuota.apiKey : '',
@@ -1937,13 +1940,15 @@
       if (balance.status === 'error') {
         return el(Tooltip, { portal: true, label: [t('balanceQueryFailed', { message: balance.message || t('unknownError') }), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
           el('div', { 'data-cm-display': 'balance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
-            wide ? el(Fragment, null, t('officialBalance'), ' ', el('span', { className: 'cm-num' }, t('queryFailed'))) : '⚠'))
+            wide ? el(Fragment, null, balanceLabel(t, state.config), ' ', el('span', { className: 'cm-num' }, t('queryFailed'))) : '⚠'))
       }
       const detail = officialBalanceTooltip(t, balance, state.config, state.reconcile, refresh)
       return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { 'data-cm-display': 'balance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
-          wide ? el(Fragment, null, el('span', { className: 'cm-balance-name' }, t('officialBalance'), rechargeLinkEl(t)), el('span', { className: 'cm-num cm-bal-amt' }, formatBalanceMoney(balance.totalBalance, state.config, balance.currency)), state.reconcile?.ok === false ? ' ⚠' : '') : el(WalletIcon, { size: 16 })))
+          wide ? el(Fragment, null, el('span', { className: 'cm-balance-name' }, balanceLabel(t, state.config), rechargeLinkEl(t)), el('span', { className: 'cm-num cm-bal-amt' }, formatBalanceMoney(balance.totalBalance, state.config, balance.currency)), state.reconcile?.ok === false ? ' ⚠' : '') : el(WalletIcon, { size: 16 })))
     }
+
+    function balanceLabel(t, config) { return t(config?.balance?.showSource === true ? 'officialBalance' : 'balance') }
 
     function officialBalanceTooltip(t, balance, config, reconcile, refresh) {
       const lines = [t('officialBalance') + ' ' + formatBalanceMoney(balance.totalBalance, config, balance.currency),
@@ -1964,7 +1969,7 @@
       const detail = officialBalanceTooltip(t, balance, config, state.reconcile, refresh)
       const body = el(Fragment, null,
         el('div', { className: 'cm-bbox-head' },
-          el('span', { className: 'cm-balance-name' }, el('span', { className: 'cm-bbox-label' }, t('officialBalance')), rechargeLinkEl(t)),
+          el('span', { className: 'cm-balance-name' }, el('span', { className: 'cm-bbox-label' }, balanceLabel(t, config)), rechargeLinkEl(t)),
           el('span', { className: 'cm-bbox-pct cm-num cm-bal-amt' }, remaining)),
         el(BalanceBar, { segments, direction: barDirectionOf(config, 'balance') }))
       return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
@@ -3050,6 +3055,24 @@
       factory: 'Factory', opendesign: 'OpenDesign',
     }
 
+    function quotaInComposer(entry, strip, kind) {
+      if (entry?.enabled !== true) return false
+      return typeof entry.showInComposer === 'boolean' ? entry.showInComposer : entry.display !== 'off' && strip?.enabled === true && strip[kind] !== false
+    }
+    function quotaPlacementValue(entry, strip, kind) {
+      const display = entry?.display ?? 'settings'
+      const composer = typeof entry?.showInComposer === 'boolean' ? entry.showInComposer : display !== 'off' && strip?.enabled === true && strip[kind] !== false
+      return composer ? ({ off: 'composer', both: 'all' }[display] ?? display + '-composer') : display
+    }
+    function quotaPlacementPatch(value) {
+      const display = { composer: 'off', 'sidebar-composer': 'sidebar', 'settings-composer': 'settings', all: 'both' }[value]
+      return { display: display ?? value, showInComposer: display !== undefined }
+    }
+    function quotaPlacementOptions(t) {
+      return [['sidebar', 'balanceSidebar'], ['settings', 'balanceSettings'], ['both', 'quotaSidebarSettings'], ['composer', 'quotaComposer'], ['sidebar-composer', 'quotaSidebarComposer'], ['settings-composer', 'quotaSettingsComposer'], ['all', 'quotaAllPositions'], ['off', 'off']]
+        .map(([value, key]) => el('option', { key: value, value }, t(key)))
+    }
+
     function QuotaStrip(props) {
       const costStore = props.useCost ? props.useCost(s => s) : undefined
       const cfg = costStore?.state?.config
@@ -3062,11 +3085,11 @@
       if (!state) return null
       const config = state.config
       const strip = config.quotaStrip ?? { enabled: false, budget: true, go: true, plans: true }
-      if (strip.enabled !== true) return null
+      if (strip.enabled !== true && config.goQuota?.showInComposer !== true && !Object.values(config.codingPlans ?? {}).some(entry => entry.enabled === true && entry.showInComposer === true)) return null
       const t = makeT(resolveLocale(config))
       const chips = []
       // 预算 chip:与预算图框同口径(≥80% 预警、≥100% 超支);点击 reload 重取状态(issue #52)。
-      if (strip.budget !== false) {
+      if (strip.enabled === true && strip.budget !== false) {
         const budget = config.budget ?? { enabled: false, amount: 100, period: 'month' }
         if (budget.enabled === true) {
           const rate = Number(config.exchangeRate)
@@ -3093,7 +3116,7 @@
         }
       }
       // Go chip:主窗口一档(与右下角 chips 的主窗口口径一致)。
-      if (strip.go !== false) {
+      if (quotaInComposer(config.goQuota, strip, 'go')) {
         const goQuota = state.goQuota
         if (config?.goQuota?.enabled !== false && goQuota?.status === 'ok') {
           const mainKey = config.goQuota.main === 'weekly' || config.goQuota.main === 'monthly' ? config.goQuota.main : 'rolling'
@@ -3114,10 +3137,10 @@
         }
       }
       // Coding Plan chip:每家厂商一条(多窗口融合为段,竖线分隔;点击刷新整家,issue #52)。
-      if (strip.plans !== false) {
+      {
         for (const rowDef of CODING_PLAN_ROWS) {
           const live = state.codingPlans?.[rowDef.id]
-          if (config.codingPlans?.[rowDef.id]?.enabled !== true || !live || live.status !== 'ok') continue
+          if (!quotaInComposer(config.codingPlans?.[rowDef.id], strip, 'plans') || !live || live.status !== 'ok') continue
           const windows = live.windows !== null && typeof live.windows === 'object' ? live.windows : {}
           const allEntries = Object.entries(windows)
           const groups = rowDef.id === 'factory'
@@ -3163,7 +3186,7 @@
       }
       // Codex chip(issue #59):connect / subscription 在位且已登录时出现;5h + 周双窗口。
       // 独立于 Coding Plan 开关:即使 strip.plans 为 false,Codex chip 仍应渲染。
-      const codexWins = config.codexQuotaEnabled === true && config.codexQuotaStrip !== false && codexQuotaCache.source === (config.codexQuotaSource ?? 'auto') && codexQuotaCache.status === 'ok' ? codexQuotaCache.windows : {}
+      const codexWins = strip.enabled === true && config.codexQuotaEnabled === true && config.codexQuotaStrip !== false && codexQuotaCache.source === (config.codexQuotaSource ?? 'auto') && codexQuotaCache.status === 'ok' ? codexQuotaCache.windows : {}
       const fiveWin = codexWins.five ?? null
       const weekWin = codexWins.weekly ?? null
       const pctOf = win => Math.max(0, Math.min(100, Math.round(Number(win.percent) || 0)))
