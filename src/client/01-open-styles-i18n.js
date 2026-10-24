@@ -1130,7 +1130,7 @@ window.__ModuleLoader__.load({
         codexQuotaFive: '5h quota',
         codexQuotaWeek: 'Weekly quota',
         codexQuotaReset: 'resets {time}',
-        codexQuotaUnavailable: 'Quota unavailable. Check the selected source is signed in; click to retry.',
+        codexQuotaUnavailable: 'Quota unavailable. Enable and sign in to the selected source; click to retry.',
         codexQuotaEnabled: 'Show Codex quota (requires a signed-in Codex plugin)',
         codexQuotaSidebar: 'Show Codex quota in sidebar',
         codexQuotaStrip: 'Show Codex quota above composer',
