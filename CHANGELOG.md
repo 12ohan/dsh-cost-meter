@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [1.9.32] - 2026-10-24
+
+- 新增 `dsh-chatgpt-sub` 图形化额度适配：侧栏和输入区显示 5 小时、每周剩余进度条及重置时间，只有周额度的账号仅显示周窗口；点击卡片可刷新。
+- 先确认插件当前绑定状态，再使用它保存在 DSH 中的凭据查询额度；前端仅接收百分比和时间，不读取共享 Codex 登录文件。支持自动检测和单独指定来源，保留原有订阅插件接口。
+- 覆盖登录恢复、解除绑定、凭据轮换、错误与超时、卸载、来源切换、严格 RPC 编解码及实际浏览器显示；适配依据为 [dsh-chatgpt-sub 0.6.3](https://github.com/songoao25/dsh-chatgpt-sub) 的公开状态接口和凭据约定。
+- Display graphical ChatGPT quota for `dsh-chatgpt-sub`, including remaining 5h/weekly windows, reset times and refresh. Verify the active binding and query through the host-held credential; keep credentials out of the browser and shared Codex login files untouched.
+
+[更新说明 / Release notes](docs/update-notes-1.9.32.md)
+
 ## [1.9.31] - 2026-10-23
 
 - 插件详情页接入完整费用设置，与左下角设置共用组件、实时快照、配置保存和按需加载；旧宿主保留设置入口。

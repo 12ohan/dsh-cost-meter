@@ -148,7 +148,7 @@
         sidebarModels: Object.fromEntries(Object.entries(MODEL_SIDEBAR_DEFAULTS).map(([k, v0]) => [k, v.sidebarModels?.[k] ?? v0])),
         codexQuotaSidebar: v.codexQuotaSidebar !== false,
         codexQuotaStrip: v.codexQuotaStrip !== false,
-        codexQuotaSource: ['connect', 'subscription', 'chatgpt', 'pi-ai'].includes(v.codexQuotaSource) ? v.codexQuotaSource : 'auto',
+        codexQuotaSource: ['connect', 'subscription', 'chatgpt', 'pi-ai', 'chatgpt-sub'].includes(v.codexQuotaSource) ? v.codexQuotaSource : 'auto',
         // Codex 订阅兼容(契约 B-5):用户已关闭一次性提示 / 已应用历史归类的时点。
         // 直通白名单缺失会导致关闭后重开页面又弹提示,或应用后状态行回落「未应用」。
         codexCompatHistoryAppliedAt: num0(v.codexCompatHistoryAppliedAt),
@@ -579,8 +579,8 @@
         {
           method: 'refreshGoQuota',
           },
-        {
-          method: 'getPiAiCodexQuota',
+        ...['getPiAiCodexQuota', 'getChatgptSubQuota'].map(method => ({
+          method,
           result: strictCodec('PiAiCodexQuota', codecOf(v => {
             needObject(v, 'pi-ai quota')
             if (!['off', 'ok', 'error'].includes(v.status)) fail('pi-ai quota status', 'off/ok/error')
@@ -592,7 +592,7 @@
             }
             return { status: v.status, windows, message: needStr(v.message, 'message') }
           })),
-        },
+        })),
         {
           method: 'refreshCustomBalance',
           // index(v1.7.1):与宿主侧 manifest 同口径——acceptsUndefined 允许旧调用
@@ -2690,10 +2690,10 @@
     }
 
     const codexQuotaCache = { source: 'auto', listeners: [] }
-    const resetCodexQuota = (rpc, readPiAi = null) => Object.assign(codexQuotaCache, { rpc, readPiAi, request: null, inFlight: null, fetchedAt: 0, status: 'idle', windows: {}, message: '' })
+    const resetCodexQuota = (rpc, readPiAi = null, readChatgptSub = null) => Object.assign(codexQuotaCache, { rpc, readPiAi, readChatgptSub, request: null, inFlight: null, fetchedAt: 0, status: 'idle', windows: {}, message: '' })
     resetCodexQuota(null)
     const codexQuotaSnapshot = () => {
-      const { rpc, readPiAi, request, inFlight, listeners, ...view } = codexQuotaCache
+      const { rpc, readPiAi, readChatgptSub, request, inFlight, listeners, ...view } = codexQuotaCache
       return view
     }
     const subscribeCodexQuota = fn => {
@@ -2703,7 +2703,7 @@
     const notifyCodexQuota = () => { for (const fn of codexQuotaCache.listeners) { try { fn() } catch { /* 订阅方异常不扩散 */ } } }
 
     /**
-     * 探测 Codex 额度。auto 按 subscription → pi-ai → chatgpt → connect 顺序回退;
+     * 探测 Codex 额度。auto 按 subscription → pi-ai → chatgpt-sub → chatgpt → connect 回退;
      * 成功缓存 5 分钟,失败 1 分钟后可重试。
      */
     async function fetchCodexQuota(force = false, enabled = false, source = 'auto') {
@@ -2723,6 +2723,13 @@
               const result = await boundedCodexRead(() => codexQuotaCache.readPiAi?.())
               if (result?.ok === true && result.value?.status === 'ok') windows = result.value.windows
               else if (result?.ok === true && result.value?.status === 'error') message = result.value.message
+            } catch {}
+          }
+          if (Object.keys(windows).length === 0 && (source === 'auto' || source === 'chatgpt-sub')) {
+            try {
+              const result = await boundedCodexRead(() => require.async('./client.codex.js').then(page => page.readChatgptSubQuota(codexQuotaCache.readChatgptSub)))
+              if (result?.status === 'ok') windows = result.windows
+              else if (result?.status === 'error') message = result.message
             } catch {}
           }
           if (Object.keys(windows).length === 0 && (source === 'auto' || source === 'chatgpt')) {

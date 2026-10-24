@@ -39,6 +39,7 @@ try {
   const lifetime = new AbortController()
   peer = { id: 'cm-pi-ai-owner', ctx: host, principal: { kind: 'owner' }, signal: lifetime.signal, interactions: 'none', dispose: async () => lifetime.abort() }
   const invoke = () => host.typertGateway.invoke({ namespace: 'costMeter', method: 'getPiAiCodexQuota', args: {}, ...(RemoteAccess ? { peer } : {}) })
+  const invokeSub = () => host.typertGateway.invoke({ namespace: 'costMeter', method: 'getChatgptSubQuota', args: {}, ...(RemoteAccess ? { peer } : {}) })
   globalThis.fetch = async (url, init) => {
     assert.equal(url, 'https://chatgpt.com/backend-api/wham/usage')
     calls.push(init.headers.authorization)
@@ -51,6 +52,9 @@ try {
   if (RemoteAccess) await host.plugin(RemoteAccess).await()
   await host.plugin(Gateway, {}).await()
   await host.credentials.modifyRecord(credentialKey('llm-pi-ai', 'openai-codex'), () => ({ kind: 'grant', payload: { type: 'oauth', access: 'SYNTHETIC_PI_AI_ACCESS', refresh: 'SYNTHETIC_REFRESH', expires: Date.now() + 60000 } }))
+  const subAccess = 'fixture.' + Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 600,
+    'https://api.openai.com/auth': { chatgpt_account_id: 'SYNTHETIC_CHATGPT_SUB_ACCOUNT' } })).toString('base64url') + '.signature'
+  await host.credentials.set('OPENAI_CODEX_API_KEY', subAccess)
   const pkg = JSON.parse(readFileSync(join(repo, 'package.json')))
   for (let cycle = 0; cycle < 3; cycle++) {
     // Cold boot uses package.main; external developer tools often load index.js.
@@ -64,6 +68,9 @@ try {
     const result = await bounded('native quota ' + cycle, invoke)
     assert.equal(result.status, 'ok'); assert.equal(result.windows.weekly.percent, 17); assert.equal(result.windows.five, undefined)
     assert.ok(!JSON.stringify(result).includes('SYNTHETIC_'))
+    const subResult = await bounded('ChatGPT sub quota ' + cycle, invokeSub)
+    assert.equal(subResult.status, 'ok'); assert.equal(subResult.windows.weekly.percent, 17)
+    assert.ok(!JSON.stringify(subResult).includes(subAccess))
     const currentService = host.get('costMeter')
     const ready = new Promise(resolve => { started = resolve }); mode = 'pending'
     const pending = currentService.getPiAiCodexQuota()
@@ -78,14 +85,16 @@ try {
   }
   // A hot upgrade may retain the previous version's manifest until restart.
   const { TYPERT } = await import('../lib/typert.host.js')
-  host.typert.register({ ...TYPERT, invocations: TYPERT.invocations.filter(row => row.method !== 'getPiAiCodexQuota') })
+  host.typert.register({ ...TYPERT, invocations: TYPERT.invocations.filter(row => !['getPiAiCodexQuota', 'getChatgptSubQuota'].includes(row.method)) })
   const oldManifest = host.typert.getPackage('dsh-cost-meter', 'host')
   await host.loader.root.update([{ id: 'cost-meter', name: pathToFileURL(join(repo, pkg.main)).href }]); await host.loader.await()
   assert.equal((await bounded('native quota with cached old manifest', invoke)).status, 'ok')
+  assert.equal((await bounded('ChatGPT sub quota with cached old manifest', invokeSub)).status, 'ok')
   assert.equal(host.typert.getPackage('dsh-cost-meter', 'host'), oldManifest, 'hot upgrade preserves the previous manifest owner')
   await host.loader.root.update([]); await host.loader.await()
   assert.equal(host.typert.getPackage('dsh-cost-meter', 'host'), oldManifest)
   assert.equal(host.typert.local.get('costMeter/getPiAiCodexQuota'), undefined, 'unload removes the compatibility invocation')
+  assert.equal(host.typert.local.get('costMeter/getChatgptSubQuota'), undefined)
   assert.deepEqual(errors, [])
   console.log(JSON.stringify({ check: 'real DSH pi-ai quota and hot reload', host: req('@deepseek-ai/dsh/package.json').version, cycles: 3, timings, fixtureReads: calls.length, externalRequests: 0 }))
 } catch (error) { testError = error; throw error } finally {
