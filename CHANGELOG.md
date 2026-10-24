@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.9.33] - 2026-10-24
+
+- 验证兼容 billion-context 0.1.205 / 0.1.206、dsh-codex-subscription 3.1.6 和 dsh-codex-connect 0.2.0-alpha.10，接受已验证的接口指纹及发布包完整性；费用插件运行时代码无需调整。
+- 新增 Codex Connect 实际发布包的额度解析、公开状态类与 HTTP 状态路由检查，覆盖账号快照一致性、单周/双窗口、登录失效、额度失败和请求鉴权。
+- 持续集成保留旧版本并加入上述版本；兼容监控基线更新为 0.1.206 / 3.1.6 / 0.2.0-alpha.10。
+- 来源为 `github-actions[bot]` 的 [#392](https://github.com/Han-1413141/dsh-cost-meter/issues/392)、[#393](https://github.com/Han-1413141/dsh-cost-meter/issues/393)、[#394](https://github.com/Han-1413141/dsh-cost-meter/issues/394) 自动监控报告，报告提供新版版本号与接口指纹变化。
+- Verify the new upstream releases without changing runtime adapters. Add published Codex Connect parser/status-route checks, expand the pinned CI matrix and accept only tested compatibility fingerprints and package integrity.
+
+[更新说明 / Release notes](docs/update-notes-1.9.33.md)
+
 ## [1.9.32] - 2026-10-24
 
 - 新增 `dsh-chatgpt-sub` 图形化额度适配：侧栏和输入区显示 5 小时、每周剩余进度条及重置时间，只有周额度的账号仅显示周窗口；点击卡片可刷新。
