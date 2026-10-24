@@ -1997,6 +1997,8 @@
         el(HistoryPanel, { state, api }),
         // 按会话统计(全部历史,不分日期;issue #22)
         el(SessionRankPanel, { state, api }),
+        el(BillingStatistics, { state, api, load: api.loadBillingStorage, draft, setDraft, locale,
+          disabled: saveState.status === 'saving' || (draft ?? config).billingStorageRetentionDays !== config.billingStorageRetentionDays }),
         // 历史数据操作(导入安装前历史/清除全部历史;与用量统计同组)
         el('div', null,
           el('h3', { className: 'cm-h' }, t('historyDataTitle')),
@@ -2223,6 +2225,8 @@
         return pages[name]
       }
       const api = {
+        loadBillingStorage: () => loadPage('billing-storage'),
+        billingStorage: async options => call('billingStorage', [billingStorageOptionsCodec.parse(options)]),
         loadSettingsOverview: () => loadPage('settings-overview'),
         loadStatistics: () => loadPage('statistics'),
         loadOpenRouter: () => loadPage('openrouter'),

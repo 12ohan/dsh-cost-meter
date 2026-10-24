@@ -18,6 +18,7 @@ import { getTurnInspection } from '../lib/turn-inspection.js'
 import { getCallInspection } from '../lib/call-inspection.js'
 import { getSessionTrajectory } from '../lib/trajectory.js'
 import { getContextCosts, getContextIntegration } from '../lib/context-costs.js'
+import { manageBillionStorage } from '../lib/billion-context-storage.js'
 
 assert.ok(process.env.DSH_TEST_NODE_MODULES, 'set DSH_TEST_NODE_MODULES to an installed DSH runtime')
 const req = createRequire(join(resolve(process.env.DSH_TEST_NODE_MODULES), '__statistics_client.cjs'))
@@ -77,6 +78,7 @@ class Connection extends Service {
           return { ok: true, value: { ...state, config: rest } }
         }
         if (endpoint === 'costMeter/updateConfig') { state.config = applyConfigPatch(state.config, payload.args.patch).config; return { ok: true, value: state } }
+        if (endpoint === 'costMeter/billingStorage') return { ok: true, value: await manageBillionStorage(ledger.path, payload.args.options) }
         if (endpoint === 'costMeter/getOpenRouterCatalog') return { ok: true, value: { fetchedAt: '2026-10-09T05:00:00Z', stale: false, error: '', models: [] } }
         if (endpoint === 'costMeter/getRepricingHistory') return { ok: true, value: [] }
         if (endpoint === 'costMeter/getPriceCatalog') return { ok: true, value: buildPriceCatalog() }
@@ -138,6 +140,19 @@ try {
     assert.equal((await first.api.releasePriceLock('openai/gpt-4o')).ok, true)
     assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/releasePriceLock', { id: 'openai/gpt-4o' }], 'shipped settings wrapper uses the positional string accepted by the gateway')
     await assert.rejects(first.api.releasePriceLock('missing'), /missing/, 'business failures reach the price editor')
+    for (const retentionDays of [0, 30, 7]) {
+      await first.api.updateConfig({ billingStorageRetentionDays: retentionDays })
+      assert.equal(first.store.getSnapshot().state.config.billingStorageRetentionDays, retentionDays, 'retention survives the shipped client state parser')
+      const storage = await first.api.billingStorage({ retentionDays })
+      assert.equal(storage.retentionDays, retentionDays)
+      assert.equal(storage.applied, false)
+      assert.equal(storage.streams.oldestAt, null)
+      assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/billingStorage', { options: { retentionDays, apply: false, streams: true, groups: true } }])
+    }
+    const beforeInvalidStorage = calls.length
+    await assert.rejects(first.api.billingStorage({ retentionDays: 7, path: '/other' }), /billing storage options/)
+    await assert.rejects(first.api.billingStorage({ retentionDays: 7, apply: 'true' }), /boolean/)
+    assert.equal(calls.length, beforeInvalidStorage, 'invalid cleanup arguments never reach transport')
     // A transient asset failure must be retryable without damaging the main face.
     failLoad = true
     await assert.rejects(first.api.loadStatistics(), /synthetic chunk load failure/)

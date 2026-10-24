@@ -26,7 +26,7 @@ const state = { config, today: day, month: { ...day, cost: 28, apiCost: 18 }, to
   ] }] }
 const client = readdirSync(join(root, 'src/client')).filter(name => name.endsWith('.js')).sort().map(name => readFileSync(join(root, 'src/client', name), 'utf8')).join('')
   .replace('exports.apply = apply', 'exports.fixture = { CostSection, CostOverview }; exports.apply = apply')
-const chunks = ['settings-overview', 'statistics', 'community', 'pricing', 'openrouter', 'display', 'codex'].map(name => readFileSync(join(root, 'lib/client.' + name + '.js'), 'utf8')).join('\n')
+const chunks = ['billing-storage', 'settings-overview', 'statistics', 'community', 'pricing', 'openrouter', 'display', 'codex'].map(name => readFileSync(join(root, 'lib/client.' + name + '.js'), 'utf8')).join('\n')
 const code = `import React from ${literal(req.resolve('react'))};import{createRoot}from ${literal(req.resolve('react-dom/client'))};
 const el=React.createElement,modules={};window.fixtureErrors=[];window.fixtureWrites=0;
 window.addEventListener('error',e=>window.fixtureErrors.push(e.message));window.addEventListener('unhandledrejection',e=>window.fixtureErrors.push(String(e.reason)));
@@ -38,9 +38,15 @@ const store={getSnapshot:()=>snapshot,subscribe:fn=>{listeners.add(fn);return()=
 const emit=()=>{snapshot={...snapshot,state};listeners.forEach(fn=>fn())};
 function useCost(){return React.useSyncExternalStore(store.subscribe,store.getSnapshot)}
 const api={loadCommunity:async()=>()=>null,updateConfig:async patch=>{window.fixtureWrites++;state={...state,config:{...state.config,...patch}};emit();return state},reload:async()=>{}};
-for(const [key,name]of Object.entries({loadSettingsOverview:'settings-overview',loadDisplay:'display',loadPricing:'pricing',loadOpenRouter:'openrouter',loadCodex:'codex'}))api[key]=async()=>modules['client.'+name+'.js'].mount({},store,config=>config.locale==='en'?'en':'zh');
+for(const [key,name]of Object.entries({loadBillingStorage:'billing-storage',loadSettingsOverview:'settings-overview',loadDisplay:'display',loadPricing:'pricing',loadOpenRouter:'openrouter',loadCodex:'codex'}))api[key]=async()=>modules['client.'+name+'.js'].mount({},store,config=>config.locale==='en'?'en':'zh');
+let storageApplies=0,storageFailure=false;
+api.billingStorage=async options=>{if(storageFailure){storageFailure=false;throw Error('Synthetic storage failure')};if(options.apply)storageApplies++;
+const metric=(files,bytes,eligibleFiles)=>({files,bytes,eligibleFiles,eligibleBytes:bytes,oldestAt:1791504000000,newestAt:1792796400000});
+return {retentionDays:options.retentionDays,applied:options.apply,streams:metric(storageApplies?180:10744,1800000,options.retentionDays?10564:0),groups:metric(storageApplies?20:23553,4000000,options.retentionDays?23533:0),archives:metric(storageApplies?42:0,storageApplies?200000:0,0),sessions:38,reclaimableBytes:5400000,archivedStreams:10564,removedFiles:34097,releasedBytes:5400000}};
+const StoragePage=modules['client.billing-storage.js'].mount();
+function StorageFixture(){const {state}=useCost();return el(StoragePage,{state,api,locale:state.config.locale,draft:state.config,setDraft:config=>api.updateConfig(config)})}
 const root=createRoot(document.getElementById('root'));let generation=0;
-const render=mode=>{document.getElementById('heading').textContent=mode==='plugin'?'插件 / 费用计量':mode==='future'?'设置 / 费用（待启用展示页）':'设置 / 费用';root.render(el(mode==='future'?modules.main.fixture.CostOverview:modules.main.fixture.CostSection,{key:++generation,useCost,api}))};
+const render=mode=>{document.getElementById('heading').textContent=mode==='storage'?'费用 / 用量 / 计费历史存储':mode==='plugin'?'插件 / 费用计量':mode==='future'?'设置 / 费用（待启用展示页）':'设置 / 费用';root.render(el(mode==='storage'?StorageFixture:mode==='future'?modules.main.fixture.CostOverview:modules.main.fixture.CostSection,{key:++generation,useCost,api}))};
 document.getElementById('settings').onclick=()=>render('settings');document.getElementById('plugin').onclick=()=>render('plugin');document.getElementById('future').onclick=()=>render('future');
 document.getElementById('theme').onclick=()=>{document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'};
 document.getElementById('language').onclick=()=>{state={...state,config:{...state.config,locale:state.config.locale==='en'?'zh':'en'}};emit()};
@@ -66,6 +72,19 @@ const sizes=[];for(const width of [960,560,360]){document.getElementById('root')
 state={...state,config:{...state.config,locale:'zh'}};emit();document.getElementById('root').style.width='';await settle();check(window.fixtureWrites===writes,'display page and live updates never save');check(!window.fixtureErrors.length,window.fixtureErrors.join(';'));
 result.textContent='PASS: 双入口配置同步；展示页无编辑控件；费用/额度实时更新；错误提示；中英文；960/560/360px。';
 }catch(error){result.textContent='FAIL '+error.message;throw error}};
+const storageButton=document.createElement('button');storageButton.textContent='存储清理预览';storageButton.onclick=()=>render('storage');document.querySelector('nav').append(storageButton);
+const storageCheck=document.createElement('button');storageCheck.textContent='运行存储检查';storageCheck.onclick=async()=>{const result=document.getElementById('result');result.textContent='Running storage';try{
+state={...state,config:{...state.config,locale:'zh',billingStorageRetentionDays:7}};emit();render('storage');await settle();
+const panel=()=>document.querySelector('[data-billing-storage]');const button=name=>[...panel().querySelectorAll('button')].find(node=>node.textContent===name);
+check(panel().textContent.includes('10744')&&panel().textContent.includes('23553'),'storage inventory visible');check(storageApplies===0,'mount is preview only');
+button('预览清理').click();await settle();check(panel().textContent.includes('预计释放')&&button('确认清理'),'fresh preview before confirmation');check(storageApplies===0,'preview never applies');button('取消').click();await settle();check(storageApplies===0,'cancel never applies');
+const select=value=>{const field=panel().querySelector('select');field.value=value;field.dispatchEvent(new Event('change',{bubbles:true}))};select('0');await settle();check(button('预览清理').disabled,'keep all disables cleanup');select('30');await settle();check(state.config.billingStorageRetentionDays===30,'retention saves');select('7');await settle();button('预览清理').click();await settle();button('确认清理').click();await settle();check(storageApplies===1,'exactly one confirmed apply');check(panel().textContent.includes('已归档')&&panel().textContent.includes('180 个文件'),'result and refreshed inventory');
+storageFailure=true;button('刷新统计').click();await settle();check(panel().querySelector('[role=alert]').textContent.includes('Synthetic storage failure'),'errors visible');
+state={...state,config:{...state.config,locale:'en'}};emit();await settle();check(panel().textContent.includes('Billing history storage'),'English labels');
+for(const width of [960,560,360]){document.getElementById('root').style.width=width+'px';await settle();check(panel().scrollWidth<=panel().clientWidth+1,'storage overflow '+width)}
+state={...state,config:{...state.config,locale:'zh'}};emit();document.getElementById('root').style.width='';await settle();button('刷新统计').click();await settle();check(!window.fixtureErrors.length,window.fixtureErrors.join(';'));
+result.textContent='PASS: 存储统计；预览不删除；确认后单次执行；取消；保留时间保存；全部保留；错误反馈；中英文；960/560/360px。';
+}catch(error){result.textContent='FAIL '+error.message}};document.querySelector('nav').append(storageCheck);
 document.getElementById('check').onclick=()=>window.runChecks().catch(()=>{});render('settings');`
 const bundle = (await build({ stdin: { contents: code, resolveDir: root }, bundle: true, write: false, format: 'iife', define: { 'process.env.NODE_ENV': '"production"' } })).outputFiles[0].text
 const theme = readFileSync(join(root, 'test/fixtures/peak-theme.css'), 'utf8')
