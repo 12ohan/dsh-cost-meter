@@ -1,5 +1,13 @@
 # dsh-cost-meter 版本更新历史
 
+## v1.9.33(2026-10-24)—— 上游新版兼容验证
+
+- 验证 billion-context 0.1.205 / 0.1.206、Codex Subscription 3.1.6 和 Codex Connect alpha.10 的实际发布包，费用插件运行时代码保持原样。
+- 新增 Connect 额度解析与只读状态路由检查，覆盖当前账号快照、登录/额度失败及鉴权；新版本进入持续集成，监控基线同步更新。
+- 处理 `github-actions[bot]` 的 #392、#393、#394 监控报告；详细范围和发布包指纹见兼容监控文档。
+
+[更新说明](update-notes-1.9.33.md)
+
 ## v1.9.32(2026-10-24)—— dsh-chatgpt-sub 图形化额度
 
 - `dsh-chatgpt-sub` 接入现有 ChatGPT (Codex) 额度卡片与输入区横条，显示实际剩余比例和重置时间，支持周窗口单独显示及点击刷新。
