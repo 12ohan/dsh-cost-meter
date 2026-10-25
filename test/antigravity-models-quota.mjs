@@ -164,7 +164,7 @@ import { parseAntigravityQuota, GATEWAY_PROVIDER_ADAPTERS } from '../lib/gateway
 // A Gemini group name without a valid bucket must still reach the models fallback.
 const fallbackCase = async (cancel = false) => {
   const calls = [], controller = new AbortController()
-  const result = await queryGatewayQuota({ get: key => key === 'credentials' ? { resolve: async () => ({ value: 'KEY', source: 'env' }) } : undefined },
+  const pending = queryGatewayQuota({ get: key => key === 'credentials' ? { resolve: async () => ({ value: 'KEY', source: 'env' }) } : undefined },
     { id: 'fallback', type: 'cliproxyapi', enabled: true, display: 'both', baseURL: 'http://127.0.0.1:8317', includeProviders: ['antigravity'] },
     { signal: controller.signal, fetchImpl: async (url, init) => {
       if (new URL(url).pathname === GATEWAY_MANAGEMENT_PATHS.authFiles) return Response.json({ auth_files: [{ auth_index: 'idx', provider: 'antigravity', project_id: 'aicode-consumers' }] })
@@ -176,7 +176,8 @@ const fallbackCase = async (cancel = false) => {
       const count = calls.filter(url => url.includes('fetchAvailableModels')).length
       return Response.json({ status_code: 200, body: JSON.stringify({ models: { 'gemini-3-flash': { quotaInfo: { remainingFraction: count === 1 ? 2 : 0.7 } } } }) })
     } })
-  return { result, calls }
+  if (cancel) { await assert.rejects(pending, { name: 'AbortError' }); return { calls } }
+  return { result: await pending, calls }
 }
 {
   const { result, calls } = await fallbackCase()
@@ -184,9 +185,8 @@ const fallbackCase = async (cancel = false) => {
   assert.ok(result.accounts[0].windows.some(row => row.id === 'gemini-model:gemini-3-flash' && row.percent === 30))
 }
 {
-  const { result, calls } = await fallbackCase(true)
+  const { calls } = await fallbackCase(true)
   assert.equal(calls.filter(url => url.includes('fetchAvailableModels')).length, 1, 'cancellation stops fallback requests')
-  assert.notEqual(result.accounts[0].status, 'ok', 'a cancelled query cannot publish a successful quota')
 }
 
 console.log('[ok] Antigravity: per-model quota fallback, project suppression, validation, cancellation and geminiOnly filtering passed')

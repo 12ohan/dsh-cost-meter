@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.9.39] - 2026-10-25
+
+- Zod 升级至 4.6.6，修复超长集合校验导致过量错误对象和内存占用的高危漏洞（GHSA-mrhx-c7xc-m3w5）。
+- 修复代理计费扫描中断及文件、归档暂时读取失败后漏导入的问题；保留失败记录重试，正常记录继续处理，空闲目录保持增量扫描。
+- 已封存日志压缩后先同步并发布归档，再移除原文件；写入或同步失败时保留原始记录。
+- 本进程计费流使用已成功保存的元数据快照，避免 Windows 异步读取占用文件期间同步替换失败。
+- 网关停用、删除、配置与凭据变化、插件卸载时取消旧请求；响应体读取、重试等待和后续账号查询统一响应取消。WorkBuddy / XD Pool 同步补齐响应体取消。
+- 导出任务最后访问 10 分钟后主动释放，大量调用分批处理并在收集时限制数据量；CSV 按行检查输出大小。
+- 非法 Token 分项不再使整次调用费用归零，其他有效分项继续计费。
+- Recover transient billing reads, sync sealed archives before deleting originals, propagate quota cancellation, expire idle exports and preserve valid charges alongside invalid Token buckets.
+
+[更新说明 / Release notes](docs/update-notes-1.9.39.md)
+
 ## [1.9.38] - 2026-10-25
 
 - WorkBuddy 积分增加 dsh-xdpool 适配，读取国内、国际账号池，支持当前、全部和勾选账号，沿用现有积分观测统计。

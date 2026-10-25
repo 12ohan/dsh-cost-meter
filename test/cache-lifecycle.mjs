@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { setImmediate as tick } from 'node:timers/promises'
 import { apply } from '../lib/index.js'
 import { stateSchema } from '../lib/typert.host.js'
-import { GATEWAY_MANAGEMENT_PATHS } from '../lib/gateway-quotas.js'
+import { GATEWAY_MANAGEMENT_PATHS, managementKeyVarOf } from '../lib/gateway-quotas.js'
 import { queryCustomBalance } from '../lib/custom-balance.js'
 
 const failures = []
@@ -127,6 +127,31 @@ await check('网关首次并发读取共享在途请求', async () => {
 
 const row = (label, path = label) => ({ enabled: true, label, display: 'both', refreshMinutes: 15,
   request: { url: 'http://127.0.0.1/' + path, headers: {} }, extract: { remaining: 'balance' } })
+
+for (const action of ['disable', 'remove', 'replace-key', 'clear-key', 'dispose']) {
+  await check(`网关 ${action} 取消旧请求并阻止继续查询账号`, async () => {
+    const gate = deferred(); let signal, calls = 0
+    await fixture(gatewayConfig, async (url, init) => {
+      signal ??= init.signal; calls++
+      await gate.promise
+      return gatewayResponse(url, 15)
+    }, async (api, dispose) => {
+      const pending = api.getState(); let mutation
+      try {
+        await until(() => signal)
+        const configured = (await api.getLocalState()).config.gatewayQuotas.sources[0]
+        if (action === 'disable') mutation = api.updateConfig({ gatewayQuotas: { sources: [{ ...configured, enabled: false }] } })
+        else if (action === 'remove') mutation = api.updateConfig({ gatewayQuotas: { sources: [] } })
+        else if (action === 'replace-key') mutation = api.setCredential('customVar:' + managementKeyVarOf(gateway), 'REPLACEMENT_TEST_KEY')
+        else if (action === 'clear-key') mutation = api.clearCredential('customVar:' + managementKeyVarOf(gateway))
+        else mutation = dispose()
+        mutation.catch(() => {})
+        await until(() => signal.aborted)
+      } finally { gate.resolve(); await Promise.all([pending, mutation]) }
+      if (['disable', 'remove', 'dispose'].includes(action)) assert.equal(calls, 1, '旧来源停止后不再发出账号查询')
+    })
+  })
+}
 await check('官方余额关闭后立即重新显示，无需重启或等待刷新间隔', async () => {
   let calls = 0
   const config = { balance: { display: 'both', refreshMinutes: 60, reconcile: false } }
