@@ -8,7 +8,7 @@ import { gzipSync } from 'node:zlib'
 import { setTimeout as delay, setImmediate } from 'node:timers/promises'
 import { createBillionInventory } from '../lib/billion-context-inventory.js'
 import { installBillionContextBilling } from '../lib/billion-context-billing.js'
-import { billionRoot, billionStreamPath, billionSessionKey } from '../lib/billion-context-history.js'
+import { billionRoot, billionStreamPath, billionSessionKey, readBillionStreamFileAsync } from '../lib/billion-context-history.js'
 import { archiveSealedJournals } from '../lib/journal-storage.js'
 import { fetchWorkBuddyAccounts } from '../lib/workbuddy-accounts.js'
 import { queryGatewayQuota, GATEWAY_MANAGEMENT_PATHS } from '../lib/gateway-quotas.js'
@@ -31,6 +31,14 @@ const stream = { protocol: 1, streamId: randomUUID(), sessionId: 'retry', finish
 const file = billionStreamPath(root, stream.sessionId, stream.streamId)
 fs.mkdirSync(join(file, '..'), { recursive: true }); fs.writeFileSync(file, JSON.stringify(stream))
 try {
+  await check('invalid JSON metadata is skipped instead of entering the I/O retry queue', async () => {
+    try {
+      for (const body of ['null', '[]', '12', '{}', '{invalid']) {
+        fs.writeFileSync(file, body)
+        assert.equal(await readBillionStreamFileAsync({ path: file, key: billionSessionKey(stream.sessionId) }), null)
+      }
+    } finally { fs.writeFileSync(file, JSON.stringify(stream)) }
+  })
   await check('oversized constrained collections fail without allocating an error for every element', async () => {
     const schema = z.array(z.number()).max(2)
     assert.deepEqual(schema.parse([1, 2]), [1, 2])
