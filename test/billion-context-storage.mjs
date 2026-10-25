@@ -137,7 +137,7 @@ try {
   assert.ok(before.length)
   console.log('[ok] #397 storage: preview/CLI, retention, active receipts, durable archives, identical replay, idempotence, live override, locking and junction safety')
 } finally {
-  for (const dispose of effects.reverse()) dispose?.()
-  ledger.close(); restarted?.close()
+  for (const dispose of effects.reverse()) await dispose?.()
+  await ledger.close(); await restarted?.close()
   fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 }
