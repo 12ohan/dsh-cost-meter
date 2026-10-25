@@ -210,7 +210,16 @@ try {
   ledger.config = sanitizeConfig({ ...ledger.config, planBilling: selected })
   ledger.planSamples = { volcengine: { fiveHour: [{ t: at, p: 10, lt: 0, lc: 0 }] }, minimax: { fiveHour: [{ t: at, p: 5, lt: 10, lc: 0 }] } }
   await repairPlanHourBuckets(ledger, logs, { nowMs: now })
-  for (const value of Object.values(stats())) assert.equal(value.localTokens, 1200, 'replayed call is counted in its actual windows')
+  // A call before Monday/month-start belongs only to windows that still include it.
+  const calendar = new Date(now)
+  const starts = {
+    fiveHour: now - 5 * 3600_000,
+    weekly: new Date(calendar.getFullYear(), calendar.getMonth(), calendar.getDate() - (calendar.getDay() + 6) % 7).getTime(),
+    monthly: new Date(calendar.getFullYear(), calendar.getMonth(), 1).getTime(),
+  }
+  for (const [window, value] of Object.entries(stats())) {
+    assert.equal(value.localTokens, at + 100 >= starts[window] ? 1200 : 0, `replayed call is counted in its actual ${window} window`)
+  }
   assert.equal(usageDay(ledger).calls, original.calls)
   assert.equal(usageDay(ledger).cost, original.cost)
   assert.equal(ledger.planSamples.volcengine, undefined, 'incompatible per-1% sample baseline is discarded')

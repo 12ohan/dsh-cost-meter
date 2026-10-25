@@ -70,6 +70,7 @@ window.__ModuleLoader__.load({
               sub: t('callsTokens', { calls: day.calls, input: formatTokens(day.input), cache: formatTokens(day.cacheRead + day.cacheWrite), output: formatTokens(day.output) }) })
           }))),
         note(t('cardsFootnote')),
+        el(h.BillingAccuracyNote, { state }),
         note(t('cardsTogglePlanTotal') + ': ' + text(config.showTotalWithPlan ? '已开启' : '已关闭', config.showTotalWithPlan ? 'On' : 'Off')),
         config.budget?.enabled && config.hideBudget !== true ? el(h.BudgetBoxContent, { state, wide: true }) : null,
         el('h3', { className: 'cm-h' }, text('余额与额度', 'Balances and quotas')),
