@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- 将 billion-context 兼容弹窗改为设置页的一行费用误差说明，不再打断聊天；感谢 [@qingyu-ye 的问题报告及附件](https://github.com/Han-1413141/dsh-cost-meter/issues/409)。
+- 官方余额与通用 HTTP 自定义余额的 401/403 自动查询等待刷新间隔；429 遵守 `Retry-After`，连续手动刷新同样等待，减少拒绝后的重复请求。
+- [#409 核查记录](docs/issue-409-account-status.md)区分 LobsterAI 账号禁用、社区报告和本地计费提示；平台封禁原因待官方确认。
+- Move billion-context accuracy guidance into settings and throttle rejected balance queries, including manual refreshes during HTTP 429 cooldowns.
+
 ## [1.9.39] - 2026-10-25
 
 - Zod 升级至 4.6.6，修复超长集合校验导致过量错误对象和内存占用的高危漏洞（GHSA-mrhx-c7xc-m3w5）。

@@ -566,58 +566,6 @@ window.__ModuleLoader__.load({
             el('div', { className: 'cm-context-preview-extra' }, el('p', null, text('最近一次调用', 'Latest call')), el('div', { className: 'cm-context-preview-row' }, el('span', null, text('输入 $0.012 · 输出 $0.004', 'Input $0.012 · output $0.004'))),
               el('p', { className: 'cm-context-muted' }, text('用量计费合计 $0.016', 'Usage-based total $0.016')))) : null))
     }
-    function BillionCompatibilityNotice({ meter, locale, config, api }) {
-      const ref = useRef(null), [dismissed, setDismissed] = useState('')
-      const id = meter?.noticeId ?? '', storageKey = 'dsh-cost-meter:billion-compatibility:' + id
-      const text = (zh, en) => locale === 'en' ? en : zh
-      let seen = dismissed === id
-      try { seen ||= window.localStorage.getItem(storageKey) === 'seen' } catch {}
-      const visible = config?.billionContextNoticeEnabled !== false && !config?.billionContextNoticesSeen?.includes(id) && id && !seen && (meter.unresolved > 0 || ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility))
-      const [saving, setSaving] = useState(false), [saveError, setSaveError] = useState('')
-      const dismiss = async (mute = false) => {
-        if (saving) return
-        setSaving(true); setSaveError('')
-        try {
-          if (api?.updateConfig) await api.updateConfig({ billionContextNoticesSeen: [...new Set([...(config?.billionContextNoticesSeen ?? []), id])].slice(-32), ...(mute ? { billionContextNoticeEnabled: false } : {}) })
-          try { window.localStorage.setItem(storageKey, 'seen') } catch {}
-          setDismissed(id)
-        } catch { setSaveError(text('保存失败，请重试。', 'Could not save. Please retry.')) }
-        finally { setSaving(false) }
-      }
-      useEffect(() => {
-        const node = ref.current
-        if (!visible || !node) return
-        let opened = false, previous
-        const show = () => {
-          if (opened || document.hidden || [...document.querySelectorAll('dialog[open],[aria-modal="true"]')].some(other => other !== node && other.getClientRects().length)) return
-          try { previous = document.activeElement; node.showModal(); node.querySelector('button[data-cm-notice-ack]')?.focus(); opened = true } catch {}
-        }
-        let timer
-        const attempt = () => { show(); if (!opened && !document.hidden) timer = setTimeout(attempt, 1000) }
-        const onVisibility = () => { clearTimeout(timer); if (!document.hidden && !opened) attempt() }
-        attempt(); document.addEventListener('visibilitychange', onVisibility)
-        return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', onVisibility); if (node.open) node.close(); if (opened && previous?.isConnected) previous.focus?.({ preventScroll: true }) }
-      }, [id, !!visible])
-      if (!visible) return null
-      return el('dialog', { ref, className: 'cm-billion-notice', 'aria-labelledby': 'cm-billion-title', 'aria-describedby': 'cm-billion-description',
-        onCancel: event => { event.preventDefault(); dismiss() } },
-        el('style', null, '.cm-billion-notice{box-sizing:border-box;width:min(500px,calc(100vw - 32px));padding:24px;border:1px solid var(--dsw-alias-border-l1,#8885);border-radius:14px;background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-1,#fff) r g b / 1);color:var(--dsw-alias-label-primary,#25262b);font:13px/1.6 system-ui;box-shadow:0 18px 70px #0003}.cm-billion-notice::backdrop{background:#0005}.cm-billion-notice h2{margin:0 0 12px;font-size:16px}.cm-billion-notice footer{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:20px}.cm-billion-notice a{color:var(--dsw-alias-state-business-primary,#4d6bfe)}.cm-billion-notice button{margin-left:auto;padding:6px 14px;border:1px solid var(--dsw-alias-border-l1,#8885);border-radius:7px;background:transparent;color:inherit;cursor:pointer}'),
-        el('h2', { id: 'cm-billion-title' }, text('billion-context 计费兼容提醒', 'billion-context billing compatibility')),
-        el('p', { id: 'cm-billion-description' }, meter.unresolved > 0
-          ? text('部分代理调用同时包含已知与缺失的用量，无法确定宿主汇总是否与已有记录重叠。已保留确定的代理费用及宿主原始用量，尚未叠加不明确的金额。请反馈此问题以核对缺失部分。', 'Some proxy streams mix known and missing usage. The host total may overlap the recorded calls. Known proxy costs and the original host usage are retained; ambiguous amounts are not added. Report the issue to resolve the missing portion.')
-          : meter.compatibility === 'needs_update'
-          ? text('检测到 billion-context ', 'Detected billion-context ') + meter.version + text('。请更新到 0.1.181 或更新版本，再接入完整内部计费。', '. Update to 0.1.181 or later for complete internal billing.')
-          : meter.compatibility === 'changed'
-            ? text('检测到 billion-context 计费接口变化，内部费用尚未完整采集。请到交流群反馈，或提交 issue，以便更新接入。', 'The billion-context metering interface has changed. Internal cost coverage is incomplete. Report this in the community group or open an issue so the integration can be updated.')
-            : text('原版 billion-context 的自动计费接入尚未完成。更新费用插件后请完全重启 DSH，让新启动的本地代理接入计费；仍有问题时，到交流群反馈或提交 issue。', 'Automatic billing for the original billion-context package is not connected. Fully restart DSH after updating cost-meter so its local proxy starts with metering. If the problem persists, contact the community group or open an issue.')),
-        el('p', null, text('反馈时请附 billion-context、费用插件及 DSH 的版本。', 'Include the billion-context, cost-meter and DSH versions in your report.')),
-        saveError ? el('p', { role: 'alert' }, saveError) : null,
-        el('footer', null,
-          el('button', { type: 'button', disabled: saving, onClick: () => dismiss(true) }, text('不再弹出此提醒', 'Do not show this reminder again')),
-          el('a', { href: 'https://github.com/Han-1413141/dsh-cost-meter/blob/master/README.zh-CN.md#交流与反馈', target: '_blank', rel: 'noopener noreferrer', onClick: () => dismiss(false) }, text('加入交流群', 'Community group')),
-          el('a', { href: 'https://github.com/Han-1413141/dsh-cost-meter/issues/new?template=bug_report.yml', target: '_blank', rel: 'noopener noreferrer', onClick: () => dismiss(false) }, text('提交 issue', 'Open an issue')),
-          el('button', { type: 'button', autoFocus: true, disabled: saving, 'data-cm-notice-ack': true, onClick: () => dismiss(false) }, text('知道了', 'Dismiss'))))
-    }
     function ContextPrompt({ manager, getLocale }) {
       const state = React.useSyncExternalStore(manager.subscribe, manager.getSnapshot), ref = useRef(null)
       const text = (zh, en) => getLocale() === 'en' ? en : zh
@@ -1526,11 +1474,10 @@ window.__ModuleLoader__.load({
         if (typeof slots.inject === 'function') ctx.effect(() => slots.inject('shell.overlay', register), 'cost-meter: context preview prompt')
       }
       const Page = props => el(props.sessionId ? SessionStatistics : Statistics, { ...props, api, contextIntegration: manager ? { manager, getLocale } : null })
-      Page.BillionCompatibilityNotice = BillionCompatibilityNotice
       Page.prefetch = options => prefetchStatistics(api, options)
       ctx.effect(() => () => requestCaches.delete(api), 'cost-meter: statistics cache cleanup')
       return Page
     }
-    return { mount, prefetchStatistics, Statistics, SessionStatistics, SessionDetail, TurnInspection, ShareChart, ContextCosts, BillionCompatibilityNotice, ContextPrompt, ContextPreview, ContextIntegrationSettings, createContextIntegration, contextCostBreakdown, installContextCosts, CONTRIBUTION, parseContextCosts, parseStatistics, parseDetail, parseInspection, dailyChartRows, requestStart, requestValue, requestFailure, showsPlaceholder, refreshKeyOf }
+    return { mount, prefetchStatistics, Statistics, SessionStatistics, SessionDetail, TurnInspection, ShareChart, ContextCosts, ContextPrompt, ContextPreview, ContextIntegrationSettings, createContextIntegration, contextCostBreakdown, installContextCosts, CONTRIBUTION, parseContextCosts, parseStatistics, parseDetail, parseInspection, dailyChartRows, requestStart, requestValue, requestFailure, showsPlaceholder, refreshKeyOf }
   },
 })

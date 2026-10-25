@@ -10,17 +10,12 @@
 
     const loadedPages = new WeakMap()
     const warmPage = (load, props) => load?.().then(page => { loadedPages.set(load, page); return page.prefetch?.(props) }).catch(() => {})
-    function BillionCompatibilityGuide(props) {
-      const state = props.useCost?.(s => s)?.state, meter = state?.billionContext
-      const [Page, setPage] = useState(null)
-      const show = state?.config?.billionContextNoticeEnabled !== false && meter?.noticeId && !state?.config?.billionContextNoticesSeen?.includes(meter.noticeId) && (meter.unresolved > 0 || ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility))
-      useEffect(() => {
-        if (!show) return
-        let active = true
-        props.api.loadStatistics().then(page => { if (active) setPage(() => page.BillionCompatibilityNotice) }).catch(() => {})
-        return () => { active = false }
-      }, [!!show, props.api])
-      return show && Page ? el(Page, { meter, config: state.config, api: props.api, locale: resolveLocale(state?.config ?? {}) }) : null
+    function BillingAccuracyNote({ state }) {
+      const meter = state?.billionContext
+      if (!meter || !(meter.unresolved > 0 || ['needs_update', 'changed', 'bridge_missing'].includes(meter.compatibility))) return null
+      return el('p', { className: 'cm-note', 'data-billing-accuracy': 'billion-context' }, resolveLocale(state.config) === 'en'
+        ? 'Some billion-context usage records are incomplete; cost totals may differ from the provider bill.'
+        : 'billion-context 部分用量记录不完整，费用统计可能存在偏差。')
     }
     function BillingStatistics(props) {
       const load = props.load ?? props.api.loadStatistics
@@ -1710,7 +1705,7 @@
     function CostOverview(props) {
       const snapshot = props.useCost?.(s => s)
       return el(BillingStatistics, { state: snapshot?.state, snapshot, api: props.api, load: props.api.loadSettingsOverview,
-        helpers: { makeT, Card, displayCostOf, quotaWindowRow, codingPlanWindowLabel, formatBalanceMoney,
+        helpers: { makeT, Card, BillingAccuracyNote, displayCostOf, quotaWindowRow, codingPlanWindowLabel, formatBalanceMoney,
           formatCustomBalanceMoney, CODING_PLAN_ROWS, UsagePanel, TodaySessions, BudgetBoxContent, useCodexQuota, codingPlanWindowEntries } })
     }
 
@@ -1948,6 +1943,7 @@
         // 防抖落盘产生分钟级时差;reasoning 由 API 单列上报但不计费,token 合计
         // 天然对不齐,引导以金额对账。
         el('p', { className: 'cm-note', key: 'cards-footnote' }, t('cardsFootnote')),
+        el(BillingAccuracyNote, { state }),
         // 宿主/浏览器时区错位提示(issue #74):宿主以非本地时区运行时,「今日」
         // 的日界与用户感知不同(本地午夜后的调用记前一日),避免误判为漏计。
         (() => {
@@ -2356,8 +2352,6 @@
       })
       slots.inject('sidebar.footer.action', () => slots.register(
         { name: 'sidebar.footer.action', id: 'cost-meter-simple-guide', order: 1, inject: injected }, SidebarSimpleGuide))
-      slots.inject('sidebar.footer.action', () => slots.register(
-        { name: 'sidebar.footer.action', id: 'cost-meter-billion-compatibility', order: 2, inject: injected }, BillionCompatibilityGuide))
       slots.inject('sidebar.footer.action', () => slots.register(
         { name: 'sidebar.footer.action', id: 'cost-meter-peak-progress-guide', order: 1, inject: injected }, PeakProgressGuide))
       slots.inject('sidebar.footer.action', () => slots.register(

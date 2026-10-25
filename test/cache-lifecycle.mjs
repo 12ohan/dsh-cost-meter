@@ -297,4 +297,75 @@ await check('自定义余额重定向释放响应流', async () => {
   })
 })
 
+// #409: rejection must not turn UI polling or queued refresh clicks into an HTTP loop.
+for (const kind of ['official', 'custom']) {
+  const config = kind === 'official'
+    ? { balance: { display: 'both', refreshMinutes: 1, reconcile: false } }
+    : { customBalances: [{ ...row('limited'), refreshMinutes: 1 }] }
+  const refresh = api => kind === 'official' ? api.refreshBalance() : api.refreshCustomBalance(0)
+  const value = state => kind === 'official' ? state.balance : state.customBalances[0]
+  const success = () => kind === 'official'
+    ? Response.json({ balance_infos: [{ currency: 'USD', total_balance: '25' }] })
+    : Response.json({ balance: 25 })
+  for (const status of [401, 403]) {
+    await check(`${kind} HTTP ${status} 自动查询等待间隔，手动刷新可恢复`, async () => {
+      let calls = 0
+      await fixture(config, async () => ++calls === 1 ? new Response('private upstream body', { status }) : success(), async api => {
+        const first = await api.getState()
+        assert.equal(value(first).status, 'error')
+        assert.ok(!JSON.stringify(first).includes('private upstream body'))
+        await api.getState(); await api.getState()
+        assert.equal(calls, 1)
+        assert.equal((await refresh(api)).ok, true)
+        assert.equal(calls, 2)
+      })
+    })
+  }
+  for (const header of ['900', 'date', 'invalid', '']) {
+    await check(`${kind} HTTP 429 遵守 ${header || '缺省'} Retry-After，包括并发手动刷新`, async () => {
+      const originalNow = Date.now
+      let now = Date.UTC(2026, 9, 26), calls = 0
+      const gate = deferred(), delay = ['900', 'date'].includes(header) ? 900_000 : 60_000
+      const retryAfter = header === 'date' ? new Date(now + delay).toUTCString() : header
+      Date.now = () => now
+      try {
+        await fixture(config, async () => {
+          calls++
+          if (calls > 1) return success()
+          await gate.promise
+          return new Response('private upstream body', { status: 429, headers: { 'Retry-After': retryAfter } })
+        }, async api => {
+          const initial = api.getState()
+          await until(() => calls === 1)
+          const queued = [refresh(api), refresh(api)]
+          await tick()
+          gate.resolve()
+          const states = await Promise.all([initial, ...queued])
+          assert.equal(value(states[0]).status, 'error')
+          assert.equal(calls, 1, 'queued clicks must observe the rejection from the first request')
+          await api.updateConfig({ decimals: 3 })
+          now += delay - 1
+          await api.getState()
+          assert.equal((await refresh(api)).ok, false)
+          assert.equal(calls, 1, 'manual refresh and unrelated settings cannot bypass the wait')
+          now++
+          assert.equal((await refresh(api)).ok, true)
+          assert.equal(calls, 2)
+          stateSchema.parse(await api.getState())
+        })
+      } finally { gate.resolve(); Date.now = originalNow }
+    })
+  }
+  await check(`${kind} 429 后换用新凭据或新端点时清除旧等待状态`, async () => {
+    let calls = 0
+    await fixture(config, async () => ++calls === 1 ? new Response('', { status: 429 }) : success(), async api => {
+      await api.getState()
+      if (kind === 'official') await api.setCredential('balance', 'TEST_NEW_BALANCE_KEY')
+      else await api.updateConfig({ customBalances: [{ ...row('replacement'), refreshMinutes: 1 }] })
+      await api.getState()
+      assert.equal(calls, 2)
+    })
+  })
+}
+
 if (failures.length) throw new AggregateError(failures, `${failures.length} cache lifecycle regressions`)
