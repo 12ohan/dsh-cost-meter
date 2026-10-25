@@ -2,10 +2,15 @@
 
 ## [Unreleased]
 
-- 将 billion-context 兼容弹窗改为设置页的一行费用误差说明，不再打断聊天；感谢 [@qingyu-ye 的问题报告及附件](https://github.com/Han-1413141/dsh-cost-meter/issues/409)。
-- 官方余额与通用 HTTP 自定义余额的 401/403 自动查询等待刷新间隔；429 遵守 `Retry-After`，连续手动刷新同样等待，减少拒绝后的重复请求。
-- [#409 核查记录](docs/issue-409-account-status.md)区分 LobsterAI 账号禁用、社区报告和本地计费提示；平台封禁原因待官方确认。
-- Move billion-context accuracy guidance into settings and throttle rejected balance queries, including manual refreshes during HTTP 429 cooldowns.
+## [1.9.40] - 2026-10-26
+
+- billion-context 费用误差说明移至“设置 → 费用 → 概览”，以普通灰字按需显示，不再自动弹窗打断聊天。
+- 优化余额查询的等待策略，减少无效重复请求及相关使用风险。官方余额与通用 HTTP 自定义余额收到 401/403 后，自动查询等待配置间隔；429 遵守 `Retry-After`，连续手动刷新同样等待。
+- 请求恢复成功或切换凭据、查询来源后清除对应等待状态，保持错误信息可见。
+- 感谢 [@qingyu-ye](https://github.com/qingyu-ye) 在 [#409](https://github.com/Han-1413141/dsh-cost-meter/issues/409) 提供问题报告、截图及日志附件。
+- Move billing accuracy guidance into settings and reduce redundant balance requests with authentication backoff and rate-limit-aware refreshes.
+
+[更新说明 / Release notes](docs/update-notes-1.9.40.md)
 
 ## [1.9.39] - 2026-10-25
 
