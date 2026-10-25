@@ -10,8 +10,12 @@ window.__ModuleLoader__.load({ id: 'dsh-cost-meter', chunk: 'client.plan-setting
       const selected = rows.filter(row => scope === 'all' || (scope === 'current' ? row.current : ids.has(row.id)))
       const number = value => typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—'
       const sum = key => selected.length && selected.every(row => typeof row[key] === 'number') ? selected.reduce((sum, row) => sum + row[key], 0) : null
-      const equiv = bucket => Object.entries(bucket?.byProviderModel ?? {}).reduce((sum, [key, row]) => /^(workbuddy|workbuddy-ai|workbuddy-global|workbuddy-subscription):/.test(key) ? sum + (row.cost ?? 0) : sum, 0)
+      const equiv = bucket => Object.entries(bucket?.byProviderModel ?? {}).reduce((sum, [key, row]) => /^(workbuddy|workbuddy-ai|workbuddy-global|workbuddy-subscription|xdpool|xdpool-global):/.test(key) ? sum + (row.cost ?? 0) : sum, 0)
       return el('section', { className: 'cm-workbuddy-accounts', style: { minWidth: 0 } },
+        el('div', { className: 'cm-field' }, el('label', null, text('积分来源', 'Credit source')),
+          el('select', { className: 'cm-input', 'aria-label': text('积分来源', 'Credit source'), value: config.accountSource ?? 'auto', onChange: e => setPlan('accountSource', e.target.value) },
+            ...[['auto', text('自动识别', 'Automatic')], ['connect', text('WorkBuddy 连接插件', 'WorkBuddy connectors')], ['xdpool', 'dsh-xdpool']].map(([value, label]) => el('option', { value, key: value }, label))),
+          el('p', { className: 'cm-note' }, text('自动识别优先读取连接插件的账号列表，其次读取 XD Pool。两者同时使用时可指定来源。', 'Automatic uses connector accounts first, then XD Pool. Select a source when using both.'))),
         el('div', { className: 'cm-field' }, el('label', null, text('统计账号', 'Accounts to include')),
           el('select', { className: 'cm-input', 'aria-label': text('统计账号', 'Accounts to include'), value: scope, onChange: e => setPlan('accountScope', e.target.value) },
             ...[['current', text('当前账号（各区域）', 'Current account per region')], ['all', text('全部账号', 'All accounts')], ['selected', text('勾选账号', 'Select accounts')]].map(([value, label]) => el('option', { value, key: value }, label)))),

@@ -91,6 +91,10 @@ jobs:
           npm pack dsh-connect-workbuddy@4.14.1 --ignore-scripts --pack-destination .tmp-connect-workbuddy-published
           tar -xzf .tmp-connect-workbuddy-published/dsh-connect-workbuddy-4.14.1.tgz -C .tmp-connect-workbuddy-published
           node test/connect-workbuddy-published.mjs
+          mkdir -p .tmp-xdpool-published
+          npm pack dsh-xdpool@2.4.6 --ignore-scripts --pack-destination .tmp-xdpool-published
+          tar -xzf .tmp-xdpool-published/dsh-xdpool-2.4.6.tgz -C .tmp-xdpool-published
+          node test/xdpool-published.mjs
           node test/context-costs.mjs --host
           node test/context-costs-client.mjs
           node test/context-costs-lifecycle.mjs

@@ -6,7 +6,7 @@
 
 **Session cost tracking plugin for the DeepSeek Harness web GUI (bilingual UI)**
 
-[![version](https://img.shields.io/badge/version-1.9.37-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
+[![version](https://img.shields.io/badge/version-1.9.38-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
 [![npm](https://img.shields.io/npm/v/dsh-cost-meter?label=npm)](https://www.npmjs.com/package/dsh-cost-meter)
 [![dshfind](https://dshfind.com/api/badge/Han-1413141/dsh-cost-meter?metric=downloads&lang=en)](https://dshfind.com/zh/plugins/Han-1413141/dsh-cost-meter?ref=badge)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -16,11 +16,11 @@
 
 </div>
 
-**v1.9.37** adds single-conversation and overall billing exports (CSV / JSON), and orders quota windows consistently. Volcano Coding Plan now shows only its supported 5h, weekly and monthly windows.
+**v1.9.38** adds dsh-xdpool WorkBuddy credits: CN/global accounts, source selection and current/all/selected balances, with matching WorkBuddy billing classification.
 
 **Host floor: DSH 0.2.0** · Adaptation target: **0.2.1-rc.2** (npm `next`). Expand the compatibility notes below for exact declarations, host records and troubleshooting.
 
-Release notes: [v1.9.37](docs/update-notes-1.9.37.md#english). Fully restart DSH after updating.
+Release notes: [v1.9.38](docs/update-notes-1.9.38.md#english). Fully restart DSH after updating.
 
 ![Promo art](docs/promo.en.png)
 
@@ -131,6 +131,8 @@ The `extract` rules accept four forms: a numeric constant, a dot path string, `a
 - **Plain HTTP is allowed for loopback endpoints**: `http://` is accepted when the host is `127.0.0.1` / `localhost` / `[::1]` (the traffic never leaves the machine), which covers local read-only routes that listen on loopback only and serve no TLS (e.g. `dsh-workbuddy-connect`'s `/plugins/dsh-workbuddy-connect/status`). **Every non-loopback host still requires https**; plaintext is refused.
 
 ### WorkBuddy credits example (local plugin route)
+
+The dedicated **WorkBuddy credits** quota card now supports dsh-xdpool. Select **Credit source → dsh-xdpool** when using multiple connectors; current, all and selected accounts work across CN/global pools. See the [integration notes](docs/update-notes-1.9.38.md#english).
 
 With `dsh-workbuddy-connect` installed, its web status route already returns the aggregated credit total — no credential needs to be copied:
 
@@ -352,22 +354,22 @@ On Node.js 20, use `npm install -g pnpm@10` instead. See [pnpm installation and 
 dsh plugin --profile web add dsh-cost-meter
 ```
 
-**PowerShell one-click script** (copy the whole line, paste, press Enter; pnpm is provisioned automatically, git is auto-detected — no clone needed; the install chain is **pinned to the release tag `v1.9.37`** — review the script before running):
+**PowerShell one-click script** (copy the whole line, paste, press Enter; pnpm is provisioned automatically, git is auto-detected — no clone needed; the install chain is **pinned to the release tag `v1.9.38`** — review the script before running):
 
 ```powershell
-irm https://raw.githubusercontent.com/Han-1413141/dsh-cost-meter/v1.9.37/install.ps1 | iex
+irm https://raw.githubusercontent.com/Han-1413141/dsh-cost-meter/v1.9.38/install.ps1 | iex
 ```
 
 **Or a plain command line** (the machine must already have pnpm and git; also pinned to the tag):
 
 ```sh
-dsh plugin --profile web add github:Han-1413141/dsh-cost-meter#v1.9.37
+dsh plugin --profile web add github:Han-1413141/dsh-cost-meter#v1.9.38
 ```
 
 Without git, use the GitHub tag archive:
 
 ```sh
-dsh plugin --profile web add https://github.com/Han-1413141/dsh-cost-meter/archive/refs/tags/v1.9.37.tar.gz
+dsh plugin --profile web add https://github.com/Han-1413141/dsh-cost-meter/archive/refs/tags/v1.9.38.tar.gz
 ```
 
 After installing, **restart** `dsh web` (plugin rows, the Typert manifest and the client bundle are all scanned at startup):
@@ -432,7 +434,7 @@ Workarounds:
 
    ```yaml
    minimumReleaseAgeExclude:
-     - dsh-cost-meter@1.9.37
+     - dsh-cost-meter@1.9.38
    ```
 
 3. For a one-off CLI operation, forward the pnpm flag: `dsh plugin --profile desktop remove dsh-cost-meter --config.minimum-release-age=0` (or add `--trust-lockfile` when only lockfile verification fails). Both flags were verified against pnpm 11.28.5 in a temporary profile.
