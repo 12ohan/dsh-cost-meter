@@ -567,8 +567,8 @@ dsh --profile web --port 3099                           # 真机启动(观察启
 使用交流、问题反馈和功能建议，欢迎加入微信交流群。
 
 <p align="center">
-  <a href="docs/community-wechat.jpg"><img src="docs/community-wechat.jpg" alt="dsh-cost-meter 微信交流群二维码" width="320" /></a><br />
-  <a href="docs/community-wechat.jpg">查看二维码大图</a>
+  <a href="docs/community-wechat.png"><img src="docs/community-wechat.png" alt="dsh-cost-meter 微信交流群二维码" width="320" /></a><br />
+  <a href="docs/community-wechat.png">查看二维码大图</a>
 </p>
 
 ## 更新历史

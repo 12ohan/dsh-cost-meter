@@ -563,8 +563,8 @@ Check and clear the host search before changing stored data.
 Join the WeChat group to discuss the plugin, share feedback, and suggest features.
 
 <p align="center">
-  <a href="docs/community-wechat.jpg"><img src="docs/community-wechat.jpg" alt="dsh-cost-meter WeChat community QR code" width="320" /></a><br />
-  <a href="docs/community-wechat.jpg">View full-size QR code</a>
+  <a href="docs/community-wechat.png"><img src="docs/community-wechat.png" alt="dsh-cost-meter WeChat community QR code" width="320" /></a><br />
+  <a href="docs/community-wechat.png">View full-size QR code</a>
 </p>
 
 ## Update history
