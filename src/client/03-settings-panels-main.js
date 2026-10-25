@@ -1522,7 +1522,7 @@
     /** 单个 Coding Plan 订阅卡片(11 家共用:开关在标题行,展示/间隔/计划额度/凭据收在展开区)。 */
     let planSettingsPage
     function loadPlanSettings() {
-      return planSettingsPage ??= require.async('./client.plan-settings.js').then(module => module.mount({ useQuotaRefresh, miniMaxWindowsOf, MiniMaxPlanCard, barDirectionOf, quotaWindowRow, codingPlanWindowLabel, numInput, CredentialField, QuotaCard, resolveLocale, formatMoneyUsd, quotaPlacementValue, quotaPlacementPatch, quotaPlacementOptions })).catch(error => { planSettingsPage = null; throw error })
+      return planSettingsPage ??= require.async('./client.plan-settings.js').then(module => module.mount({ useQuotaRefresh, miniMaxWindowsOf, MiniMaxPlanCard, barDirectionOf, quotaWindowRow, codingPlanWindowLabel, codingPlanWindowEntries, numInput, CredentialField, QuotaCard, resolveLocale, formatMoneyUsd, quotaPlacementValue, quotaPlacementPatch, quotaPlacementOptions })).catch(error => { planSettingsPage = null; throw error })
     }
     function PlanQuotaCard(props) { return el(BillingStatistics, { ...props, load: loadPlanSettings }) }
 
@@ -1711,7 +1711,7 @@
       const snapshot = props.useCost?.(s => s)
       return el(BillingStatistics, { state: snapshot?.state, snapshot, api: props.api, load: props.api.loadSettingsOverview,
         helpers: { makeT, Card, displayCostOf, quotaWindowRow, codingPlanWindowLabel, formatBalanceMoney,
-          formatCustomBalanceMoney, CODING_PLAN_ROWS, UsagePanel, TodaySessions, BudgetBoxContent, useCodexQuota } })
+          formatCustomBalanceMoney, CODING_PLAN_ROWS, UsagePanel, TodaySessions, BudgetBoxContent, useCodexQuota, codingPlanWindowEntries } })
     }
 
     function CostSection(props) {
@@ -1729,7 +1729,7 @@
       // 设置页当前标签(issue #29):概览/额度/用量/价格/显示;仅切可见分区,不拆配置与保存逻辑。
       const [activeTab, setTab] = useState('overview')
       const codexInstalled = state?.codexCompat?.installed === true && state?.codexCompat?.enabled === true
-      const tab = activeTab === 'codex' && !codexInstalled ? 'overview' : activeTab
+      const tab = activeTab === 'export' ? 'statistics' : activeTab === 'codex' && !codexInstalled ? 'overview' : activeTab
       useEffect(() => { if (!codexInstalled) setTab(current => current === 'codex' ? 'overview' : current) }, [codexInstalled])
       const [quotaTarget, setQuotaTarget] = useState(null)
       // 自动保存状态:idle(无改动) | saving | saved | error。
@@ -1912,7 +1912,7 @@
         el(BillingStatistics, { state, api, load: api.loadCommunity, locale, quiet: true }),
         // 操作结果提示(价格同步/历史导入/清除):全局展示,不随触发按钮所在标签页。
         cmMsg(message),
-        tab === 'statistics' ? el(BillingStatistics, { state, api }) : null,
+        tab === 'statistics' ? el(BillingStatistics, { state, api, autoExport: activeTab === 'export' }) : null,
         // ── 概览:汇总卡片、今日会话、预算、官方余额 ──
         tab === 'overview' ? el(Fragment, { key: 'overview' },
         // 汇总卡片(今日卡片受 hideTodayCost 门控,issue #46;金额为真金白银口径,issue #64)
@@ -1971,6 +1971,7 @@
           el('span', null, t('cardsTogglePlanTotal'))),
         // 今日会话
         el('div', null,
+          el('button', { className: 'cm-btn', onClick: () => setTab('export') }, locale === 'en' ? 'Export cost records' : '导出费用记录'),
           el('h3', { className: 'cm-h' }, t('todaySessions')),
           el(TodaySessions, { state, t })),
         // 预算

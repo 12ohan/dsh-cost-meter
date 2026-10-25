@@ -107,10 +107,20 @@ window.__ModuleLoader__.load({
       return q
     }
     const codec = (name, parse) => { const schema = { parse }; return { mode: 'strict', typeSymbol: 'dsh-cost-meter#' + name, schema, create: () => schema } }
+    const parseExport = object({ id: string, status: string, filename: string, mime: string, totalBytes: number, offset: number, nextOffset: number, data: string, completedSessions: number, totalSessions: number, rows: number, message: string })
+    const parseExportQuery = value => {
+      const query = {}
+      for (const key of ['id', 'format', 'locale', 'from', 'to', 'provider', 'model', 'sessionId', 'displayCurrency']) if (value?.[key] != null) { query[key] = string(value[key]); if (query[key].length > 512) throw Error('Export filter too long') }
+      if (value?.offset != null) { query.offset = number(value.offset); if (!Number.isSafeInteger(query.offset) || query.offset < 0 || query.offset > 67108864) throw Error('Invalid export offset') }
+      if (value?.cancel != null) query.cancel = boolean(value.cancel)
+      if (query.format && !['csv-summary', 'csv-calls', 'json'].includes(query.format)) throw Error('Invalid export format')
+      return query
+    }
     // Remote contributions have separate ownership from Host manifests. The main
     // client already owns "dsh-cost-meter"; a lazy group needs its own identity.
     // Endpoints and type symbols still match the original Host costMeter face.
     const CONTRIBUTION = { package: 'dsh-cost-meter/statistics', descriptors: [
+      ['getBillingExport', 'BillingExport', parseExport, parseExportQuery],
       ['getSessionTrajectory', 'Trajectory', parseTrajectory, parseTrajectoryQuery],
       ['getBillingStatistics', 'BillingStatistics', parseStatistics], ['getSessionBilling', 'SessionBilling', parseDetail], ['getTurnInspection', 'TurnInspection', parseInspection, parseInspectionQuery], ['getCallInspection', 'CallInspection', parseCallInspection, parseCallInspectionQuery], ['getContextCosts', 'ContextCosts', parseContextCosts, parseContextCostsQuery],
     ].map(([method, name, parse, queryParser]) => ({ id: 'dsh-cost-meter#costMeter/' + method, service: 'costMeter', namespace: 'costMeter', method, invocation: { kind: 'direct' },
@@ -909,19 +919,19 @@ window.__ModuleLoader__.load({
           el('td', null, feeShare(amount(row, basis), total)), el('td', { className: 'cm-fee-parent' }, feeShare(amount(row, basis), row.parentTotal)))))))
     }
 
-    function FeeDialog({ title, text, onClose, children }) {
+    function FeeDialog({ title, text, onClose, children, compact = false }) {
       const dialog = useRef(null), trigger = useRef(document.activeElement)
       useEffect(() => {
         const node = dialog.current
         if (node && !node.open) node.showModal()
         return () => { node?.close(); if (trigger.current?.isConnected) trigger.current.focus({ preventScroll: true }) }
       }, [])
-      return el('dialog', { ref: dialog, className: 'cm-fee-dialog', 'aria-label': text('费用详细信息', 'Fee details'),
+      return el('dialog', { ref: dialog, className: 'cm-fee-dialog' + (compact ? ' cm-export-dialog' : ''), 'aria-label': compact ? title : text('费用详细信息', 'Fee details'),
         onCancel: event => { event.preventDefault(); event.stopPropagation(); onClose() },
         onClick: event => { event.stopPropagation(); if (event.target !== event.currentTarget) return; const r = event.currentTarget.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) onClose() } },
         el('style', null, `
           dialog.cm-fee-dialog{padding:0;border:1px solid var(--cm-border);border-radius:14px;background:var(--cm-opaque-base,#fff);background:rgb(from var(--dsw-alias-bg-layer-2,var(--cm-bg)) r g b / 1);color:var(--cm-label);width:min(1080px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 96px);margin:auto;box-shadow:0 18px 70px #0003;overflow:hidden;font:13px/1.5 var(--ds-font-family-sans,system-ui);container-type:inline-size}
-          dialog.cm-fee-dialog[open]{display:flex;flex-direction:column}dialog.cm-fee-dialog::backdrop{background:#0005}
+          dialog.cm-fee-dialog[open]{display:flex;flex-direction:column}dialog.cm-fee-dialog.cm-export-dialog{width:min(540px,calc(100vw - 24px))}dialog.cm-fee-dialog::backdrop{background:#0005}
           .cm-fee-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 20px;border-bottom:1px solid var(--cm-border);flex:none}.cm-fee-dialog-head h3{font-size:15px;font-weight:600;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cm-fee-dialog-head .cm-stat-btn{padding:0;width:30px;height:30px;border:0;font-size:23px;line-height:1;background:transparent;color:var(--cm-muted);flex:none}.cm-fee-dialog-head .cm-stat-btn:hover{background:var(--cm-surface);color:var(--cm-label)}
           .cm-fee-dialog-body{padding:18px 20px;overflow:auto;overscroll-behavior:contain;min-height:0}.cm-fee-popup-columns{display:grid;grid-template-columns:250px minmax(0,1fr);gap:20px;align-items:start}.cm-fee-popup-list{max-height:65vh;overflow:auto;overscroll-behavior:contain;padding-right:8px;border-right:1px solid var(--cm-border)}.cm-fee-popup-list-head{display:flex;justify-content:space-between;font-size:11px;color:var(--cm-muted);margin:0 6px 8px}.cm-fee-popup-detail{min-width:0}.cm-fee-dialog .cm-fee-popup-step{display:block;width:100%;padding:9px 10px;margin:2px 0;text-align:left;border:0;border-radius:7px;background:transparent;color:var(--cm-label);font:inherit;cursor:pointer}.cm-fee-popup-step>span{display:flex;justify-content:space-between;gap:8px;font-size:12px}.cm-fee-popup-step b{font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums}.cm-fee-popup-step small{display:block;margin-top:3px;font-size:11px;color:var(--cm-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cm-fee-dialog .cm-fee-popup-step:hover{background:var(--cm-surface)}.cm-fee-dialog .cm-fee-popup-step[aria-pressed=true]{background:color-mix(in srgb,var(--cm-accent) 10%,var(--cm-bg));box-shadow:inset 2px 0 var(--cm-accent)}.cm-fee-popup-call-select{display:flex;align-items:center;gap:8px;margin-bottom:12px}.cm-fee-popup-call-select select{min-width:0;max-width:100%;padding:5px 8px;border:1px solid var(--cm-border);border-radius:7px;background:var(--cm-bg);color:var(--cm-label)}
           @container(max-width:700px){.cm-fee-popup-columns{grid-template-columns:1fr;gap:14px}.cm-fee-popup-list{max-height:160px;border-right:0;border-bottom:1px solid var(--cm-border);padding:0 0 8px}.cm-fee-dialog-body{padding:12px}.cm-fee-dialog-head{padding:12px}.cm-fee-dialog .cm-call-tool-parts{grid-template-columns:1fr}}
@@ -1313,6 +1323,75 @@ window.__ModuleLoader__.load({
       return { basis, choose, saving, error }
     }
 
+    function ExportForm({ api, query, text, onClose }) {
+      const [format, setFormat] = useState(query.sessionId ? 'csv-calls' : 'csv-summary'), [scope, setScope] = useState('current')
+      const [busy, setBusy] = useState(false), [status, setStatus] = useState(''), [error, setError] = useState('')
+      const active = useRef(true), generation = useRef(0), job = useRef('')
+      const cancel = () => {
+        generation.current++
+        const id = job.current; job.current = ''
+        if (id) Promise.resolve(api.getBillingExport({ id, cancel: true })).catch(() => {})
+      }
+      useEffect(() => { active.current = true; return () => { active.current = false; cancel() } }, [])
+      const start = async () => {
+        const run = ++generation.current, valid = () => active.current && generation.current === run
+        setBusy(true); setStatus(text('正在准备费用记录…', 'Preparing cost records…')); setError('')
+        let id = ''
+        try {
+          let page = await api.getBillingExport({ ...(scope === 'all' ? {} : query), offset: 0, format, locale: text('zh', 'en') })
+          id = page.id
+          if (!valid()) { if (id) await api.getBillingExport({ id, cancel: true }); return }
+          job.current = id
+          while (page.status === 'preparing') {
+            setStatus(text('正在整理对话 ', 'Preparing conversations ') + page.completedSessions + ' / ' + (page.totalSessions || '…'))
+            await new Promise(done => setTimeout(done, 250))
+            if (!valid()) return
+            page = await api.getBillingExport({ id, offset: 0 })
+          }
+          if (page.status !== 'ready') throw Error(page.message || text('导出失败，请重试。', 'Export failed. Try again.'))
+          const chunks = [], filename = page.filename, mime = page.mime, size = page.totalBytes, warning = page.message
+          if (!Number.isSafeInteger(size) || size < 0 || size > 67108864) throw Error(text('导出文件大小异常。', 'Invalid export size.'))
+          let offset = 0
+          while (offset < size) {
+            if (!valid()) return
+            if (page.status !== 'ready' || page.offset !== offset || page.nextOffset <= offset || page.nextOffset > size) throw Error(text('导出数据不完整，请重试。', 'Incomplete export data. Try again.'))
+            const bytes = Uint8Array.from(atob(page.data), char => char.charCodeAt(0))
+            if (bytes.length !== page.nextOffset - offset) throw Error(text('导出数据不完整，请重试。', 'Incomplete export data. Try again.'))
+            chunks.push(bytes); offset = page.nextOffset
+            setStatus(text('正在下载 ', 'Downloading ') + Math.round(offset / size * 100) + '%')
+            if (offset < size) page = await api.getBillingExport({ id, offset })
+          }
+          if (!valid()) return
+          const url = URL.createObjectURL(new Blob(chunks, { type: mime })), link = document.createElement('a')
+          link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove()
+          setTimeout(() => URL.revokeObjectURL(url), 30000)
+          setStatus(text('文件已下载。', 'File downloaded.') + (warning ? ' ' + warning : ''))
+        } catch (failure) {
+          if (valid()) { setError(String(failure?.message || failure)); setStatus('') }
+        } finally {
+          if (id) Promise.resolve(api.getBillingExport({ id, cancel: true })).catch(() => {})
+          if (job.current === id) job.current = ''
+          if (valid()) setBusy(false)
+        }
+      }
+      return el('div', { 'data-billing-export': true },
+        el('p', { className: 'cm-stat-sub', style: { marginBottom: 12 } }, text('导出费用、Token、模型和时间，不含对话正文或凭据。', 'Exports costs, tokens, models and timestamps, without conversation text or credentials.')),
+        !query.sessionId ? el('label', { style: { display: 'grid', gap: 6, marginBottom: 12 } }, text('导出范围', 'Export range'), el('select', { value: scope, disabled: busy, onChange: event => setScope(event.target.value) },
+          el('option', { value: 'current' }, text('当前筛选范围', 'Current filters')), el('option', { value: 'all' }, text('全部保留记录', 'All retained records')))) : el('p', { className: 'cm-stat-sub', style: { marginBottom: 12 } }, text('当前单个对话', 'This conversation')),
+        el('label', { style: { display: 'grid', gap: 6, marginBottom: 12 } }, text('文件格式', 'File format'), el('select', { value: format, disabled: busy, onChange: event => setFormat(event.target.value) },
+          ...[['csv-summary', text('CSV 汇总（每个对话一行）', 'CSV summary (one row per conversation)')], ['csv-calls', text('CSV 调用明细', 'CSV call details')], ['json', text('JSON 完整记录', 'JSON complete records')]].map(([value, label]) => el('option', { key: value, value }, label)))),
+        el('p', { className: 'cm-stat-sub', style: { marginBottom: 16 } }, text('同时保留 API 费用和 Plan 等值。汇总使用账本金额；调用明细缺失或有差异时会标注。', 'Includes API cost and Plan equivalent. Summary uses recorded ledger amounts; missing or differing call details are marked.')),
+        error ? el('p', { role: 'alert', style: { marginBottom: 12 } }, error) : null,
+        status ? el('p', { role: 'status', style: { marginBottom: 12 } }, status) : null,
+        el('div', { className: 'cm-stat-controls' }, button(busy ? text('导出中…', 'Exporting…') : text('导出文件', 'Export file'), start, { disabled: busy }),
+          button(busy ? text('取消导出', 'Cancel export') : text('关闭', 'Close'), () => { cancel(); onClose() })))
+    }
+    function ExportEntry({ api, query, text, autoOpen = false }) {
+      const [open, setOpen] = useState(autoOpen)
+      return el(Fragment, null, button(text('导出费用记录', 'Export cost records'), () => setOpen(true), { 'data-export-entry': query.sessionId ? 'session' : 'all' }),
+        open ? el(FeeDialog, { title: text('导出费用记录', 'Export cost records'), text, compact: true, onClose: () => setOpen(false) }, el(ExportForm, { api, query, text, onClose: () => setOpen(false) })) : null)
+    }
+
     function SessionStatistics({ state, api, sessionId, formatMoneyUsd, formatTokens, resolveLocale, contextIntegration }) {
       const text = (zh, en) => (resolveLocale ? resolveLocale(state.config) : state.config.locale) === 'en' ? en : zh
       const [revision, setRevision] = useState(0), preference = useStatisticsBasis(state.config, api, text), { basis } = preference
@@ -1321,7 +1400,7 @@ window.__ModuleLoader__.load({
       const query = { sessionId, from: '', to: '', provider: '', model: '', basis, offset: 0 }
       return el('div', { className: 'cm-stat cm-stat-session', 'data-session-id': sessionId }, el('style', null, css),
         compressionBillingNotice(text, state.billionContext),
-        el('div', { className: 'cm-stat-panel-head' }, el('p', { className: 'cm-stat-sub' }, text('当前对话 · 全部调用', 'This conversation · all calls')), button(text('刷新', 'Refresh'), () => setRevision(n => n + 1))),
+        el('div', { className: 'cm-stat-panel-head' }, el('p', { className: 'cm-stat-sub' }, text('当前对话 · 全部调用', 'This conversation · all calls')), el('div', { className: 'cm-stat-controls' }, el(ExportEntry, { api, query, text }), button(text('刷新', 'Refresh'), () => setRevision(n => n + 1)))),
         el(SessionDetail, { key: sessionId + ':' + basis, api, query, revision: refreshKey, money, formatTokens, text, overview: true },
           el(ContextCosts, { key: sessionId, api, sessionId, revision: refreshKey, money, text, compact: true, expanded: true })),
         el('details', { className: 'cm-session-options' }, el('summary', null, text('显示与联动设置', 'Display and integration settings')),
@@ -1330,10 +1409,10 @@ window.__ModuleLoader__.load({
           contextIntegration ? el(ContextIntegrationSettings, contextIntegration) : null))
     }
 
-    function Statistics({ state, api, sessionId = '', formatMoneyUsd, formatTokens, resolveLocale, contextIntegration }) {
+    function Statistics({ state, api, sessionId = '', formatMoneyUsd, formatTokens, resolveLocale, contextIntegration, autoExport = false }) {
       const en = resolveLocale ? resolveLocale(state.config) === 'en' : (state.config.locale === 'en' || state.config.locale !== 'zh' && (state.config.activeLocale || state.meta?.locale || (typeof navigator !== 'undefined' && /^zh/i.test(navigator.language) ? 'zh' : 'en')) === 'en')
       const text = (zh, english) => en ? english : zh
-      const [period, setPeriod] = useState(sessionId ? 'all' : 'week'), [custom, setCustom] = useState(null)
+      const [period, setPeriod] = useState(sessionId || autoExport ? 'all' : 'week'), [custom, setCustom] = useState(null)
       const [scope, setScope] = useState({ id: sessionId, title: sessionId }), [provider, setProvider] = useState(''), [model, setModel] = useState('')
       const preference = useStatisticsBasis(state.config, api, text), { basis } = preference, [offset, setOffset] = useState(0), [revision, setRevision] = useState(0), [showModels, setShowModels] = useState(false)
       const today = state.meta.dayKey || new Date().toISOString().slice(0, 10)
@@ -1357,7 +1436,7 @@ window.__ModuleLoader__.load({
       const metric = (label, value, sub) => el('div', { className: 'cm-stat-metric', key: label }, el('div', { className: 'cm-stat-sub' }, label), el('div', { className: 'cm-stat-value' }, value), el('div', { className: 'cm-stat-sub' }, sub))
       return el('div', { className: 'cm-stat' }, el('style', null, css),
         el('header', { className: 'cm-stat-head' }, el('div', null, el('h2', null, text('计费统计', 'Cost statistics')), el('p', { className: 'cm-stat-sub' }, scope.id ? text('单对话 · ', 'Conversation · ') + (scope.title === scope.id ? data?.sessions[0]?.title || scope.title : scope.title) : text('全部对话 · 从总额查看每一笔调用', 'All conversations · from totals to individual calls'))),
-          button(text('刷新', 'Refresh'), () => setRevision(n => n + 1))),
+          el('div', { className: 'cm-stat-controls' }, el(ExportEntry, { api, query, text, autoOpen: autoExport }), button(text('刷新', 'Refresh'), () => setRevision(n => n + 1)))),
         (contextIntegration || window.__BILI__ || state.billionContext?.connected) ? el('details', { className: 'cm-stat-options' },
           el('summary', null, text('计费与联动设置', 'Billing and integration settings')),
           compressionBillingNotice(text, state.billionContext),
@@ -1417,12 +1496,12 @@ window.__ModuleLoader__.load({
       const unmount = await ctx.get('remote').$mount(CONTRIBUTION)
       ctx.effect(() => () => unmount(), 'cost-meter: statistics contribution')
       const remote = ctx.get('remote.costMeter')
-      const api = Object.fromEntries(['getBillingStatistics', 'getSessionBilling', 'getTurnInspection', 'getCallInspection', 'getContextCosts', 'getSessionTrajectory'].map(method => [method, async query => {
+      const api = Object.fromEntries(['getBillingExport', 'getBillingStatistics', 'getSessionBilling', 'getTurnInspection', 'getCallInspection', 'getContextCosts', 'getSessionTrajectory'].map(method => [method, async query => {
         const displayCurrency = source?.getSnapshot?.()?.state?.config?.currency
-        const parsed = (method === 'getSessionTrajectory' ? parseTrajectoryQuery : method === 'getContextCosts' ? parseContextCostsQuery : method === 'getCallInspection' ? parseCallInspectionQuery : method === 'getTurnInspection' ? parseInspectionQuery : parseQuery)(query)
-        const result = await remote[method]({ ...parsed, ...(['getBillingStatistics', 'getSessionBilling', 'getSessionTrajectory'].includes(method) && ['CNY', 'EUR', 'USD'].includes(displayCurrency) ? { displayCurrency } : {}) })
+        const parsed = (method === 'getBillingExport' ? parseExportQuery : method === 'getSessionTrajectory' ? parseTrajectoryQuery : method === 'getContextCosts' ? parseContextCostsQuery : method === 'getCallInspection' ? parseCallInspectionQuery : method === 'getTurnInspection' ? parseInspectionQuery : parseQuery)(query)
+        const result = await remote[method]({ ...parsed, ...(['getBillingExport', 'getBillingStatistics', 'getSessionBilling', 'getSessionTrajectory'].includes(method) && ['CNY', 'EUR', 'USD'].includes(displayCurrency) ? { displayCurrency } : {}) })
         if (!result?.ok) throw new Error(result?.error?.message || 'Statistics request failed')
-        return ({ getBillingStatistics: parseStatistics, getSessionBilling: parseDetail, getTurnInspection: parseInspection, getCallInspection: parseCallInspection, getContextCosts: parseContextCosts, getSessionTrajectory: parseTrajectory }[method])(result.value)
+        return ({ getBillingExport: parseExport, getBillingStatistics: parseStatistics, getSessionBilling: parseDetail, getTurnInspection: parseInspection, getCallInspection: parseCallInspection, getContextCosts: parseContextCosts, getSessionTrajectory: parseTrajectory }[method])(result.value)
       }]))
       api.saveStatisticsBasis = async statisticsBasis => {
         const result = await remote.updateConfig({ statisticsBasis })

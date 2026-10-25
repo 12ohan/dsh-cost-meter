@@ -14,6 +14,7 @@ import { TYPERT } from '../lib/typert.host.js'
 import { buildPriceCatalog } from '../lib/pricing.js'
 import { billingStatistics } from '../lib/billing-statistics.js'
 import { getSessionBilling } from '../lib/turn-cost.js'
+import { createBillingExporter } from '../lib/billing-export.js'
 import { getTurnInspection } from '../lib/turn-inspection.js'
 import { getCallInspection } from '../lib/call-inspection.js'
 import { getSessionTrajectory } from '../lib/trajectory.js'
@@ -32,6 +33,7 @@ const config = sanitizeConfig({ locale: 'en', hideOfficialBalance: true, goQuota
 const state = { config, pricesRev: 'fixture:1', meta: { now: 1, dayKey: '2026-09-30', timezone: 'UTC' } }
 const work = mkdtempSync(join(tmpdir(), 'cm-statistics-client-'))
 const ledger = { config, days: {}, path: join(work, 'ledger.json') }
+const exporter = createBillingExporter(ledger, { get: () => undefined })
 function moduleFrom(source, require) {
   let factory
   vm.runInNewContext(source, {
@@ -88,6 +90,7 @@ class Connection extends Service {
         if (endpoint === 'costMeter/getContextIntegration') return { ok: true, value: await getContextIntegration({ get: () => undefined }) }
         if (endpoint === 'costMeter/loginCodingPlan') return { ok: true, value: { ok: false, message: 'synthetic login response', state } }
         if (endpoint === 'costMeter/getBillingStatistics') return { ok: true, value: billingStatistics(ledger, payload.args.query) }
+        if (endpoint === 'costMeter/getBillingExport') return { ok: true, value: exporter.get(payload.args.query) }
         if (endpoint === 'costMeter/getSessionBilling') return { ok: true, value: await getSessionBilling(ledger, { get: () => ({ get: () => ({ snapshotEvents: () => [] }) }) }, payload.args.query) }
         if (endpoint === 'costMeter/getTurnInspection') return { ok: true, value: await getTurnInspection({ get: () => ({ get: () => ({ snapshotEvents: () => [] }) }) }, payload.args.query) }
         if (endpoint === 'costMeter/getSessionListCosts') return { ok: true, value: [] }
@@ -175,6 +178,11 @@ try {
     assert.equal((await api.getBillingStatistics(query)).totals.calls, 0)
     assert.equal((await api.getSessionBilling(query)).found, false)
     assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/getSessionBilling', { query: { ...query, displayCurrency: 'CNY' } }])
+    const exporting = await api.getBillingExport({ sessionId: 'selected', format: 'json', locale: 'zh' })
+    assert.equal(exporting.status, 'preparing')
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), ['costMeter/getBillingExport', { query: { sessionId: 'selected', format: 'json', locale: 'zh', displayCurrency: 'CNY' } }])
+    assert.equal((await api.getBillingExport({ id: exporting.id, cancel: true })).status, 'cancelled')
+    await assert.rejects(api.getBillingExport({ format: 'bad' }), /Invalid export/)
     const count = calls.length
     await assert.rejects(api.getBillingStatistics({ ...query, turnOffset: -1 }), /Invalid statistics query/)
     assert.equal(calls.length, count, 'strict input validation runs before transport')
@@ -243,6 +251,7 @@ try {
     console.log('[ok] #210 real browser registry/gateway ' + req('@deepseek-ai/dsh-api-gateway/package.json').version + ': main + lazy statistics, retry, concurrent/repeated open, both RPCs, strict input and unload/reload')
   }
 } finally {
+  exporter.dispose()
   await client.fiber.dispose()
   assert.equal(dirname(work), tmpdir())
   rmSync(work, { recursive: true, force: true })
