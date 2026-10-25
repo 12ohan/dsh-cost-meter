@@ -19,8 +19,8 @@ window.__ModuleLoader__.load({
       const status = (live, body) => el(Fragment, null,
         ['ok', 'partial'].includes(live?.status) ? body : el('p', { className: live?.status === 'error' ? 'cm-err' : 'cm-note', role: live?.status === 'error' ? 'alert' : undefined }, live?.message || t('codingPlanNotQueried')),
         ['ok', 'partial'].includes(live?.status) && live.message ? note(live.message) : null, fetched(live))
-      const windows = wins => {
-        const entries = Object.entries(wins ?? {}).filter(([, win]) => win != null)
+      const windows = (wins, provider) => {
+        const entries = (h.codingPlanWindowEntries ? h.codingPlanWindowEntries(wins, provider) : Object.entries(wins ?? {})).filter(([, win]) => win != null)
         return entries.length ? el('div', { className: 'cm-go-list' }, entries.map(([name, win]) =>
           h.quotaWindowRow(t, (win.label || h.codingPlanWindowLabel(name === 'five' ? '5h' : name, t)) + (typeof win.percent === 'number' ? text(' · 剩余', ' · remaining') : ''), win, 'remaining', false, name))) : note(t('codingPlanNotQueried'))
       }
@@ -39,7 +39,7 @@ window.__ModuleLoader__.load({
       if (config.codexQuotaEnabled === true) cards.push(section('codex', t('codexQuotaTitle'), status(codex, windows(codex.windows))))
       for (const { id, labelKey } of h.CODING_PLAN_ROWS) {
         const cfg = config.codingPlans?.[id], live = state.codingPlans?.[id]
-        if (cfg?.enabled === true && cfg.display !== 'off') cards.push(section(id, t(labelKey), status(live, windows(live?.windows))))
+        if (cfg?.enabled === true && cfg.display !== 'off') cards.push(section(id, t(labelKey), status(live, windows(live?.windows, id))))
       }
       const customEntries = config.customBalances?.length ? config.customBalances : config.customBalance ? [config.customBalance] : []
       customEntries.forEach((entry, index) => {

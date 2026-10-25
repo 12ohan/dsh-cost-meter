@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.9.37] - 2026-10-24
+
+- 单个对话的费用明细增加“导出费用记录”，支持 CSV 汇总、CSV 调用明细和 JSON 完整费用记录；导出完整记录，不受页面分页限制。
+- 费用设置的概览和计费统计增加统一导出入口，可导出当前筛选范围或全部保留记录。文件包含对话标题、模型、Token、时间和费用，不含对话正文或凭据。
+- 导出保留账本金额、历史价格、币种和 API / Plan 双口径；计入子代理时每条调用只导出一次。调用明细缺失或与账本不同会标注，支持取消和分块下载。
+- 额度窗口统一按 5h → 日 → 周 → 月排列，只显示实际支持的窗口；火山 Coding Plan 去掉混入的日额度，只显示 5h、周、月。
+- Export single-conversation or filtered/all retained billing records as summary CSV, call CSV or JSON; preserve recorded amounts, historical pricing/currency and subagent ownership. Order supported quota windows consistently and remove the unsupported Volcano Coding Plan daily window.
+
+[更新说明 / Release notes](docs/update-notes-1.9.37.md)
+
 ## [1.9.36] - 2026-10-24
 
 - “DeepSeek 余额”名称改为可选：默认显示“余额”，在显示设置的官方余额组件中开启“显示余额来源（DeepSeek）”后显示来源；悬停提示始终保留账户来源。

@@ -4012,13 +4012,13 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   assert.equal(usageParsed.fiveHour.percent, 25, 'UsageDetails FiveHour 300/1200=25%')
   assert.equal(usageParsed.weekly.percent, 10, 'UsageDetails Weekly 900/9000=10%')
   assert.equal(usageParsed.monthly.percent, 16.7, 'UsageDetails Monthly (18000-15000)/18000≈16.7%')
-  // 4b) AFPDaily / daily 窗口(实测 GetAFPUsage 返回 daily,需兼容)
+  // GetAFPUsage 的 AFPDaily 属于另一产品，不能混入 Coding Plan。
   const dailyData = {
     ResponseMetadata: {},
     Result: { UsageDetails: [{ QuotaType: 'AFPDaily', Total: 100, Used: 0, ResetTime: '2026-08-26T00:00:00Z' }] },
   }
   const dailyParsed = parseVolcengineUsage(dailyData)
-  assert.equal(dailyParsed.daily.percent, 0, 'AFPDaily 归一为 daily')
+  assert.equal(dailyParsed, null, 'Coding Plan 不接受 AFPDaily 日窗口')
   // 4c) GetCodingPlanUsage 官方形态(issue #71 实测 by @suyukun):
   // Result.QuotaUsage[] + Level 窗口名 + 仅 Percent(无 used/total)+ ResetTimestamp 秒。
   const codingPlanData = {
@@ -6962,6 +6962,8 @@ await import('./pricing-history-performance.mjs')
 await import('./price-multiplier.mjs')
 await import('./billing-history-service.mjs')
 await import('./billing-statistics.mjs')
+await import('./billing-export.mjs')
+await import('./quota-window-order.mjs')
 await import('./turn-inspection.mjs')
 await import('./billing-statistics-client.mjs')
 // 无外部依赖(纯 vm + 假 DOM),因此并入本套件而不是浏览器作业。

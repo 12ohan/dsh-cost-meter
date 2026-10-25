@@ -2868,6 +2868,14 @@
       return String(name).replace(/_/g, ' ')
     }
 
+    function codingPlanWindowEntries(windows, provider) {
+      const rank = name => {
+        const key = name.replace(/^core_/, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+        return /^(fivehour|five|5h|rolling|session)$/.test(key) ? 0 : /^(daily|day|1d)$/.test(key) ? 1 : /^(weekly|week|7d|sevenday)$/.test(key) ? 2 : /^(monthly|month|30d)$/.test(key) ? 3 : 4
+      }
+      return Object.entries(windows ?? {}).filter(([name]) => provider !== 'volcengine' || [0, 2, 3].includes(rank(name))).sort((a, b) => rank(a[0]) - rank(b[0]))
+    }
+
     function CodingPlanBox(props) {
       const hoverProps = useQuotaHoverRefresh()
       const { id, state, wide, api } = props
@@ -2877,7 +2885,7 @@
       const rowDef = CODING_PLAN_ROWS.find(r => r.id === id)
       if (!rowDef || !live || live.status !== 'ok') return null
       const windows = live.windows !== null && typeof live.windows === 'object' ? live.windows : {}
-      const entries = Object.entries(windows)
+      const entries = codingPlanWindowEntries(windows, id)
       if (entries.length === 0) return null
       const pctOf = win => win !== null && typeof win === 'object' && typeof win.percent === 'number'
         ? Math.max(0, Math.min(100, Math.round(Number(win.percent) || 0))) : null
@@ -3142,7 +3150,7 @@
           const live = state.codingPlans?.[rowDef.id]
           if (!quotaInComposer(config.codingPlans?.[rowDef.id], strip, 'plans') || !live || live.status !== 'ok') continue
           const windows = live.windows !== null && typeof live.windows === 'object' ? live.windows : {}
-          const allEntries = Object.entries(windows)
+          const allEntries = codingPlanWindowEntries(windows, rowDef.id)
           const groups = rowDef.id === 'factory'
             ? [allEntries.filter(([name]) => !name.startsWith('core_')), allEntries.filter(([name]) => name.startsWith('core_'))]
             : [allEntries]

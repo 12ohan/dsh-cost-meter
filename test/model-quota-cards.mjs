@@ -11,7 +11,7 @@ const source = readdirSync(sourceDir).filter(name => name.endsWith('.js')).sort(
 const expose = ['SidebarModelCosts', 'sidebarModelRows', 'modelStatsRows', 'MODEL_SIDEBAR_DEFAULTS', 'MODEL_OPEN_KEY', 'QuotaCard', 'useQuotaRefresh', 'QuotasSection', 'PlanQuotaCard', 'GatewayQuotaCard', 'GoQuotaCard', 'GoQuotaSettings', 'CustomBalanceEntryPanel', 'SidebarFooter', 'CornerChips', 'parseConfig', 'makeT', 'CODING_PLAN_ROWS']
 expose.push('CostSection', 'MiniMaxPlanCard')
 expose.push('quotaPlacementValue', 'quotaPlacementPatch', 'quotaPlacementOptions')
-expose.push('BalancePanel', 'CredentialField', 'parseBalance', 'miniMaxWindowsOf', 'barDirectionOf', 'quotaWindowRow', 'codingPlanWindowLabel', 'numInput', 'resolveLocale', 'formatMoneyUsd')
+expose.push('BalancePanel', 'CredentialField', 'parseBalance', 'miniMaxWindowsOf', 'barDirectionOf', 'quotaWindowRow', 'codingPlanWindowLabel', 'codingPlanWindowEntries', 'numInput', 'resolveLocale', 'formatMoneyUsd')
 const element = (type, props, ...children) => ({ type, props: props ?? {}, children })
 const nodes = value => Array.isArray(value) ? value.flatMap(nodes) : value && typeof value === 'object' ? [value, ...nodes(value.children)] : []
 const textOf = value => Array.isArray(value) ? value.map(textOf).join(' ') : value && typeof value === 'object' ? textOf(value.children) : typeof value === 'string' || typeof value === 'number' ? String(value) : ''
@@ -104,6 +104,9 @@ const base = sanitizeConfig({ locale: 'en', currency: 'USD', symbol: '$', exchan
   position: 'off', sidebar: false, hideTodayCost: true, hideOfficialBalance: true, goQuota: { enabled: false },
   budget: { enabled: false }, peakEnabled: false, corner: { enabled: false } })
 const e = environment(), t = e.ui.makeT('en')
+const unorderedWindows = { monthly: { percent: 18 }, weekly: { percent: 46 }, daily: { percent: 0 }, fiveHour: { percent: 14 } }
+assert.deepEqual(Array.from(e.ui.codingPlanWindowEntries(unorderedWindows, 'kimi'), ([name]) => name), ['fiveHour', 'daily', 'weekly', 'monthly'])
+assert.deepEqual(Array.from(e.ui.codingPlanWindowEntries(unorderedWindows, 'volcengine'), ([name, win]) => [name, win.percent]), [['fiveHour', 14], ['weekly', 46], ['monthly', 18]], 'cached daily windows are omitted only for Volcano Coding Plan')
 
 // #159: sidebar/reset countdown, rail infinity, minute updates and cleanup.
 {
