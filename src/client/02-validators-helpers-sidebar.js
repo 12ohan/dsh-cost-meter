@@ -207,7 +207,7 @@
                 apiKey: typeof e.apiKey === 'string' ? e.apiKey : '',
                 ...(id === 'minimax' ? { baseUrl: typeof e.baseUrl === 'string' ? e.baseUrl : '' } : {}),
                 ...(id === 'factory' ? { orgId: typeof e.orgId === 'string' ? e.orgId : '', factoryPool: ['core', 'both'].includes(e.factoryPool) ? e.factoryPool : 'standard' } : {}),
-                ...(id === 'workbuddy' ? { accountScope: e.accountScope ?? 'current', accountIds: Array.isArray(e.accountIds) ? e.accountIds : [] } : {}),
+                ...(id === 'workbuddy' ? { accountScope: e.accountScope ?? 'current', accountIds: Array.isArray(e.accountIds) ? e.accountIds : [], ...(typeof e.accountSource === 'string' ? { accountSource: e.accountSource } : {}) } : {}),
                 ...(id === 'opendesign' ? { workspaceId: typeof e.workspaceId === 'string' ? e.workspaceId : '' } : {}),
                 ...(id === 'qwen' ? { quotaSource: ['cli', 'bailian'].includes(e.quotaSource) ? e.quotaSource : 'local' } : {}),
                 // SCNet / 千问本地计量字段(issue #26/#78):其余厂商无此键,缺省剔除。
@@ -1194,7 +1194,7 @@
       kimi: ['kimi', 'kimi-code'],
       commandcode: ['commandcode', 'command-code'],
       clinepass: ['clinepass', 'cline-pass'],
-      workbuddy: ['workbuddy', 'workbuddy-subscription', 'workbuddy-ai', 'workbuddy-global'],
+      workbuddy: ['workbuddy', 'workbuddy-subscription', 'workbuddy-ai', 'workbuddy-global', 'xdpool', 'xdpool-global'],
       antigravity: ['antigravity'],
       stepfun: ['stepfun', 'step-code'],
       'volcengine-agent': ['volcengine-agent', 'ark-agent-plan', 'volcengine-agent-plan'],

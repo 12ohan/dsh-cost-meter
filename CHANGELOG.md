@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.9.38] - 2026-10-25
+
+- WorkBuddy 积分增加 dsh-xdpool 适配，读取国内、国际账号池，支持当前、全部和勾选账号，沿用现有积分观测统计。
+- WorkBuddy 设置增加“积分来源”：自动识别、WorkBuddy 连接插件、dsh-xdpool。账号标识按来源隔离，多个插件不会重复相加；失败、冷却无数据、账号移除时保留未知状态。
+- xdpool / xdpool-global 精确归入 WorkBuddy 计费家族，沿用 API / Plan 设置及手动覆盖；历史修正不重算价格，不改变已记录的总金额。
+- 修复 #404：感谢 @qiyeren 提出适配需求；接口兼容依据为 @XDTrees 的 dsh-xdpool 2.4.6 发布包。
+- Add dsh-xdpool WorkBuddy credits with CN/global account selection and explicit source control; preserve unknown balances, isolate account identities and classify only the two WorkBuddy pool routes.
+
+[更新说明 / Release notes](docs/update-notes-1.9.38.md)
+
 ## [1.9.37] - 2026-10-25
 
 - 单个对话的费用明细增加“导出费用记录”，支持 CSV 汇总、CSV 调用明细和 JSON 完整费用记录；导出完整记录，不受页面分页限制。

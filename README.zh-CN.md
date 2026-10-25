@@ -6,7 +6,7 @@
 
 **DeepSeek Harness 会话费用统计插件(界面中英双语)**
 
-[![version](https://img.shields.io/badge/version-1.9.37-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
+[![version](https://img.shields.io/badge/version-1.9.38-4176E6)](https://github.com/Han-1413141/dsh-cost-meter)
 [![npm](https://img.shields.io/npm/v/dsh-cost-meter?label=npm)](https://www.npmjs.com/package/dsh-cost-meter)
 [![dshfind](https://dshfind.com/api/badge/Han-1413141/dsh-cost-meter?metric=downloads&lang=zh)](https://dshfind.com/zh/plugins/Han-1413141/dsh-cost-meter?ref=badge)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -16,11 +16,11 @@
 
 </div>
 
-**v1.9.37** 新增单个对话和总体费用导出（CSV / JSON），统一额度窗口顺序；火山 Coding Plan 只显示实际支持的 5h、周、月。
+**v1.9.38** 支持 dsh-xdpool 的国内／国际 WorkBuddy 积分、多账号筛选与来源选择，并同步适配对应路由的 API / Plan 归属。
 
 **宿主要求：DSH 0.2.0 起支持** · 适配目标 **0.2.1-rc.2**（npm `next`）。完整声明、历史记录与安装排障见下方展开项。
 
-更新说明：[v1.9.37](docs/update-notes-1.9.37.md#中文)。更新后完全重启 DSH。
+更新说明：[v1.9.38](docs/update-notes-1.9.38.md#中文)。更新后完全重启 DSH。
 
 ![宣传图](docs/promo.png)
 
@@ -130,6 +130,8 @@ CLIProxyAPI 网关来源卡片可勾选「只显示 Gemini 额度」，仅影响
 - **本机回环端点支持明文 HTTP**:端点主机为 `127.0.0.1` / `localhost` / `[::1]` 时允许 `http://`(流量不出网卡),用于只监听回环、不提供 TLS 的本地只读路由(如 `dsh-workbuddy-connect` 的 `/plugins/dsh-workbuddy-connect/status`)。**非回环主机仍强制 https**,明文请求一律拒绝。
 
 ### WorkBuddy 积分示例(本机插件路由)
+
+“费用 → 额度”的 **WorkBuddy 积分** 卡现已支持 dsh-xdpool。多个连接插件同时使用时，可将“积分来源”选为 dsh-xdpool；支持国内／国际池的当前、全部或勾选账号。详见[适配说明](docs/update-notes-1.9.38.md#中文)。
 
 已安装 `dsh-workbuddy-connect` 时,其 Web 状态路由直接返回聚合积分,无需复制任何凭据:
 
@@ -352,22 +354,22 @@ Node.js 20 请改用 `npm install -g pnpm@10`。版本要求见 [pnpm 官方安�
 dsh plugin --profile web add dsh-cost-meter
 ```
 
-**PowerShell 一键脚本**(复制整行粘贴回车;自动补齐 pnpm、自动探测 git,无需克隆仓库;安装链**固定到发布 tag `v1.9.37`**,建议先下载审阅再运行):
+**PowerShell 一键脚本**(复制整行粘贴回车;自动补齐 pnpm、自动探测 git,无需克隆仓库;安装链**固定到发布 tag `v1.9.38`**,建议先下载审阅再运行):
 
 ```powershell
-irm https://raw.githubusercontent.com/Han-1413141/dsh-cost-meter/v1.9.37/install.ps1 | iex
+irm https://raw.githubusercontent.com/Han-1413141/dsh-cost-meter/v1.9.38/install.ps1 | iex
 ```
 
 **或直接命令行**(机器上需已有 pnpm 与 git;同样固定到 tag):
 
 ```sh
-dsh plugin --profile web add github:Han-1413141/dsh-cost-meter#v1.9.37
+dsh plugin --profile web add github:Han-1413141/dsh-cost-meter#v1.9.38
 ```
 
 没有 git 时可用 GitHub tag 打包直链:
 
 ```sh
-dsh plugin --profile web add https://github.com/Han-1413141/dsh-cost-meter/archive/refs/tags/v1.9.37.tar.gz
+dsh plugin --profile web add https://github.com/Han-1413141/dsh-cost-meter/archive/refs/tags/v1.9.38.tar.gz
 ```
 
 安装后**重启** `dsh web`(插件行、Typert 清单与客户端 bundle 均在启动时扫描):
@@ -432,7 +434,7 @@ DSH **0.2.1-rc.1 / 0.2.1-rc.2** 宿主自带 pnpm **11.28.5**，默认启用内�
 
    ```yaml
    minimumReleaseAgeExclude:
-     - dsh-cost-meter@1.9.37
+     - dsh-cost-meter@1.9.38
    ```
 
 3. 仅本次操作用 CLI 透传 pnpm 参数：`dsh plugin --profile desktop remove dsh-cost-meter --config.minimum-release-age=0`；若只是 lockfile 校验阶段失败，可改用 `--trust-lockfile`。这两个参数已在本机 pnpm 11.28.5 临时 Profile 上实测可用。

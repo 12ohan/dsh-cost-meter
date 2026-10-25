@@ -117,7 +117,7 @@ try {
 } finally { rmSync(goRoot, { recursive: true, force: true }) }
 
 const workbuddyConfig = sanitizeConfig({ codingPlans: { workbuddy: { enabled: true } } })
-for (const provider of ['workbuddy', 'workbuddy-subscription', 'workbuddy-ai', 'llm-workbuddy-ai', ' WorkBuddy-AI ', 'workbuddy-global', 'llm-workbuddy-global']) {
+for (const provider of ['workbuddy', 'workbuddy-subscription', 'workbuddy-ai', 'llm-workbuddy-ai', ' WorkBuddy-AI ', 'workbuddy-global', 'llm-workbuddy-global', 'xdpool', 'xdpool-global', 'llm-xdpool']) {
   assert.equal(planProviderIdOf(provider, workbuddyConfig.planBilling, workbuddyModel), 'workbuddy')
   assert.equal(ui.planProviderIdOfLocal(provider, workbuddyConfig, workbuddyModel), 'workbuddy')
   assertBilling(provider, workbuddyModel, workbuddyConfig, 'plan')
