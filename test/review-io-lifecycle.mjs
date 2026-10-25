@@ -15,6 +15,7 @@ import { queryGatewayQuota, GATEWAY_MANAGEMENT_PATHS } from '../lib/gateway-quot
 import { collectBillingExport, createBillingExporter } from '../lib/billing-export.js'
 import { sanitizeConfig, localDayKey } from '../lib/store.js'
 import { costOf } from '../lib/pricing.js'
+import { z } from 'zod'
 
 const errors = []
 const check = async (name, run) => {
@@ -30,6 +31,14 @@ const stream = { protocol: 1, streamId: randomUUID(), sessionId: 'retry', finish
 const file = billionStreamPath(root, stream.sessionId, stream.streamId)
 fs.mkdirSync(join(file, '..'), { recursive: true }); fs.writeFileSync(file, JSON.stringify(stream))
 try {
+  await check('oversized constrained collections fail without allocating an error for every element', async () => {
+    const schema = z.array(z.number()).max(2)
+    assert.deepEqual(schema.parse([1, 2]), [1, 2])
+    const result = schema.safeParse(Array(2000).fill('invalid'))
+    assert.equal(result.success, false)
+    assert.ok(result.error.issues.some(issue => issue.code === 'too_big'))
+    assert.ok(result.error.issues.length < 10)
+  })
   await check('invalid token buckets preserve charges for valid usage', async () => {
     const rate = { cacheMiss: 2, cacheHit: .5, output: 8, longContext: { aboveInputTokens: 100000, cacheMiss: 4, cacheHit: 1, output: 16 } }
     for (const key of ['output', 'cacheRead', 'cacheWrite', 'reasoning']) for (const value of [Infinity, -Infinity, NaN])
@@ -79,7 +88,7 @@ try {
       return handle
     }
     syncBuiltinESMExports()
-    try { await assert.rejects(archiveSealedJournals(dir, { minAgeMs: 0 }), { code: 'EIO' }) }
+    try { await assert.rejects(archiveSealedJournals(dir, { minAgeMs: 0, now: Date.now() + 1000 }), { code: 'EIO' }) }
     finally { fs.promises.open = original; syncBuiltinESMExports() }
     assert.equal(fs.readFileSync(journal, 'utf8'), '{"seq":1}\n')
     assert.deepEqual(fs.readdirSync(dir), [journal.slice(dir.length + 1)])
