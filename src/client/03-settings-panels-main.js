@@ -1302,6 +1302,8 @@
                 value: entry[field] ?? '',
                 onChange: event => setField(field, event.target.value),
               }))),
+            el('label', { className: 'cm-field' }, el('span', null, resolveLocale(config) === 'en' ? 'Dashboard link (optional)' : '跳转链接（可选）'),
+              el('input', { className: 'cm-input', type: 'url', 'aria-label': resolveLocale(config) === 'en' ? 'Dashboard link' : '跳转链接', value: entry.dashboardUrl ?? '', placeholder: 'https://example.com/account', onChange: event => setField('dashboardUrl', event.target.value) })),
             !fixedAdapter && el('div', { className: 'cm-field' },
               el('label', null, t('customBalanceUnitLabel')),
               el('select', {
@@ -1966,6 +1968,7 @@
             },
           }),
           el('span', null, t('cardsTogglePlanTotal'))),
+        el(BillingStatistics, { state, api, load: api.loadPricing, mode: 'billing', draft, setDraft, locale }),
         // 今日会话
         el('div', null,
           el('button', { className: 'cm-btn', onClick: () => setTab('export') }, locale === 'en' ? 'Export cost records' : '导出费用记录'),

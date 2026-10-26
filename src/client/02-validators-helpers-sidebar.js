@@ -116,6 +116,7 @@
       enabled: e.enabled === true,
       label: typeof e.label === 'string' ? e.label : '',
       labelEn: typeof e.labelEn === 'string' ? e.labelEn : '',
+      dashboardUrl: typeof e.dashboardUrl === 'string' ? e.dashboardUrl : '',
       display: oneOf(e.display, ['sidebar', 'settings', 'off'], 'both'),
       unit: e.adapter === 'tokenrhythm' ? 'CNY' : ['CNY', 'EUR', 'CREDITS'].includes(e.unit) ? e.unit : 'USD',
       convertToDisplayCurrency: e.convertToDisplayCurrency === true,
@@ -1298,6 +1299,7 @@
         if (configured === 'plan' || configured === 'api') return configured
       }
       if (planId === null) return 'api'
+      if (planId === 'go' && /^(?:llm-)?(?:dsh-opencode-go|opencode-go(?:-plus)?)$/i.test(String(provider).trim())) return 'plan'
       return enabledPlanSetOfLocal(config).has(planId) ? 'plan' : 'api'
     }
     /**
@@ -1918,14 +1920,16 @@
     // stopPropagation 避免触发外层图框的点击刷新(issue #37)。
     const DEEPSEEK_RECHARGE_URL = 'https://platform.deepseek.com/usage'
 
-    function rechargeLinkEl(t) {
+    function rechargeLinkEl(t, href = DEEPSEEK_RECHARGE_URL, label = t('balanceRechargeLink')) {
+      if (!href) return null
+      try { const url = new URL(href); if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null } catch { return null }
       return el('a', {
         className: 'cm-bal-link',
-        href: DEEPSEEK_RECHARGE_URL,
+        href,
         target: '_blank',
         rel: 'noreferrer noopener',
-        title: t('balanceRechargeLink'),
-        'aria-label': t('balanceRechargeLink'),
+        title: label,
+        'aria-label': label,
         onClick: event => event.stopPropagation(),
         onKeyDown: event => event.stopPropagation(),
       }, el('svg', { width: 14, height: 14, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true },
@@ -2057,7 +2061,7 @@
         rail: Math.round(segments.remainingPct) + '%',
         body: el(Fragment, null,
           el('div', { className: 'cm-bbox-head' },
-            el('span', { className: 'cm-bbox-label' }, label),
+            el('span', { className: 'cm-balance-name' }, el('span', { className: 'cm-bbox-label' }, label), rechargeLinkEl(t, entryCfg?.dashboardUrl || '', label)),
             el('span', { className: 'cm-bbox-pct cm-num cm-bal-amt' }, remaining)),
           el(BalanceBar, { segments, direction: barDirectionOf(config, 'balance') })),
       }
@@ -2129,13 +2133,13 @@
       if (custom.status === 'error') {
         return el(Tooltip, { portal: true, label: [custom.message || t('unknownError'), ...clickRefreshTipLines(t, refresh)].join('; '), side: 'right', delayMs: 300 },
           el('div', { 'data-cm-display': 'customBalance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + ' cm-bal-err' + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
-            wide ? el(Fragment, null, el('span', { className: 'cm-bal-label', title: label }, label), el('span', { className: 'cm-num cm-bal-amt' }, t('queryFailed'))) : '⚠'))
+            wide ? el(Fragment, null, el('span', { className: 'cm-balance-name' }, el('span', { className: 'cm-bal-label', title: label }, label), rechargeLinkEl(t, entry?.dashboardUrl || '', label)), el('span', { className: 'cm-num cm-bal-amt' }, t('queryFailed'))) : '⚠'))
       }
       const amount = formatCustomBalanceMoney(custom.remaining, config, custom, entry)
       const detail = [customBalanceDetailText(custom, config, t, state, entry), ...clickRefreshTipLines(t, refresh)].join(' · ')
       return el(Tooltip, { portal: true, label: detail, side: 'right', delayMs: 300 },
         el('div', { 'data-cm-display': 'customBalance', className: 'cm-foot clickable' + (wide ? '' : ' cm-foot-rail') + (refresh.busy ? ' busy' : ''), ...clickableRefreshProps(refresh.busy, refresh.run) },
-          wide ? el(Fragment, null, el('span', { className: 'cm-bal-label', title: label }, label), el('span', { className: 'cm-num cm-bal-amt' }, amount)) : el(WalletIcon, { size: 16 })))
+          wide ? el(Fragment, null, el('span', { className: 'cm-balance-name' }, el('span', { className: 'cm-bal-label', title: label }, label), rechargeLinkEl(t, entry?.dashboardUrl || '', label)), el('span', { className: 'cm-num cm-bal-amt' }, amount)) : el(WalletIcon, { size: 16 })))
     }
 
     function CornerChips(props) {

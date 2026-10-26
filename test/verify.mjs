@@ -1361,7 +1361,7 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   // 设置开关与读侧白名单。
   assert.ok(displaySource.includes("setField('hideOfficialBalance'"), '独立显示页含隐藏官方余额开关')
   assert.ok(displaySource.includes("setField('hideTodayCost'"), '独立显示页含隐藏今日消耗开关')
-  assert.ok(clientSource.includes('hideOfficialBalanceLabel') && clientSource.includes('hideTodayCostLabel'), '开关文案存在(zh/en)')
+  assert.ok(displaySource.includes('隐藏官方账户余额') && displaySource.includes('Hide official account balance') && displaySource.includes('隐藏今日消耗金额') && displaySource.includes('Hide today'), '独立显示页保留双语开关文案')
   assert.ok(clientSource.includes('hideOfficialBalance: v.hideOfficialBalance === true'), 'parseConfig 白名单含 hideOfficialBalance(读侧不剥离)')
   assert.ok(clientSource.includes('hideTodayCost: v.hideTodayCost === true'), 'parseConfig 白名单含 hideTodayCost(读侧不剥离)')
   assert.ok(clientSource.includes("sidebarTodayMetric: ['tokens', 'both'].includes") && displaySource.includes("setField('sidebarTodayMetric'"), '今日指标双端接线')
@@ -1402,7 +1402,7 @@ assert.deepEqual(CODING_PLAN_PROVIDERS.scnet.credentialEnvs, [], 'scnet 不需�
   assert.ok(clientSource.includes("if (config.quotaStrip?.promptSeen === true) return null"), '引导卡按 promptSeen 门控')
   assert.ok(clientSource.includes("if (strip.enabled !== true && config.goQuota?.showInComposer !== true") && clientSource.includes('function quotaInComposer('), '横条保留默认门控，并允许单家显式选择输入框上方')
   assert.ok(clientSource.includes('cm-qstrip') && clientSource.includes('cm-qchip') && clientSource.includes('cm-qguide'), '横条/引导卡 CSS 类存在')
-  assert.ok(clientSource.includes('quotaStripEnable') && clientSource.includes('quotaStripShowBudget') && clientSource.includes('quotaStripShowGo') && clientSource.includes('quotaStripShowPlans'), '设置 UI 开关文案存在')
+  assert.ok(readFileSync(new URL('../src/display/index.js', import.meta.url), 'utf8').includes('Enable the quota strip by default') && clientSource.includes('quotaStripShowBudget') && clientSource.includes('quotaStripShowGo') && clientSource.includes('quotaStripShowPlans'), '设置 UI 开关文案存在')
   assert.ok(clientSource.includes('quotaStripGuideTitle') && clientSource.includes('quotaStripGuideOn') && clientSource.includes('quotaStripGuideOff'), '引导卡文案存在')
   assert.ok(clientSource.includes('quotaStripGuideBody'), '引导卡正文文案存在')
   assert.ok(clientSource.includes('promptSeen: true } })'), '设置开关与引导选择均写 promptSeen')
@@ -3891,7 +3891,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   // issue #59-1:充值直达链接。
   // CodeQL #7 误报:这是断言源码里「充值链接字符串存在」的存在性检查,并非用子串匹配做 URL 净化。
   assert.ok(src.includes("https://platform.deepseek.com/usage"), 'issue #59: DeepSeek 充值页 URL 在册') // codeql[js/incomplete-url-substring-sanitization]
-  assert.equal([...src.matchAll(/rechargeLinkEl\(t\)/g)].length, 3, 'issue #59: 充值链接在 helper 定义与余额行/图框两处渲染共出现三次')
+  assert.equal([...src.matchAll(/rechargeLinkEl\(t\)/g)].length, 2, 'issue #59: 官方充值链接在余额行/图框两处渲染')
   assert.ok(src.includes('.cm-bal-link{'), 'issue #59: 充值链接样式存在')
   assert.ok(src.includes('balanceRechargeLink:') && [...src.matchAll(/balanceRechargeLink:/g)].length === 2, 'issue #59: 充值提示文案 zh/en 各一份')
   // issue #59-2:Codex 周额度客户端探测模块。
@@ -6928,6 +6928,7 @@ await import('./settings-regressions.mjs')
 await import('./model-statistics.mjs')
 await import('./display-controls.mjs')
 await import('./official-balance-channel.mjs')
+await import('./custom-balance-links.mjs')
 await import('./model-display-names.mjs')
 await import('./settings-poll-race.mjs')
 await import('./plan-provider-matching.mjs')
@@ -6983,6 +6984,7 @@ await import('./mimo-quota.mjs')
 await import('./baidu-token-plan.mjs')
 await import('./workbuddy-quota.mjs')
 await import('./workbuddy-billing.mjs')
+await import('./go-auto-billing.mjs')
 await import('./workbuddy-connect.mjs')
 await import('./workbuddy-accounts.mjs')
 await import('./workbuddy-xdpool.mjs')
