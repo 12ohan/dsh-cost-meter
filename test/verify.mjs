@@ -1125,6 +1125,7 @@ const officialHosts = {
   volcengine: ['open.volcengineapi.com'],
   qwen: [],
   mimo: ['platform.xiaomimimo.com'],
+  'baidu-coding': ['console.bce.baidu.com'],
 }
 for (const id of CODING_PLAN_PROVIDER_IDS) {
   assert.ok(CODING_PLAN_PROVIDERS[id] !== undefined, `提供商注册:${id}`)
@@ -6977,6 +6978,7 @@ await import('./session-log-repair.mjs')
 await import('./client-issues-127-129.mjs')
 await import('./model-quota-cards.mjs')
 await import('./mimo-quota.mjs')
+await import('./baidu-token-plan.mjs')
 await import('./workbuddy-quota.mjs')
 await import('./workbuddy-billing.mjs')
 await import('./workbuddy-connect.mjs')

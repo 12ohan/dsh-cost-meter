@@ -1200,7 +1200,7 @@
       'volcengine-agent': ['volcengine-agent', 'ark-agent-plan', 'volcengine-agent-plan'],
       'tencent-coding': ['tencent-coding', 'tencent-coding-plan', 'tokenhub-coding-plan'],
       'tencent-token': ['tencent-token', 'tencent-token-plan', 'tokenhub-token-plan'],
-      'baidu-coding': ['baidu-coding-plan', 'qianfan-coding-plan'],
+      'baidu-coding': ['baidu-coding-plan', 'qianfan-coding-plan', 'baidu-token-plan', 'qianfan-token-plan', 'baidu-tokenplan', 'qianfan-tokenplan'],
 
       qwen: ['qwen', 'qwen-tokenplan', 'qianwen-tokenplan', 'qwen-token-plan', 'qianwen-token-plan'],
       scnet: ['scnet', 'scnet-tokenplan', 'scnet-token-plan'],
@@ -2864,6 +2864,7 @@
       if (name === 'daily' || name === 'day') return t('goShortDaily')
       if (name === 'plan') return t('mimoWindowPlan')
       if (name === 'compensation') return t('mimoWindowCompensation')
+      if (name === 'usage') return t('quotaUsedTotal')
       if (name === 'balance') return t('codingPlanWindowBalance')
       return String(name).replace(/_/g, ' ')
     }
@@ -3060,6 +3061,7 @@
       volcengine: 'Ark',
       qwen: 'Qwen',
       mimo: 'MiMo',
+      'baidu-coding': '千帆',
       factory: 'Factory', opendesign: 'OpenDesign',
     }
 
