@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- 修复 Agent Teams 在默认关闭“包含子代理”时遗漏成员费用的问题：正确读取宿主团队快照，统一会话徽章、当前对话统计、明细和会话列表的合计范围。感谢 [@KURISUNO4](https://github.com/KURISUNO4) 在 [#420](https://github.com/Han-1413141/dsh-cost-meter/issues/420) 提供复现数据、根因定位及修复建议。
+- Fix Agent Teams cost aggregation with the subagent setting off; keep badge, selected-conversation statistics, details and session-list totals consistent without duplicating ledger entries.
+
 - 新增百度千帆 Token Plan 个人版额度查询，支持积分制和 Token 制、控制台 Cookie 凭据及登录过期提示；感谢 [@minevery512](https://github.com/minevery512) 在 [#418](https://github.com/Han-1413141/dsh-cost-meter/issues/418) 提出需求。[配置说明](docs/baidu-token-plan.md)。
 - 验证 billion-context 0.1.208 与 dsh-codex-subscription 3.1.7 的实际发布包，更新兼容基线与 CI，处理自动监控 [#416](https://github.com/Han-1413141/dsh-cost-meter/issues/416)、[#417](https://github.com/Han-1413141/dsh-cost-meter/issues/417)。
 - Add Baidu Qianfan Token Plan Personal quota via console Cookie, with separate credits/Token units; validate the latest billion-context and Codex subscription packages.
