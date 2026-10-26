@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- 修复 Go 订阅在自动归属列表为空时仍被记入 API 花费的问题，增加历史分类修正及概览页“渠道计费方式”入口。感谢 [@ZIye1208](https://github.com/ZIye1208) 在 [#424](https://github.com/Han-1413141/dsh-cost-meter/issues/424) 提供复现、根因定位和改进建议。
+- 自定义余额新增逐条配置的跳转链接，侧栏余额行与进度卡支持打开中转站账户页面，点击链接不触发余额刷新。感谢 [@yi-Xu-0100](https://github.com/yi-Xu-0100) 在 [#425](https://github.com/Han-1413141/dsh-cost-meter/issues/425) 提出需求并提供界面示例。
+- Classify explicit Go subscription routes independently of frozen quota-query snapshots, repair historical API/Plan splits, expose channel billing controls, and add optional dashboard links to custom balance cards.
+
 - 修复 Agent Teams 在默认关闭“包含子代理”时遗漏成员费用的问题：正确读取宿主团队快照，统一会话徽章、当前对话统计、明细和会话列表的合计范围。感谢 [@KURISUNO4](https://github.com/KURISUNO4) 在 [#420](https://github.com/Han-1413141/dsh-cost-meter/issues/420) 提供复现数据、根因定位及修复建议。
 - Fix Agent Teams cost aggregation with the subagent setting off; keep badge, selected-conversation statistics, details and session-list totals consistent without duplicating ledger entries.
 

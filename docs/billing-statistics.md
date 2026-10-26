@@ -2,6 +2,12 @@
 
 ## English
 
+### Channel billing
+
+In **Cost → Overview → Channel billing**, select a channel and choose Automatic, Plan subscription or Metered API. The choice applies to its models; individual model overrides take priority. Saving updates historical API/Plan classification without changing tokens, API-equivalent amounts or recorded exchange rates. Quota-query switches remain independent.
+
+Automatic classification recognizes `dsh-opencode-go`, `opencode-go` and `opencode-go-plus` (including the `llm-` prefix) as Go subscriptions even when `planBilling.autoProviders` is empty. Explicit model/channel/family choices still take priority. Existing records receive a one-time classification correction. Other ambiguous channels continue using their saved automatic membership; `opencode-zen` remains metered API.
+
 ### Conversation cost views
 
 The conversation **Cost details** view defaults to the treemap and offers four layouts over the same complete cost totals:
@@ -52,6 +58,12 @@ Cache hit rate is `cacheRead / (input + cacheRead + cacheWrite)`. Token composit
 The statistics screen uses DSH's package-local asynchronous module loader. Since **1.8.2**, the main and statistics Remote contributions have distinct registration identities; their combined lifecycle is tested against the real **0.2.0-rc.2** client registry/gateway (the 0.1.7-rc.2 leg was dropped together with the 0.2.0 floor). That loader exists throughout the supported host range, so hosts below the floor are refused at admission instead of showing an in-app upgrade message. Both shipped client files stay below the 256 KiB per-file limit.
 
 ## 简体中文
+
+### 渠道计费方式
+
+在 **费用 → 概览 → 渠道计费方式** 中选择渠道，再选择“自动”“Plan 订阅”或“API 按量”。设置适用于该渠道所有模型，模型单独设置优先。保存后更新历史 API/Plan 归属，保留 Token、API 等值金额和记录时的汇率金额。额度查询开关独立控制。
+
+自动归类按明确的订阅渠道识别 `dsh-opencode-go`、`opencode-go`、`opencode-go-plus`，支持 `llm-` 前缀，不再受空 `planBilling.autoProviders` 列表影响。用户显式设置的模型、原始渠道或套餐家族分类优先。已有账本启动后进行一次分类修正；其他无法仅凭渠道名判断的来源继续使用已保存的自动归属，`opencode-zen` 仍为 API 按量。
 
 ### 对话费用视图
 
