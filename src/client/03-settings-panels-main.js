@@ -849,7 +849,7 @@
     /** Plan 提供商显示名(复用额度面板的 labelKey;Go 单独)。 */
     function planProviderLabelOf(id, t) {
       if (id === 'go') return 'OpenCode Go / Go Plus'
-      const added = { codex: 'Codex / ChatGPT', 'volcengine-agent': 'Volcengine Agent Plan', 'tencent-coding': 'Tencent Coding Plan', 'tencent-token': 'Tencent Token Plan', 'baidu-coding': 'Baidu Qianfan Coding Plan' }
+      const added = { codex: 'Codex / ChatGPT', 'volcengine-agent': 'Volcengine Agent Plan', 'tencent-coding': 'Tencent Coding Plan', 'tencent-token': 'Tencent Token Plan' }
       if (added[id]) return added[id]
       const row = CODING_PLAN_ROWS.find(r => r.id === id)
       return row !== undefined ? t(row.labelKey) : id
@@ -1510,6 +1510,7 @@
       { id: 'volcengine', labelKey: 'codingPlanVolcengine' },
       { id: 'qwen', labelKey: 'codingPlanQwen' },
       { id: 'mimo', labelKey: 'codingPlanMimo' },
+      { id: 'baidu-coding', labelKey: 'codingPlanBaidu' },
       { id: 'workbuddy', labelKey: 'wbT' },
       { id: 'factory', labelKey: 'codingPlanFactory' },
     ]

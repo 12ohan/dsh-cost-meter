@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- 新增百度千帆 Token Plan 个人版额度查询，支持积分制和 Token 制、控制台 Cookie 凭据及登录过期提示；感谢 [@minevery512](https://github.com/minevery512) 在 [#418](https://github.com/Han-1413141/dsh-cost-meter/issues/418) 提出需求。[配置说明](docs/baidu-token-plan.md)。
+- 验证 billion-context 0.1.208 与 dsh-codex-subscription 3.1.7 的实际发布包，更新兼容基线与 CI，处理自动监控 [#416](https://github.com/Han-1413141/dsh-cost-meter/issues/416)、[#417](https://github.com/Han-1413141/dsh-cost-meter/issues/417)。
+- Add Baidu Qianfan Token Plan Personal quota via console Cookie, with separate credits/Token units; validate the latest billion-context and Codex subscription packages.
+
 ## [1.9.41] - 2026-10-26
 
 - 修复 Web 端 `conversation.chat.turnTail` 缺少 chain 插槽选择器导致的加载失败（[#413](https://github.com/Han-1413141/dsh-cost-meter/issues/413)，由 [@korion3](https://github.com/korion3) 报告、定位并在 [#414](https://github.com/Han-1413141/dsh-cost-meter/pull/414) 提供修复）。
