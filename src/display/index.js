@@ -210,6 +210,7 @@ window.__ModuleLoader__.load({
     }
     function DetailedSettings({ state, draft, setDraft, t, locale, numInput, displayOptions, CURRENCY_PRESETS, USAGE_POSITION_SWITCHABLE, open = false }) {
       const config=state.config
+      const text = (zh, en) => locale === 'en' ? en : zh
       const setField=(key,value)=>setDraft(previous=>({...previous,[key]:value}))
       return el('details', { className: 'cm-display-details', open: open || undefined },
         el('summary', null, locale === 'en' ? 'More options · layout, currency and refresh intervals' : '详细设置 · 布局、金额格式与刷新频率'),
@@ -343,7 +344,7 @@ window.__ModuleLoader__.load({
                 if (draft === null) return
                 setDraft({ ...draft, balance: { ...(draft.balance ?? { display: 'both', refreshMinutes: 5, showProgressBar: false, budgetCap: null }), budgetCap: v > 0 ? v : null } })
               }),
-              el('span', { className: 'cm-hint' }, t('balanceBudgetCapHint'))),
+              el('span', { className: 'cm-hint' }, text('留空则优先使用 API 返回的 max_budget;仍无则显示整条浅蓝', 'Leave empty to use API max_budget; if still missing, show full light-blue bar'))),
             // 进度条方向(issue #67):四组条独立选择剩余/已用方向,默认保持各自原设计。
             el('div', { className: 'cm-field' },
               el('label', null, t('barDirectionsTitle')),
@@ -360,7 +361,7 @@ window.__ModuleLoader__.load({
                 },
                 el('option', { value: 'remaining' }, t('barDirectionRemaining')),
                 el('option', { value: 'used' }, t('barDirectionUsed'))))),
-              el('span', { className: 'cm-hint' }, t('barDirectionsHint'))),
+              el('span', { className: 'cm-hint' }, text('各组进度条可独立选择填充方向:「剩余方向」满条起步、随消耗递减;「已用方向」空条起步、随消耗填满。', 'Each group of bars can independently choose its fill direction: "Remaining" starts full and drains with usage; "Used" starts empty and fills up.'))),
             el('div', { className: 'cm-field' },
               el('label', null, t('customBalanceDisplayLabel')),
               el('select', {

@@ -249,6 +249,7 @@
           refreshMinutes: typeof v.balance?.refreshMinutes === 'number' && Number.isFinite(v.balance.refreshMinutes) ? v.balance.refreshMinutes : 5,
           showProgressBar: v.balance?.showProgressBar === true,
           showSource: v.balance?.showSource === true,
+          officialChannelOnly: v.balance?.officialChannelOnly === true,
           budgetCap: typeof v.balance?.budgetCap === 'number' && Number.isFinite(v.balance.budgetCap) && v.balance.budgetCap > 0 ? v.balance.budgetCap : null,
           clickHintSeen: v.balance?.clickHintSeen === true,
         },
@@ -1948,6 +1949,13 @@
           wide ? el(Fragment, null, el('span', { className: 'cm-balance-name' }, balanceLabel(t, state.config), rechargeLinkEl(t)), el('span', { className: 'cm-num cm-bal-amt' }, formatBalanceMoney(balance.totalBalance, state.config, balance.currency)), state.reconcile?.ok === false ? ' ⚠' : '') : el(WalletIcon, { size: 16 })))
     }
 
+    function officialBalanceVisible(state, provider, preview) {
+      if (preview || state.config?.balance?.officialChannelOnly !== true) return true
+      const official = value => /^(?:llm-)?deepseek(?:-official|-account)?$/.test(String(value).trim().toLowerCase())
+      return typeof provider === 'string' && provider.trim() ? official(provider)
+        : Object.keys(state.today?.byProviderModel ?? {}).some(key => official(key.split(':')[0]))
+    }
+
     function balanceLabel(t, config) { return t(config?.balance?.showSource === true ? 'officialBalance' : 'balance') }
 
     function officialBalanceTooltip(t, balance, config, reconcile, refresh) {
@@ -3464,15 +3472,15 @@
       useProjectionRefresh(props, projectionUsage)
       const current = costStore?.state
       const state = current ? { ...current, config: peakConfigForState(current, projectionUsage?.provider) } : null
-      return state ? renderSidebarFooter(state, !!props.wide, props.api) : null
+      return state ? renderSidebarFooter(state, !!props.wide, props.api, false, projectionUsage?.provider) : null
     }
 
     // Shared presentation only: no store, projection or quota subscription.
-    function renderSidebarFooter(state, wide, api, preview = false) {
+    function renderSidebarFooter(state, wide, api, preview = false, provider) {
       const config = peakConfigForState(state)
       const t = makeT(resolveLocale(config))
       const showBalance = (config.balance?.display === 'sidebar' || config.balance?.display === 'both')
-        && config.hideOfficialBalance !== true
+        && config.hideOfficialBalance !== true && officialBalanceVisible(state, provider, preview)
       // 多配置形态(v1.7.0,issue #79):可见性逐条判定(可见条目集由
       // visibleCustomEntries 统一给出;组件内部逐条按快照状态渲染)。
       const visibleCustom = visibleCustomEntries(state, config)
