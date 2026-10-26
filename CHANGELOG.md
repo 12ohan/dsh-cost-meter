@@ -2,10 +2,11 @@
 
 ## [Unreleased]
 
-- 新增官方余额“仅官方渠道显示”开关，默认关闭；按当前会话渠道显示侧栏官方余额，无渠道投影时参考今日官方调用，设置页与预览不受渠道限制。感谢 [@littleyellowbicycle](https://github.com/littleyellowbicycle) 在 [#421](https://github.com/Han-1413141/dsh-cost-meter/issues/421) 提出需求与判定规则。
 - 新增百度千帆 Token Plan 个人版额度查询，支持积分制和 Token 制、控制台 Cookie 凭据及登录过期提示；感谢 [@minevery512](https://github.com/minevery512) 在 [#418](https://github.com/Han-1413141/dsh-cost-meter/issues/418) 提出需求。[配置说明](docs/baidu-token-plan.md)。
 - 验证 billion-context 0.1.208 与 dsh-codex-subscription 3.1.7 的实际发布包，更新兼容基线与 CI，处理自动监控 [#416](https://github.com/Han-1413141/dsh-cost-meter/issues/416)、[#417](https://github.com/Han-1413141/dsh-cost-meter/issues/417)。
 - Add Baidu Qianfan Token Plan Personal quota via console Cookie, with separate credits/Token units; validate the latest billion-context and Codex subscription packages.
+- 新增官方余额“仅官方渠道显示”开关，默认关闭；按当前会话渠道显示侧栏官方余额，无渠道投影时参考今日官方调用，设置页与预览不受渠道限制。感谢 [@littleyellowbicycle](https://github.com/littleyellowbicycle) 在 [#421](https://github.com/Han-1413141/dsh-cost-meter/issues/421) 提出需求与判定规则。
+- Add an opt-in official-channel filter for the sidebar balance, with current-session precedence and today's official-call fallback; keep settings and previews accessible.
 
 ## [1.9.41] - 2026-10-26
 
