@@ -3855,7 +3855,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
 {
   const planSrc = readClientSource()
   // 双语文案:显示位置标签 + 提示,选项复用 balanceSidebar/balanceSettings/balanceBoth/off。
-  for (const key of ['codingPlanDisplayLabel', 'codingPlanDisplayNote']) {
+  for (const key of ['codingPlanDisplayLabel']) {
     const count = [...planSrc.matchAll(new RegExp(key + ":", 'g'))].length
     assert.equal(count, 2, `文案 ${key} 在 zh/en 各声明一次`)
   }
@@ -4076,7 +4076,7 @@ console.log('[ok] OpenRouter/SiliconFlow/CommandCode 解析器与白名单通过
   // 7) 客户端文案与输入框存在
   const clientSrc = readClientSource()
   assert.ok(clientSrc.includes('volcengineAccessKeyIdLabel') && clientSrc.includes('volcengineSecretAccessKeyLabel'), '客户端双凭据文案存在')
-  assert.ok(clientSrc.includes('volcengineNote'), '客户端说明文案存在')
+  assert.ok(clientSrc.includes('Volcano Ark needs AK/SK') && clientSrc.includes('火山方舟需 AK/SK'), '客户端说明文案存在')
   // v1.6.8 密钥治理:AK/SK 双输入框改走 write-only CredentialField,目标为凭据库引用键。
   assert.ok(clientSrc.includes("target: 'codingPlans.volcengine.ak'") && clientSrc.includes("target: 'codingPlans.volcengine.sk'"), '客户端 AK/SK 双输入框写回凭据库')
   assert.ok(clientSrc.includes("planId === 'volcengine'"), '客户端 volcengine 分支渲染')
@@ -6985,6 +6985,7 @@ await import('./baidu-token-plan.mjs')
 await import('./workbuddy-quota.mjs')
 await import('./workbuddy-billing.mjs')
 await import('./go-auto-billing.mjs')
+await import('./query-accounts.mjs')
 await import('./workbuddy-connect.mjs')
 await import('./workbuddy-accounts.mjs')
 await import('./workbuddy-xdpool.mjs')

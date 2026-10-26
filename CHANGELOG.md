@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- 支持同一来源保存多个查询账号，在设置中选择余额或额度展示账号；凭据分开存储，切换时取消旧请求并清除缓存及采样基准。感谢 [@376797822](https://github.com/376797822) 在 [#427](https://github.com/Han-1413141/dsh-cost-meter/issues/427) 提出多账号查询和展示选择需求。[使用说明](docs/query-accounts.md)。
+- Add named query accounts with isolated credentials and a selected account for balances/quotas; cancel old requests and reset observation baselines on switching.
+
 - 修复 Go 订阅在自动归属列表为空时仍被记入 API 花费的问题，增加历史分类修正及概览页“渠道计费方式”入口。感谢 [@ZIye1208](https://github.com/ZIye1208) 在 [#424](https://github.com/Han-1413141/dsh-cost-meter/issues/424) 提供复现、根因定位和改进建议。
 - 自定义余额新增逐条配置的跳转链接，侧栏余额行与进度卡支持打开中转站账户页面，点击链接不触发余额刷新。感谢 [@yi-Xu-0100](https://github.com/yi-Xu-0100) 在 [#425](https://github.com/Han-1413141/dsh-cost-meter/issues/425) 提出需求并提供界面示例。
 - Classify explicit Go subscription routes independently of frozen quota-query snapshots, repair historical API/Plan splits, expose channel billing controls, and add optional dashboard links to custom balance cards.

@@ -104,6 +104,7 @@ jobs:
           node test/session-list-browser.mjs
           node test/session-costs-browser.mjs
           node test/billing-export-browser.mjs
+          node test/query-accounts-browser.mjs
           node test/session-costs-performance-browser.mjs
           node test/statistics-cache.mjs
           node test/statistics-warmup.mjs

@@ -136,8 +136,9 @@ const Card = factory(() => ({ createElement: el, useState: value => [value, () =
   useQuotaRefresh: () => [false, null, () => {}], CredentialField: 'CredentialField', QuotaCard: 'QuotaCard',
   resolveLocale: () => 'en', quotaPlacementValue: () => 'both', quotaPlacementOptions: () => [], numInput: () => null,
 })
-const tree = Card({ state: { config: { codingPlans: {} } }, api: {}, t: key => key, draft: null,
+const route = Card({ state: { config: { codingPlans: {} } }, api: {}, t: key => key, draft: null,
   setDraft() {}, planId: 'baidu-coding', labelKey: 'codingPlanBaidu' })
+const tree = route.type(route.props)
 assert.match(JSON.stringify(tree.props.configNode), /Cookie \(console\.bce\.baidu\.com\)/)
 assert.match(JSON.stringify(tree.props.configNode), /BAIDU_QIANFAN_COOKIE/)
 assert.match(JSON.stringify(tree.props.configNode), /tokenPlanPersonal\/resource/)

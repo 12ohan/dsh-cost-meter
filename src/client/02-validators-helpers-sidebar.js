@@ -132,6 +132,7 @@
         for (const id of Object.keys(v.prices.models)) models[id] = parsePrice(v.prices.models[id], path + '.prices.models.' + id)
       }
       return {
+        queryAccounts: v.queryAccounts && typeof v.queryAccounts === 'object' ? v.queryAccounts : {},
         locale: v.locale === 'zh' || v.locale === 'en' || v.locale === 'auto' ? v.locale : 'auto',
         position: v.position === 'header' || v.position === 'off' ? v.position : 'dock',
         sidebar: v.sidebar !== false,

@@ -1117,7 +1117,7 @@
           el('button', { className: 'cm-btn small', onClick: doRefresh, disabled: busy }, busy ? t('refreshing') : t('refreshBalance'))),
         body,
         el('label', null, t('balanceApiKey')),
-        el(CredentialField, { target: 'balance', configured: balance.keyConfigured, source: balance.keySource, t, api, placeholder: 'sk-…' }),
+        el(AccountCredentialLauncher, { state, draft, setDraft, target: 'balance', configured: balance.keyConfigured, source: balance.keySource, t, api, placeholder: 'sk-…' }),
         el('p', { className: 'cm-hint' }, t('balanceKeyHint')),
         reconcile !== undefined && reconcile.ok === false ? el('div', { className: 'cm-bal-line warn' }, '⚠ ' + reconcile.message) : null,
         el('label', { className: 'cm-check' },
@@ -1397,7 +1397,7 @@
         el('div', { className: 'cm-field' }, el('label', null, t('goQuotaRefreshIntervalLabel')),
           numInput({ value: cfg.refreshMinutes }, v => set('refreshMinutes', Math.min(1440, Math.max(1, Math.floor(v)))))),
         el('label', null, t('goQuotaKeyLabel')),
-        el(CredentialField, { target: 'goQuota', configured: config.goQuota?.keyConfigured === true, source: config.goQuota?.keySource, t, api, placeholder: 'sk-…' }))
+        el(AccountCredentialLauncher, { state: { config }, draft, setDraft, target: 'goQuota', configured: config.goQuota?.keyConfigured === true, source: config.goQuota?.keySource, t, api, placeholder: 'sk-…' }))
     }
 
     function GoQuotaCard(props) {
@@ -1523,6 +1523,12 @@
       return planSettingsPage ??= require.async('./client.plan-settings.js').then(module => module.mount({ useQuotaRefresh, miniMaxWindowsOf, MiniMaxPlanCard, barDirectionOf, quotaWindowRow, codingPlanWindowLabel, codingPlanWindowEntries, numInput, CredentialField, QuotaCard, resolveLocale, formatMoneyUsd, quotaPlacementValue, quotaPlacementPatch, quotaPlacementOptions })).catch(error => { planSettingsPage = null; throw error })
     }
     function PlanQuotaCard(props) { return el(BillingStatistics, { ...props, load: loadPlanSettings }) }
+    function AccountCredentialLauncher(props) {
+      const [open, setOpen] = useState(false)
+      return open || props.state.config.queryAccounts?.[props.target]?.accounts?.length
+        ? el(PlanQuotaCard, { ...props, mode: 'credential' })
+        : el(Fragment, null, el(CredentialField, props), el('button', { type: 'button', className: 'cm-btn small', onClick: () => setOpen(true) }, resolveLocale(props.state.config) === 'en' ? 'Manage accounts' : '管理账号'))
+    }
 
     /** 额度区总装:四类来源归一成同一串卡片,已启用的排前面(顺序纯由 enabled 派生,不落盘)。 */
     function QuotasSection(props) {
